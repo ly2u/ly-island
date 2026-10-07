@@ -72,7 +72,8 @@ window.addEventListener('online',()=>{if(dirty)autosaveDraft().catch(()=>{});});
 window.addEventListener('pagehide',()=>{if(dirty)rememberInput();});
 const text=(tag,value,cls)=>{const e=document.createElement(tag);e.textContent=value;if(cls)e.className=cls;return e;};
 function status(message,error=false,id='status'){$(id).textContent=message;$(id).classList.toggle('error',error);}
-async function refreshSession(){const data=await(await fetch('/api/auth/session')).json();if(!data.authenticated){csrfToken=null;throw new Error('请重新登录。');}csrfToken=data.csrfToken;if(accountUsername!==data.username){accountUsername=data.username;loadLocalDrafts();}$('account-name').textContent=data.username;$('account-settings-name').textContent=data.username;return data;}
+async function refreshSession(){const data=await(await fetch('/api/auth/session')).json();if(!data.authenticated){csrfToken=null;throw new Error('请重新登录。');}csrfToken=data.csrfToken;if(accountUsername!==data.username){accountUsername=data.username;loadLocalDrafts();}$('account-name').textContent=data.username;$('account-settings-name').textContent=data.username;$('password-mfa-label').hidden=!data.twoFactorEnabled;$('password-mfa-code').required=Boolean(data.twoFactorEnabled);return data;}
+window.addEventListener('ly-session-updated',()=>{sessionReady=refreshSession();sessionReady.catch(()=>{$('session-expired-dialog').showModal();});});
 let sessionReady=refreshSession();sessionReady.catch(()=>{$('session-expired-dialog').showModal();});
 async function request(path,options={}){await sessionReady;const response=await fetch(path,{...options,headers:{'Content-Type':'application/json','X-Requested-With':'rqly-editor','X-CSRF-Token':csrfToken,...options.headers}});const data=await response.json();if(response.status===401){if(!$('session-expired-dialog').open)$('session-expired-dialog').showModal();}if(!response.ok)throw Object.assign(new Error(data.error||'暂时未能完成，请重试。'),{status:response.status});return data;}
 $('retry-session').addEventListener('click',async()=>{try{sessionReady=refreshSession();await sessionReady;await load();if(!island)await loadIsland();$('session-expired-dialog').close();if(dirty)autosaveDraft().catch(()=>{});}catch(error){$('session-status').textContent=error.message;}});
@@ -243,9 +244,9 @@ $('password-form').addEventListener('submit',async event=>{
  event.preventDefault();if($('change-password-button').disabled)return;
  if($('new-password').value!==$('confirm-password').value){$('confirm-password').setCustomValidity('两次输入的新密码不一致。');$('confirm-password').reportValidity();status('两次输入的新密码不一致。',true,'password-status');return;}
  if((dirty||islandDirty)&&!confirm('还有内容或岛屿修改没有保存。修改密码后需要重新登录，仍要继续吗？'))return;
- const payload={currentPassword:$('current-password').value,newPassword:$('new-password').value,confirmPassword:$('confirm-password').value};$('change-password-button').disabled=true;status('正在保存新密码…',false,'password-status');
+ const payload={currentPassword:$('current-password').value,newPassword:$('new-password').value,confirmPassword:$('confirm-password').value,code:$('password-mfa-code').value};$('change-password-button').disabled=true;status('正在保存新密码…',false,'password-status');
  try{await request('/api/admin/password',{method:'POST',body:JSON.stringify(payload)});clearPasswordForm();dirty=false;islandDirty=false;csrfToken=null;location.replace('/login?changed=1');}
- catch(error){status(error.message,true,'password-status');}finally{payload.currentPassword='';payload.newPassword='';payload.confirmPassword='';$('change-password-button').disabled=false;}
+ catch(error){status(error.message,true,'password-status');}finally{payload.currentPassword='';payload.newPassword='';payload.confirmPassword='';payload.code='';$('change-password-button').disabled=false;}
 });
 
 queueMicrotask(()=>{fill();navigate(new URLSearchParams(location.search).get('view')||'overview',{replace:false});load().then(()=>{if(initialDraftId&&!['overview','island','account','media','help','ai','mailbox','organization'].includes(currentView)&&allEditorDrafts().some(d=>d.id===initialDraftId))openEditorDraft(initialDraftId);});loadIsland();});

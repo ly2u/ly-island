@@ -115,6 +115,33 @@ with tempfile.TemporaryDirectory(prefix='ly-restore-check-') as directory:
             raise SystemExit('恢复后的管理员密码存档无效。')
         if names[account_name].mode & 0o077:
             raise SystemExit('备份中的管理员密码存档权限过宽。')
+    mfa_name = 'srv/ly-data/sites/admin-mfa.json'
+    key_name = 'srv/ly-data/sites/admin-mfa-key.json'
+    if mfa_name in names:
+        mfa = json.loads((Path(directory) / mfa_name).read_text())
+        if (names[mfa_name].mode & 0o077 or mfa.get('schemaVersion') != 1
+                or type(mfa.get('enabled')) is not bool
+                or not re.fullmatch(r'(?:[a-f0-9]{32})?', mfa.get('authVersion', 'invalid'))
+                or (mfa['enabled'] and not mfa['authVersion'])):
+            raise SystemExit('两步验证存档格式或权限无效。')
+        hashes = mfa.get('recoveryHashes')
+        if not isinstance(hashes, list) or len(hashes) > 10 or len(set(hashes)) != len(hashes) or any(not isinstance(v, str) or not re.fullmatch(r'[a-f0-9]{64}', v) for v in hashes):
+            raise SystemExit('恢复码摘要格式无效。')
+        def encrypted(value):
+            return isinstance(value, dict) and all(isinstance(value.get(k), str) and re.fullmatch(r'[a-f0-9]{%d}' % n, value[k]) for k, n in [('iv',24), ('tag',32), ('ciphertext',64)])
+        if mfa['enabled'] and not encrypted(mfa.get('secret')):
+            raise SystemExit('验证器加密密钥格式无效。')
+        if not mfa['enabled'] and (mfa.get('secret') is not None or hashes):
+            raise SystemExit('关闭的两步验证状态无效。')
+        pending = mfa.get('pending')
+        if pending is not None and (not isinstance(pending, dict) or not encrypted(pending.get('secret'))):
+            raise SystemExit('未完成绑定的两步验证状态无效。')
+        if (mfa['enabled'] or pending is not None) and key_name not in names:
+            raise SystemExit('备份缺少两步验证解密密钥。')
+    if key_name in names:
+        key_data = json.loads((Path(directory) / key_name).read_text())
+        if names[key_name].mode & 0o077 or key_data.get('schemaVersion') != 1 or not re.fullmatch(r'[a-f0-9]{64}', key_data.get('key', '')):
+            raise SystemExit('两步验证解密密钥权限或格式无效。')
     ai_root = Path(directory) / 'opt/ly-stack/apps/personal-ai'
     if (ai_root / 'SOURCE-MANIFEST.json').exists():
         ai_manifest=json.loads((ai_root / 'SOURCE-MANIFEST.json').read_text())

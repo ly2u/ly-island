@@ -15,6 +15,7 @@ rqly.com 的当前网站源码快照：公众以三维浮空岛访问书屋、�
 | `scripts/`、`systemd/` | 当前 VPS 运维脚本；部分依赖服务器独有材料，详见部署说明 |
 | `docs/REVIEW.md` | 审查范围、入口、数据流、测试与已知限制 |
 | `docs/DEPLOYMENT.md` | 本地复现、部署边界和 CivilFlow 获取方式 |
+| `docs/ADMIN-MFA.md` | 可自行开启的管理员两步验证、恢复码、备份与恢复 |
 | `docs/RELEASE.md` | 按 Git 标签发布、预检查、自动回滚与手动撤销 |
 | `docs/decisions/` | 架构决策记录：已定的方向、待实施的改动与实施顺序 |
 | `docs/provenance/` | VPS 源码摘要与来源记录，旧静态/二进制清单只作为历史证据 |
