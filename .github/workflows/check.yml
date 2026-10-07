@@ -12,7 +12,7 @@ jobs:
       run:
         working-directory: apps/rqly-sites
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -29,7 +29,7 @@ jobs:
       run:
         working-directory: apps/ly-island-preview
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -40,7 +40,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Release flow in a simulated environment (fake docker, no network or production paths)
         run: |
           python3 scripts/check-release.py
@@ -48,5 +48,5 @@ jobs:
   bridge:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: python3 -m py_compile apps/personal-ai/bridge.py scripts/*.py
