@@ -227,18 +227,19 @@ def check_sites():
 ASSET_REFERENCE = re.compile(r'(?:src|href)="(/island/[^"?#]+)"')
 
 
-def check_island(expected_index_sha):
-    def index_matches():
-        status, body = http_get('/')
-        if status != 200:
-            return False, 'HTTP %d' % status
-        actual = hashlib.sha256(body).hexdigest()
-        return actual == expected_index_sha, '首页内容与发布版本不一致'
+def check_island(expected_top):
+    """expected_top：岛屿 dist 顶层文件 {文件名: sha256}。逐个确认线上实际返回的内容，再确认首页引用的资源都能访问。"""
+    for name, digest in sorted(expected_top.items()):
+        path = '/' if name == 'index.html' else '/island/' + name
 
-    wait_for('https://%s/ 返回本次发布的岛屿首页' % SITE_HOST, index_matches)
+        def content_matches(path=path, digest=digest):
+            status, body = http_get(path)
+            if status != 200:
+                return False, 'HTTP %d' % status
+            return hashlib.sha256(body).hexdigest() == digest, '内容与预期版本不一致'
+        wait_for('https://%s%s 返回预期版本' % (SITE_HOST, path), content_matches)
     _, body = http_get('/')
     references = sorted(set(ASSET_REFERENCE.findall(body.decode('utf-8', 'replace'))))
-    references.append('/island/admin-scene.js')
     for reference in references:
         def asset_ok(reference=reference):
             status, _ = http_get(reference)
@@ -436,7 +437,7 @@ def _check_into(folder, tag, commit, release_id):
     append_history({'event': 'checked', 'release': release_id, 'commit': commit})
 
     live_image = image_id(CURRENT_TAG)
-    live_index = ISLAND / 'dist' / 'index.html'
+    differences = island_differences(record)
     lines = [
         '预检查通过：%s' % release_id,
         '  标签 %s → 提交 %s' % (tag, commit),
@@ -447,7 +448,7 @@ def _check_into(folder, tag, commit, release_id):
         '与线上的差别：',
         '  当前发布：%s' % (current.get('releaseId') if current else '（尚无，迁移前状态）'),
         '  sites 镜像：%s' % ('不变' if live_image == built_id else '将切换（%s → %s）' % ((live_image or '无')[:19], built_id[:19])),
-        '  岛屿首页：%s' % ('不变' if live_index.exists() and sha256_file(live_index) == island_files['index.html'] else '将更新'),
+        '  岛屿：%s' % ('不变' if not differences else '将更新（%d 个文件不同，例如 %s）' % (len(differences), '、'.join(differences[:3]))),
     ]
     if current and current.get('commit'):
         stat = git('diff', '--stat', current['commit'], commit, check=False)
@@ -485,14 +486,39 @@ def snapshot_island(rollback_dir):
             bundle.add(ISLAND / 'src', arcname='src')
 
 
-def rollback_manifest_sha(rollback_dir):
-    """快照里 SOURCE-MANIFEST.json 的哈希；没有时返回 None。"""
-    with tarfile.open(rollback_dir / 'island-source.tar') as bundle:
-        try:
-            member = bundle.extractfile('SOURCE-MANIFEST.json')
-        except KeyError:
-            return None
-        return hashlib.sha256(member.read()).hexdigest()
+def top_hashes(folder):
+    """目录顶层普通文件的 {文件名: sha256}，例如岛屿 dist 的 index.html、admin-scene.js。"""
+    folder = Path(folder)
+    return {path.name: sha256_file(path) for path in sorted(folder.iterdir()) if path.is_file()} if folder.is_dir() else {}
+
+
+def release_top_hashes(record):
+    return {name: digest for name, digest in record['islandFiles'].items() if '/' not in name}
+
+
+def island_differences(record):
+    """线上岛屿与发布版本不一致的文件：比较全部构建产物，以及随产物同步的岛屿源码。空列表表示无需更新。"""
+    differences = []
+    for name, digest in sorted(record['islandFiles'].items()):
+        live = ISLAND / 'dist' / name
+        if not live.is_file() or sha256_file(live) != digest:
+            differences.append('dist/' + name)
+
+    def source_files(base):
+        files = {name: sha256_file(base / name) for name in ISLAND_SOURCE_FILES if (base / name).is_file()}
+        if (base / 'src').is_dir():
+            files.update({'src/' + name: digest for name, digest in tree_hashes(base / 'src').items()})
+        return files
+    expected = source_files(RELEASES / record['id'] / 'src' / 'apps' / 'ly-island-preview')
+    actual = source_files(ISLAND)
+    differences += sorted(name for name in set(expected) | set(actual) if expected.get(name) != actual.get(name))
+    return differences
+
+
+def _fault(name):
+    """仅供 scripts/check-release.py 在指定位置模拟失败；生产环境不设置 LY_TEST_FAULT。"""
+    if os.environ.get('LY_TEST_FAULT') == name:
+        raise ReleaseError('测试注入的故障：' + name)
 
 
 def atomic_install(source_file, target, mode=0o644):
@@ -536,6 +562,7 @@ def install_island(record):
     for path in sorted(built.iterdir()):
         if path.is_file() and path.name != 'index.html':
             atomic_install(path, dist / path.name)
+    _fault('island-before-index')
     atomic_install(built / 'index.html', dist / 'index.html')
     record_island_manifest(folder / 'src')
 
@@ -561,7 +588,10 @@ def restore_island(rollback_dir, source_root):
         if (ISLAND / 'src').exists():
             shutil.rmtree(ISLAND / 'src')
         bundle.extractall(ISLAND, filter='data')
-    record_island_manifest(source_root)
+    # 快照里的 SOURCE-MANIFEST.json 已原样恢复：它列出的文件都已恢复为发布前的内容，备份校验仍然成立。
+    # 只有快照里没有清单时才重新生成。
+    if 'SOURCE-MANIFEST.json' not in names:
+        record_island_manifest(source_root)
 
 
 def switch_sites(target_image, log):
@@ -575,20 +605,21 @@ def run_backup():
         raise ReleaseError('发布前备份失败，未做任何修改。')
 
 
-def undo(release_folder, previous_image, previous_index_sha, log):
-    """回到发布前的状态：恢复岛屿文件和源码，镜像标签指回之前的镜像，然后再做健康检查。"""
+def undo(release_folder, previous_image, island_started, log):
+    """回到发布前的状态，然后再做健康检查。
+
+    island_started：岛屿更新是否已经开始。一旦开始，不论进行到哪一步，都完整恢复快照
+    （顶层文件、岛屿源码、SOURCE-MANIFEST.json），不靠比较某个文件的哈希来猜测是否需要恢复。
+    """
     rollback_dir = release_folder / 'rollback'
-    live_index = ISLAND / 'dist' / 'index.html'
-    manifest = ISLAND / 'SOURCE-MANIFEST.json'
-    live_manifest_sha = sha256_file(manifest) if manifest.exists() else None
-    if not live_index.exists() or sha256_file(live_index) != previous_index_sha \
-            or live_manifest_sha != rollback_manifest_sha(rollback_dir):
+    if island_started:
         restore_island(rollback_dir, release_folder / 'src')
     if image_id(CURRENT_TAG) != previous_image:
         switch_sites(previous_image, log)
     check_sites()
-    if previous_index_sha:
-        check_island(previous_index_sha)
+    expected = top_hashes(rollback_dir / 'island-top')
+    if 'index.html' in expected:
+        check_island(expected)
 
 
 def command_deploy(release_id, skip_backup):
@@ -629,6 +660,7 @@ def command_deploy(release_id, skip_backup):
             save_release(record)
             append_history({'event': 'deploy-started', 'release': release_id, 'previousImage': previous_image})
 
+            island_started = False
             try:
                 if previous_image != record['image']['id']:
                     say('切换 sites 镜像并等待容器健康……')
@@ -636,16 +668,18 @@ def command_deploy(release_id, skip_backup):
                 else:
                     say('sites 镜像未变化，不重建容器。')
                 check_sites()
-                if previous_index_sha != record['islandIndexSha256']:
-                    say('更新岛屿静态资源……')
+                differences = island_differences(record)
+                if differences:
+                    say('更新岛屿（%d 个文件与发布版本不同，例如 %s）……' % (len(differences), '、'.join(differences[:3])))
+                    island_started = True
                     install_island(record)
                 else:
-                    say('岛屿首页未变化，不更新静态资源。')
-                check_island(record['islandIndexSha256'])
+                    say('岛屿产物和源码都与发布版本一致，不更新。')
+                check_island(release_top_hashes(record))
             except (Exception, KeyboardInterrupt) as error:  # 任何失败（包括中途按 Ctrl-C）都回滚
                 say('\n发布失败：%s\n开始自动回滚……' % error)
                 try:
-                    undo(folder, previous_image, previous_index_sha, log)
+                    undo(folder, previous_image, island_started, log)
                 except Exception as rollback_error:
                     record['state'] = 'rollback-failed'
                     record['failure'] = '%s；回滚失败：%s' % (error, rollback_error)
@@ -693,7 +727,7 @@ def command_rollback():
         with Lock(BACKUP_LOCK, '备份正在运行，请等它结束后再回滚。'), \
                 open(folder / 'deploy.log', 'a', encoding='utf-8') as log:
             say('撤销 %s，回到 %s……' % (record['id'], previous.get('releaseId') or '迁移前版本'))
-            undo(folder, previous['imageId'], previous.get('islandIndexSha256'), log)
+            undo(folder, previous['imageId'], True, log)
         record['state'] = 'rolled-back'
         record['failure'] = '手动撤销'
         save_release(record)

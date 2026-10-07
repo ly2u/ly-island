@@ -73,13 +73,14 @@ if args[0] == 'run':
         print('simulated check failure'); sys.exit(1)
     if 'npm run build' in command:
         digest = hashlib.sha256((host_dir / 'index.html').read_bytes())
+        admin = hashlib.sha256()
         for path in sorted((host_dir / 'src').rglob('*')):
-            digest.update(path.read_bytes())
-        h = digest.hexdigest()[:10]
+            (admin if path.name == 'admin-scene.js' else digest).update(path.read_bytes())
+        h, a = digest.hexdigest()[:10], admin.hexdigest()[:10]
         dist = host_dir / 'dist'; (dist / 'assets').mkdir(parents=True)
         (dist / 'assets' / ('island-%s.js' % h)).write_text("console.log('%s')" % h)
         (dist / 'assets' / ('island-%s.css' % h)).write_text('/* %s */' % h)
-        (dist / 'admin-scene.js').write_text('// admin %s' % h)
+        (dist / 'admin-scene.js').write_text('// admin %s' % a)
         broken = '<!-- BROKEN -->' if (root / 'BAD_ISLAND').exists() else ''
         (dist / 'index.html').write_text('<!doctype html>%s<script type="module" src="/island/assets/island-%s.js"></script>'
                                          '<link rel="stylesheet" href="/island/assets/island-%s.css">' % (broken, h, h))
@@ -202,6 +203,9 @@ def main():
                     target = island / 'dist' / self.path[len('/island/'):]
                     if target.is_file():
                         status, body = 200, target.read_bytes()
+                        stale = base / 'STALE_CONTENT'
+                        if stale.exists() and body == stale.read_bytes():
+                            body = b'// stale copy served instead of the new file'
                 self.send_response(status)
                 self.send_header('Content-Length', str(len(body)))
                 self.end_headers()
@@ -398,10 +402,60 @@ def main():
         expect(result.returncode != 0 and '恢复校验不一致' in result.stdout, '被改动的发布源码应使备份校验失败：\n' + result.stdout)
         groups += 1
 
+        # N. 只改后台场景：首页哈希不变，但后台场景产物变了，也必须发布
+        live_index_before = (island / 'dist' / 'index.html').read_bytes()
+        commit_7 = publish('v1.0.7', lambda: (author / 'apps' / 'ly-island-preview' / 'src' / 'admin-scene.js').open('a').write('\n// v1.0.7\n'))
+        seventh = release_id('v1.0.7', commit_7)
+        result = release('check', 'v1.0.7')
+        expect(result.returncode == 0, 'check v1.0.7 应通过：\n' + result.stdout)
+        built_7 = root / 'releases' / seventh / 'island-dist'
+        expect((built_7 / 'index.html').read_bytes() == live_index_before, '测试前提：只改后台场景时首页产物应不变')
+        expect((built_7 / 'admin-scene.js').read_bytes() != (island / 'dist' / 'admin-scene.js').read_bytes(), '测试前提：后台场景产物应变化')
+        result = release('deploy', seventh)
+        expect(result.returncode == 0, 'deploy v1.0.7 应成功：\n' + result.stdout)
+        expect((island / 'dist' / 'admin-scene.js').read_bytes() == (built_7 / 'admin-scene.js').read_bytes(), '后台场景应更新为发布版本')
+        expect(tree_digest(island / 'src') == tree_digest(root / 'releases' / seventh / 'src' / 'apps' / 'ly-island-preview' / 'src'), '岛屿源码应与发布版本一致')
+        expect(manifest_consistent(island), '发布后岛屿清单应与文件一致')
+        groups += 1
+
+        # O. 岛屿更新进行到一半失败（后台场景和源码已替换，首页和清单还没替换）：必须恢复完整快照
+        dist_before = {p.name: p.read_bytes() for p in (island / 'dist').iterdir() if p.is_file()}
+        source_before = tree_digest(island, skip=('dist', 'SOURCE-MANIFEST.json'))
+        manifest_before = (island / 'SOURCE-MANIFEST.json').read_bytes()
+        running_before = state()['running']
+        commit_8 = publish('v1.0.8', lambda: ((author / 'apps' / 'ly-island-preview' / 'src' / 'admin-scene.js').open('a').write('\n// v1.0.8\n'),
+                                              (author / 'apps' / 'ly-island-preview' / 'src' / 'main.js').open('a').write('\n// v1.0.8\n')))
+        eighth = release_id('v1.0.8', commit_8)
+        expect(release('check', 'v1.0.8').returncode == 0, 'check v1.0.8 应通过')
+        result = release('deploy', eighth, extra={'LY_TEST_FAULT': 'island-before-index'})
+        expect(result.returncode == 1 and '已自动回滚' in result.stdout, '中途失败应自动回滚：\n' + result.stdout)
+        dist_after = {p.name: p.read_bytes() for p in (island / 'dist').iterdir() if p.is_file()}
+        expect(dist_after == dist_before, '岛屿顶层文件（首页、后台场景）应全部恢复为发布前')
+        expect(tree_digest(island, skip=('dist', 'SOURCE-MANIFEST.json')) == source_before, '岛屿源码应恢复为发布前')
+        expect(manifest_consistent(island), '回滚后岛屿清单应与文件一致')
+        expect(json.loads((island / 'SOURCE-MANIFEST.json').read_text())['files'] == json.loads(manifest_before)['files'], '回滚后清单记录的文件应与发布前相同')
+        expect(state()['running'] == running_before, 'sites 应保持不变')
+        expect(json.loads((root / 'releases' / 'current.json').read_text())['releaseId'] == seventh, 'current.json 应仍为 v1.0.7')
+        groups += 1
+
+        # P. 文件已写入磁盘，但线上返回的仍是旧内容（例如缓存或挂载问题）：必须发现并回滚
+        dist_before = {p.name: p.read_bytes() for p in (island / 'dist').iterdir() if p.is_file()}
+        commit_9 = publish('v1.0.9', lambda: (author / 'apps' / 'ly-island-preview' / 'src' / 'admin-scene.js').open('a').write('\n// v1.0.9\n'))
+        ninth = release_id('v1.0.9', commit_9)
+        expect(release('check', 'v1.0.9').returncode == 0, 'check v1.0.9 应通过')
+        (base / 'STALE_CONTENT').write_bytes((root / 'releases' / ninth / 'island-dist' / 'admin-scene.js').read_bytes())
+        result = release('deploy', ninth)
+        expect(result.returncode == 1 and '已自动回滚' in result.stdout and 'admin-scene.js' in result.stdout,
+               '线上返回的后台场景不是新版本时应回滚：\n' + result.stdout)
+        expect({p.name: p.read_bytes() for p in (island / 'dist').iterdir() if p.is_file()} == dist_before, '岛屿顶层文件应恢复为发布前')
+        (base / 'STALE_CONTENT').unlink()
+        groups += 1
+
         server.shutdown()
         print('Release flow passed (%d groups): preflight leaves production untouched, tag must be merged, failed checks/'
               'config drift/tampered artifacts/failed backup block deploy, unhealthy sites or broken island roll back '
-              'automatically, chained manual rollback, backup verification covers release artifacts.' % groups)
+              'automatically, chained manual rollback, backup verification covers release artifacts, admin-scene-only '
+              'changes are released, a failure midway through the island update restores the full snapshot, and stale served content is detected.' % groups)
 
 
 

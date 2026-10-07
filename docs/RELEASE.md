@@ -161,11 +161,11 @@ python3 scripts/release.py deploy <报告里的发布编号>
 2. 运行 `backup.sh`：这期间 `sites` 和 `caddy` 会停止，网站暂时不可访问，时长与平时备份相同；
 3. 如果镜像有变化，切换 `ly-sites:current`，只重建 `sites` 容器，等待容器健康；
 4. 通过本机 Caddy 检查 `https://rqly.com/healthz`、`/api/posts`、`/notes` 和 `https://7zui.com/`；
-5. 如果岛屿有变化，先加入新的带哈希资源，再原子替换 `admin-scene.js`，最后替换 `index.html`；同步岛屿源码，重新生成 `SOURCE-MANIFEST.json`；
-6. 检查首页内容是否为本次发布的版本，以及首页引用的每个资源是否都能访问；
+5. 把线上岛屿与发布版本逐个文件比较（全部构建产物，加上随产物同步的岛屿源码）。只要有任何一个文件不同，就更新岛屿：先加入新的带哈希资源，再原子替换 `admin-scene.js` 等顶层文件，最后替换 `index.html`；同步岛屿源码，重新生成 `SOURCE-MANIFEST.json`。所以只改后台场景时也会发布；
+6. 逐个确认线上实际返回的 `index.html` 和 `admin-scene.js` 等顶层文件就是本次发布的版本，再确认首页引用的每个资源都能访问；
 7. 写入 `releases/current.json` 和 `releases/history.jsonl`。
 
-第 3 到 6 步任何一步失败都会**自动回滚**：恢复岛屿文件和源码，镜像指回原来的版本，再做一遍健康检查。
+第 3 到 6 步任何一步失败都会**自动回滚**：镜像指回原来的版本。如果岛屿更新已经开始，不论进行到哪一步，都完整恢复发布前的快照，包括顶层文件、岛屿源码和 `SOURCE-MANIFEST.json`。然后再做一遍健康检查，确认线上返回的首页和后台场景都是发布前的版本。新加入的带哈希资源会保留，旧页面可能还在引用它们，而快照里的清单没有列出它们，不影响备份校验。
 
 退出码：
 
@@ -221,8 +221,7 @@ for f in $B/island-top/*; do
   [ $n = index.html ] || { install -m 0644 $f $D/dist/$n.next && mv $D/dist/$n.next $D/dist/$n; }
 done
 install -m 0644 $B/island-top/index.html $D/dist/index.html.next && mv $D/dist/index.html.next $D/dist/index.html
-rm -rf $D/src && tar -xf $B/island-source.tar -C $D
-python3 /opt/ly-stack/scripts/record-island-source.py
+rm -rf $D/src && tar -xf $B/island-source.tar -C $D   # 同时恢复发布前的 SOURCE-MANIFEST.json
 ```
 
 最后打开首页确认，并运行一次 `bash scripts/backup.sh`。
@@ -273,6 +272,9 @@ python3 /opt/ly-stack/scripts/record-island-source.py
 - 未合并的标签被拒绝；
 - 检查失败、配置不一致、产物被改动、备份失败、线上地址本来就不通时不发布；
 - `sites` 不健康或岛屿异常时自动回滚；
+- 只改后台场景（首页产物不变）时也会发布；
+- 岛屿更新进行到一半失败时，完整恢复快照；
+- 文件已写入、但线上返回的仍是旧内容时，能发现并回滚；
 - 连续手动撤销；
 - 备份校验能发现被改动的发布产物。
 
