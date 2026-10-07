@@ -22,7 +22,10 @@
   if(last&&last.length){const range=document.createRange();range.setStart(last,last.length-1);range.setEnd(last,last.length);return range.getBoundingClientRect();}return element.getBoundingClientRect();
  }
  function previewRect(block,line,column){
-  const element=block.element,start=block.start+(element.tagName==='PRE'&&/^```/.test(lines[block.start])?1:0);
+  const element=block.element;
+  if(element.classList.contains('math-block'))return element.getBoundingClientRect();
+  if(element.tagName==='TR'){const raw=lines[line]||'',before=raw.slice(0,column),cell=Math.max(0,(before.match(/(?<!\\)\|/g)||[]).length-(raw.trimStart().startsWith('|')?1:0));return(element.children[Math.min(cell,element.children.length-1)]||element).getBoundingClientRect();}
+  const start=block.start+(element.tagName==='PRE'&&/^```/.test(lines[block.start])?1:0);
   const text=element.textContent,parts=text.split('\n'),row=Math.min(Math.max(line-start,0),parts.length-1),raw=lines[Math.min(Math.max(line,start),block.end)]||'';
   if(/^\s*!\[/.test(raw)&&element.querySelector('img')){const images=element.querySelectorAll('img'),prior=lines.slice(start,line).filter(v=>/^\s*!\[/.test(v)).length;return(images[Math.min(prior,images.length-1)]).getBoundingClientRect();}
   const prefix=element.tagName==='PRE'?0:(raw.match(/^(?:#{1,3}\s+|>\s?|\s*(?:[-*]\s+|\d+\.\s+))/)?.[0].length||0),plainColumn=Math.min(parts[row].length,Math.round(Math.max(0,column-prefix)/Math.max(1,raw.length-prefix)*parts[row].length));
@@ -51,7 +54,7 @@
  document.getElementById('title').addEventListener('focus',()=>{following=false;clearMark();scroll.scrollTop=0;});
  toggle.addEventListener('change',()=>{try{localStorage.setItem('ly-preview-follow-v1',toggle.checked?'on':'off');}catch{}if(toggle.checked)follow();else clearMark();});
  article.addEventListener('preview-reset',()=>{rendered=null;blocks=[];intent=null;following=false;clearMark();scroll.scrollTop=0;});
- article.addEventListener('preview-rendered',event=>{rendered=event.detail.body;lines=rendered.split('\n');let offset=0;starts=lines.map(line=>{const start=offset;offset+=line.length+1;return start;});blocks=[...article.querySelectorAll('[data-source-start]')].map(element=>({element,start:Number(element.dataset.sourceStart),end:Number(element.dataset.sourceEnd)}));queue();});
+ article.addEventListener('preview-rendered',event=>{rendered=event.detail.body;lines=rendered.split('\n');let offset=0;starts=lines.map(line=>{const start=offset;offset+=line.length+1;return start;});blocks=[...article.querySelectorAll('[data-source-start]')].map(element=>({element,start:Number(element.dataset.sourceStart),end:Number(element.dataset.sourceEnd)})).sort((a,b)=>a.start-b.start);queue();});
  article.addEventListener('load',queue,true);
  new MutationObserver(queue).observe(workspace,{attributes:true,attributeFilter:['data-layout']});
  if(window.ResizeObserver){new ResizeObserver(queue).observe(article);new ResizeObserver(queue).observe(source);}

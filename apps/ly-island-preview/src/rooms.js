@@ -1,3 +1,5 @@
+import {HTML_TAGS,MATH_TAGS,ARTICLE_CLASSES,MATH_ATTRIBUTES,validMathAttribute,validArticleLink} from '../../rqly-sites/public/rqly/article-policy.mjs';
+import '../../rqly-sites/public/rqly/writing.css';
 import {seriesRecords} from '../../rqly-sites/public/rqly/organization-core.mjs';
 import './organization.css';
 import './rooms.css';
@@ -19,7 +21,7 @@ function safeLink(value){try{const u=new URL(value,location.origin);if(!['http:'
 // Only our uploaded /media images may be reconstructed; scripts and event attributes are dropped.
 export function articleFragment(html){
  const template=document.createElement('template');template.innerHTML=html;
- const allowed=new Set(['P','H2','H3','H4','UL','OL','LI','BLOCKQUOTE','PRE','CODE','STRONG','EM','A','BR','HR']);
+ const allowed=new Set(HTML_TAGS.filter(tag=>tag!=='img')),mathTags=new Set(MATH_TAGS);
  const clean=node=>{
   if(node.nodeType===Node.TEXT_NODE)return document.createTextNode(node.textContent);
   const fragment=document.createDocumentFragment();if(node.nodeType!==Node.ELEMENT_NODE)return fragment;
@@ -29,10 +31,13 @@ export function articleFragment(html){
    const image=document.createElement('img');image.src=url.pathname;image.alt=(node.getAttribute('alt')||'').slice(0,250);image.loading='lazy';image.decoding='async';image.className='content-image';
    for(const dimension of ['width','height']){const value=Number(node.getAttribute(dimension));if(Number.isInteger(value)&&value>0&&value<=2400)image.setAttribute(dimension,String(value));}return image;
   }
-  if(['SCRIPT','STYLE','IFRAME','OBJECT','SVG','MATH'].includes(node.tagName))return fragment;
-  const out=allowed.has(node.tagName)?document.createElement(node.tagName.toLowerCase()):fragment;
+  const tag=node.tagName.toLowerCase();
+  if(['script','style','iframe','object','svg','annotation-xml','maction'].includes(tag))return fragment;
+  const out=mathTags.has(tag)?document.createElementNS('http://www.w3.org/1998/Math/MathML',tag):allowed.has(tag)?document.createElement(tag):fragment;
+  if(mathTags.has(tag)){for(const name of MATH_ATTRIBUTES){const value=node.getAttribute(name);if(value!==null&&validMathAttribute(name,value))out.setAttribute(name,value);}}
+  if(out.nodeType===Node.ELEMENT_NODE){const classes=(node.getAttribute('class')||'').split(/\s+/).filter(value=>ARTICLE_CLASSES.includes(value));if(classes.length)out.setAttribute('class',classes.join(' '));if(tag==='ol'&&/^\d{1,6}$/.test(node.getAttribute('start')||''))out.setAttribute('start',node.getAttribute('start'));if(tag==='div'&&classes.includes('content-table')){out.setAttribute('role','region');out.setAttribute('tabindex','0');out.setAttribute('aria-label','数据表格，可横向滚动');}}
   if(node.tagName==='A'){
-   const url=safeLink(node.getAttribute('href'));
+   const href=node.getAttribute('href'),url=validArticleLink(href)?safeLink(href):null;
    if(url){out.href=url.href;if(url.origin!==location.origin){out.target='_blank';out.rel='noopener noreferrer';}}
   }
   for(const child of node.childNodes)out.append(clean(child));return out;
@@ -43,7 +48,7 @@ function coverImage(post,cls){if(!/^\/media\/[a-f0-9]{32}\.webp$/.test(post.cove
 export class IslandRooms {
  get names(){return Object.fromEntries(Object.entries(names).map(([id,name])=>[id,this.callbacks.island?.()?.buildings?.[id]?.name||name]));}
  constructor(callbacks){
-  this.callbacks=callbacks;this.room=null;this.slug=null;this.token=0;this.pending=null;this.font=Math.max(16,Math.min(22,Number(readStored('ly-island-reader-font',18))||18));this.positions=readStored('ly-island-reading-v1',{});if(!this.positions||typeof this.positions!=='object'||Array.isArray(this.positions))this.positions={};
+  this.baseTitle=document.title;this.callbacks=callbacks;this.room=null;this.slug=null;this.token=0;this.pending=null;this.font=Math.max(16,Math.min(22,Number(readStored('ly-island-reader-font',18))||18));this.positions=readStored('ly-island-reading-v1',{});if(!this.positions||typeof this.positions!=='object'||Array.isArray(this.positions))this.positions={};
   this.dialog=el('dialog','island-room');this.dialog.id='room-dialog';this.dialog.setAttribute('aria-labelledby','room-name');
   this.dialog.innerHTML='<div class="room-window"><header class="room-top"><button class="room-home" id="room-close" aria-label="收起阅读空间，回到浮空岛">← <span>回到岛上</span></button><div class="room-heading"><span id="room-caption"></span><h2 id="room-name"></h2></div><nav class="room-switcher" aria-label="切换岛内空间"></nav><button class="room-close-icon" aria-label="关闭阅读空间">×</button></header><div class="room-scroll" tabindex="-1"><div class="room-content"></div></div><footer class="room-bottom"><span class="room-location">LY · 私人的小世界</span><span class="room-footer-hint">把写下的日子，放进书架</span><span class="room-coordinate">ISLAND / 01</span></footer></div>';
   document.body.append(this.dialog);this.content=this.dialog.querySelector('.room-content');this.scroll=this.dialog.querySelector('.room-scroll');
@@ -60,9 +65,9 @@ export class IslandRooms {
  navigate(hash){if(location.hash!==hash)history.pushState({islandRoom:true},'',location.pathname+location.search+hash);this.sync();}
  sync(){
   const q=new URLSearchParams(location.hash.slice(1)),room=q.get('room'),slug=q.get('article'),collection=q.get('collection');
-  if(!Object.hasOwn(names,room)){this.token++;this.pending?.abort();this.saveProgress();this.room=null;this.slug=null;if(this.dialog.open)this.dialog.close();document.body.classList.remove('room-open');this.callbacks.selection(null);return;}
+  if(!Object.hasOwn(names,room)){this.token++;this.pending?.abort();this.saveProgress();this.room=null;this.slug=null;if(this.dialog.open)this.dialog.close();document.body.classList.remove('room-open');this.callbacks.selection(null);document.title=this.baseTitle;return;}
   if(this.dialog.open&&room===this.room&&slug===this.slug&&collection===this.collectionId)return;
-  this.saveProgress();this.token++;this.pending?.abort();this.room=room;this.slug=slug;this.collectionId=collection;
+  this.saveProgress();this.token++;this.pending?.abort();this.room=room;this.slug=slug;this.collectionId=collection;document.title=this.names[room]+' · '+this.baseTitle;
   this.dialog.dataset.room=room;this.dialog.classList.toggle('has-article',Boolean(slug));document.body.classList.add('room-open');
   this.dialog.querySelector('#room-name').textContent=this.names[room];this.dialog.querySelector('#room-caption').textContent=captions[room];
   this.dialog.querySelector('.room-footer-hint').textContent=room==='library'?'把写下的日子，放进书架':room==='projects'?'从过程、线索和证据，认识一项工程':room==='postoffice'?'把一句问候，寄到这个小岛':room==='about'?'做工程，也保持好奇':room==='search'?'从一个词，找回一段记录':'从一个具体问题，开始动手';
@@ -125,13 +130,14 @@ export class IslandRooms {
   finally{clearTimeout(timeout);}
  }
  renderArticle(p,html){
+  document.title=p.title+' · '+this.baseTitle;
   this.content.replaceChildren();const controls=el('div','reader-controls');const back=button('← '+(this.room==='library'?'回到书架':this.room==='projects'?'回到展厅':this.room==='search'?'回到搜索结果':'回到工作台'),'reader-back',()=>this.open(this.room,null,this.collectionId));controls.append(back);
   const type=el('div','reader-type-controls');type.append(el('span','','字号'),button('A−','',()=>this.setFont(this.font-1)),button('A+','',()=>this.setFont(this.font+1)));type.children[1].setAttribute('aria-label','减小字号');type.children[2].setAttribute('aria-label','增大字号');controls.append(type);this.content.append(controls);
   const spread=el('div','reader-spread'),margin=el('aside','reader-margin'),paper=el('article','reader-paper');this.spread=spread;spread.style.setProperty('--reading-size',this.font+'px');
   margin.append(el('p','room-eyebrow',this.room==='library'?'READING / 私人藏书':this.room==='projects'?'FIELD NOTES / 工程档案':'MAKER NOTES / 研发手记'),illustration(this.room==='projects'?bridgeDrawing:this.room==='workshop'?flowDrawing:bookDrawing,'margin-drawing'),el('span','reader-category',p.topic));
   const toc=el('nav','reader-toc');toc.setAttribute('aria-label','文章目录');margin.append(el('h3','toc-title','这一页的线索'),toc);
   const bookmark=el('div','reader-bookmark');bookmark.append(el('span','','阅读书签'),el('strong','reader-progress-label','0%'));const track=el('span','reading-track');track.append(el('span','reading-fill'));bookmark.append(track,el('small','','读到的位置，会留在这个浏览器。'));margin.append(bookmark);
-  const share=button('复制这页链接 ↗','reader-share',async()=>{try{await navigator.clipboard.writeText(location.href);share.textContent='阅读链接已复制';}catch{share.textContent='复制浏览器地址即可分享';}setTimeout(()=>{share.textContent='复制这页链接 ↗';},3000);});margin.append(share,el('p','paper-signature','LY / 记录与求索'));
+  const share=button('复制这页链接 ↗','reader-share',async()=>{try{await navigator.clipboard.writeText(new URL('/notes/'+encodeURIComponent(p.slug),location.origin).href);share.textContent='阅读链接已复制';}catch{share.textContent='复制未完成，请使用下方独立文章页';}setTimeout(()=>{share.textContent='复制这页链接 ↗';},3000);});const permalink=el('a','reader-permalink','打开独立文章页 ↗');permalink.href='/notes/'+encodeURIComponent(p.slug);margin.append(share,permalink,el('p','paper-signature','LY / 记录与求索'));
   const header=el('header','article-heading');header.append(el('p','article-meta',p.date+' / '+p.topic+' / 约 '+Math.max(1,Math.ceil(p.body.length/350))+' 分钟'),el('h1','',p.title),el('p','article-deck',p.summary));if(p.kind==='project'){const details=el('div','project-details');details.append(el('span','',({planning:'计划中',active:'进行中',done:'已完成'}[p.project?.status]||'进行中')));if(p.project?.role)details.append(el('span','','负责：'+p.project.role));if(p.project?.period)details.append(el('span','','时间：'+p.project.period));header.append(details);}paper.append(header);this.renderArticleOrganization(p,paper);const cover=coverImage(p,'reader-cover');if(cover)paper.append(cover);
   const body=el('div','article-body');body.append(articleFragment(html));paper.append(body);const firstMatch=highlightArticleMatches(body,this.searchStates?.get(this.room==='search'?'':this.room)?.q||'');
   for(const [i,h] of [...body.querySelectorAll('h2,h3,h4')].entries()){h.id='reading-section-'+i;const b=button(h.textContent,'toc-item',()=>h.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'}));if(h.tagName==='H3')b.classList.add('subheading');toc.append(b);}
