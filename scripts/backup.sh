@@ -50,7 +50,13 @@ if systemctl is-active --quiet ly-ai.service; then
   ai_resume=true
   systemctl stop ly-ai.service
 fi
-tar --create --gzip --numeric-owner --exclude='*/node_modules' --exclude='srv/ly-data/sites/admin-sessions.json' --file "$partial" -C / \
+# 发布目录（scripts/release.py）：每个发布的源码导出、岛屿产物和记录，用于恢复和回滚。
+release_paths=()
+if [[ -d /opt/ly-stack/releases ]]; then
+  release_paths+=(opt/ly-stack/releases)
+fi
+tar --create --gzip --numeric-owner --exclude='*/node_modules' --exclude='srv/ly-data/sites/admin-sessions.json' \
+  --exclude='opt/ly-stack/releases/*/work' --exclude='opt/ly-stack/releases/.lock' --file "$partial" -C / \
   opt/ly-stack/compose.yaml opt/ly-stack/Caddyfile opt/ly-stack/.env \
   opt/ly-stack/env/sites.env opt/ly-stack/DEPLOYMENT-STATUS.md \
   opt/ly-stack/apps/midas_vueflow/SOURCE-MANIFEST.json \
@@ -69,7 +75,8 @@ tar --create --gzip --numeric-owner --exclude='*/node_modules' --exclude='srv/ly
   opt/ly-stack/scripts opt/ly-stack/systemd \
   srv/ly-data/sites srv/ly-data/caddy \
   opt/ly-stack/apps/personal-ai opt/ly-stack/bin \
-  var/lib/ly-ai/codex/auth.json var/lib/ly-ai/codex/config.toml
+  var/lib/ly-ai/codex/auth.json var/lib/ly-ai/codex/config.toml \
+  "${release_paths[@]}"
 if [[ $ai_resume == true ]]; then
   systemctl start ly-ai.service
   ai_resume=false
