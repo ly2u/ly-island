@@ -215,7 +215,7 @@ def main():
         threading.Thread(target=server.serve_forever, daemon=True).start()
 
         backup_marker = base / 'backups.log'
-        env = {'LY_ROOT': str(root), 'LY_DOCKER': str(bin_dir / 'docker'), 'FAKE_DOCKER_STATE': str(state_path),
+        env = {'LY_DATA_DIR': str(root / 'test-data'), 'LY_ROOT': str(root), 'LY_DOCKER': str(bin_dir / 'docker'), 'FAKE_DOCKER_STATE': str(state_path),
                'LY_HTTP_BASE': 'http://127.0.0.1:%d' % server.server_address[1], 'LY_REQUIRE_ROOT': '0',
                'LY_BACKUP_CMD': 'echo backup >> %s' % backup_marker, 'LY_BACKUP_LOCK': str(base / 'backup.lock'),
                'LY_CHECK_RETRIES': '2', 'LY_CHECK_DELAY': '0.05', 'LY_KEEP_RELEASES': '20'}
@@ -449,6 +449,29 @@ def main():
                '线上返回的后台场景不是新版本时应回滚：\n' + result.stdout)
         expect({p.name: p.read_bytes() for p in (island / 'dist').iterdir() if p.is_file()} == dist_before, '岛屿顶层文件应恢复为发布前')
         (base / 'STALE_CONTENT').unlink()
+        groups += 1
+
+        unsupported_commit = publish('v1.0.10', lambda: (author / 'apps/rqly-sites/admin-mfa.mjs').unlink())
+        unsupported = release_id('v1.0.10', unsupported_commit)
+        expect(release('check', 'v1.0.10').returncode == 0, 'MFA fixture must start with a checked older source')
+        previous_id = json.loads((root / 'releases' / seventh / 'release.json').read_text())['previous']['releaseId']
+        (root / 'releases' / previous_id / 'src/apps/rqly-sites/admin-mfa.mjs').unlink()
+
+        # Q. Enabled MFA must never disappear through either deployment or manual rollback.
+        data_dir = root / 'test-data'
+        data_dir.mkdir()
+        factor = data_dir / 'admin-mfa.json'
+        factor.write_text(json.dumps({'schemaVersion': 1, 'enabled': True}))
+        running_before = state()['running']
+        result = release('rollback')
+        expect(result.returncode != 0 and '两步验证' in result.stdout, 'MFA must block rollback to unsupported source')
+        expect(state()['running'] == running_before, 'Blocked rollback must not switch sites')
+        result = release('deploy', unsupported)
+        expect(result.returncode != 0 and '两步验证' in result.stdout, 'MFA must block deployment to unsupported source')
+        expect(state()['running'] == running_before, 'Blocked deploy must not switch sites')
+        factor.write_text('corrupt')
+        expect(release('rollback').returncode != 0, 'Unreadable MFA must fail closed')
+        factor.unlink()
         groups += 1
 
         server.shutdown()

@@ -279,3 +279,7 @@ rm -rf $D/src && tar -xf $B/island-source.tar -C $D   # 同时恢复发布前的
 - 备份校验能发现被改动的发布产物。
 
 它用假的 docker 命令和本地 HTTP 服务，不需要 Docker、网络或生产目录。GitHub Actions 每次提交都会运行它。它不能代替真实服务器上的第一次迁移和发布，所以第一次请按第 2、3 节逐步执行，并留意每一步的输出。
+
+## 两步验证的版本兼容
+
+管理员可自行开启验证器两步验证，见 [ADMIN-MFA.md](ADMIN-MFA.md)。开启后只能发布或回滚到支持它的版本，须使用 main 中最新的 `scripts/release.py`。备份需要同时包含 `admin-mfa.json` 与 `admin-mfa-key.json`；不要删除配置绕过验证。

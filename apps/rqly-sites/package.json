@@ -14,6 +14,8 @@
     "preview-files": "node scripts/export-preview.mjs"
   },
   "dependencies": {
+    "otplib": "13.5.0",
+    "qrcode": "1.5.4",
     "sharp": "0.35.5"
   }
 }

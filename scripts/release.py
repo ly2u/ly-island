@@ -37,6 +37,7 @@ from pathlib import Path, PurePosixPath
 # ---------------------------------------------------------------- 配置
 
 ROOT = Path(os.environ.get('LY_ROOT', '/opt/ly-stack'))
+DATA_DIR = Path(os.environ.get('LY_DATA_DIR', '/srv/ly-data/sites'))
 REPO = Path(os.environ.get('LY_REPO', str(ROOT / 'repository')))
 RELEASES = ROOT / 'releases'
 ISLAND = ROOT / 'apps' / 'ly-island-preview'
@@ -302,9 +303,31 @@ def probe_live():
     return problems
 
 
+def require_mfa_compatible(source):
+    """Refuse an older image that would silently ignore an enabled administrator factor."""
+    state_file = DATA_DIR / 'admin-mfa.json'
+    if not state_file.exists():
+        return
+    try:
+        state = read_json(state_file)
+        if state.get('schemaVersion') != 1 or type(state.get('enabled')) is not bool:
+            raise ValueError()
+    except (ValueError, OSError, TypeError, AttributeError):
+        raise ReleaseError('无法确认两步验证状态，停止发布或回滚；请先恢复配置。')
+    if state['enabled']:
+        module = Path(source) / 'apps/rqly-sites/admin-mfa.mjs' if source else None
+        auth = Path(source) / 'apps/rqly-sites/server.mjs' if source else None
+        if not module or not module.is_file() or not auth.is_file() or 'mfa:adminMFA' not in auth.read_text():
+            raise ReleaseError('两步验证已开启，目标版本不支持它，禁止发布或回滚。请使用支持两步验证的版本。')
+
+
 def deploy_blockers(record):
     """deploy 之前必须全部满足的条件；返回问题列表，空列表表示可以发布。"""
     problems = probe_live()
+    try:
+        require_mfa_compatible(RELEASES / record['id'] / 'src')
+    except ReleaseError as error:
+        problems.append(str(error))
     blocking, _ = config_drift(RELEASES / record['id'] / 'src')
     for name in blocking:
         problems.append('线上 %s 与标签版本不一致，需要先人工核对并安装（见 docs/RELEASE.md）' % name)
@@ -611,6 +634,8 @@ def undo(release_folder, previous_image, island_started, log):
     island_started：岛屿更新是否已经开始。一旦开始，不论进行到哪一步，都完整恢复快照
     （顶层文件、岛屿源码、SOURCE-MANIFEST.json），不靠比较某个文件的哈希来猜测是否需要恢复。
     """
+    previous_id = (read_json(release_folder / 'release.json').get('previous') or {}).get('releaseId')
+    require_mfa_compatible(RELEASES / previous_id / 'src' if previous_id else None)
     rollback_dir = release_folder / 'rollback'
     if island_started:
         restore_island(rollback_dir, release_folder / 'src')
@@ -720,6 +745,7 @@ def command_rollback():
         record = load_release(current['releaseId'])
         previous = record.get('previous') or {}
         folder = RELEASES / record['id']
+        require_mfa_compatible(RELEASES / previous['releaseId'] / 'src' if previous.get('releaseId') else None)
         if not previous.get('imageId') or not (folder / 'rollback' / 'island-top').exists():
             raise ReleaseError('发布 %s 缺少回滚快照，无法自动撤销。' % record['id'])
         if image_id(previous['imageId']) is None:

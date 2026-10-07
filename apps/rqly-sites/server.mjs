@@ -12,6 +12,7 @@ import {createContentHistory} from './content-history.mjs';
 import {searchContent} from './public/rqly/search-core.mjs';
 import {createMailboxStore} from './mailbox-store.mjs';
 import {createAdminAccount} from './admin-account.mjs';
+import {createAdminMFA} from './admin-mfa.mjs';
 import {createAdminAuth} from './admin-auth.mjs';
 import {createEditorDraftStore} from './editor-drafts.mjs';
 import {createMediaStore,MEDIA_NAME,referencesMedia} from './media-store.mjs';
@@ -35,7 +36,8 @@ const organizationStore=createOrganizationStore(DATA_DIR,{references:()=>[...rea
 const mailbox=createMailboxStore(DATA_DIR);
 const mediaStore=createMediaStore(DATA_DIR,{withdrawnHashes:WITHDRAWN_IMAGE_HASHES});
 const adminAccount=createAdminAccount({dataDir:DATA_DIR,username:()=>String(process.env.ADMIN_USERNAME||'ly'),bootstrapHash:()=>process.env.ADMIN_PASSWORD_HASH||''});
-const adminAuth=createAdminAuth({dataDir:DATA_DIR,username:()=>String(process.env.ADMIN_USERNAME||'ly'),passwordHash:adminAccount.hash,replacePasswordHash:adminAccount.replace,address:ip,secure:!preview&&process.env.NODE_ENV!=='test'});
+const adminMFA=createAdminMFA({dataDir:DATA_DIR,username:()=>String(process.env.ADMIN_USERNAME||'ly')});
+const adminAuth=createAdminAuth({dataDir:DATA_DIR,username:()=>String(process.env.ADMIN_USERNAME||'ly'),passwordHash:adminAccount.hash,replacePasswordHash:adminAccount.replace,mfa:adminMFA,address:ip,secure:!preview&&process.env.NODE_ENV!=='test'});
 const siteAI=createSiteToolService({dataDir:DATA_DIR,readPosts,writePosts,organization:()=>organizationStore.read(),summary:()=>({content:readPosts().filter(p=>!p.trashedAt).length,published:publishedPosts().length,drafts:readPosts().filter(p=>!p.published&&!p.trashedAt).length,trash:readPosts().filter(p=>p.trashedAt).length,editorDrafts:editorDrafts.read().length,media:mediaStore.summary(),island:growthStats(readPosts(),islandStore.read())})});
 const publicRoot=path.join(ROOT,'public');
 const siteTemplate=fs.readFileSync(path.join(publicRoot,'rqly/index.html'),'utf8');
@@ -165,8 +167,8 @@ export async function handler(req,res){
   if(process.env.REVIEW_ACCESS_TOKEN&&!safeEqual(String(req.headers.authorization||''),'Bearer '+process.env.REVIEW_ACCESS_TOKEN)){sendJSON(res,401,{error:'访问码不正确。'});return;}
   if(activeAI>=2){sendJSON(res,429,{error:'正在处理其他稿件，请稍后再试。'});return;}reserveAI(ip(req));activeAI++;const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),85000);const disconnect=()=>{if(!res.writableEnded)controller.abort();};res.on('close',disconnect);try{const result=await requestAI(input,controller.signal);if(!res.destroyed)sendJSON(res,200,{result});}catch(error){if(!res.destroyed)sendJSON(res,502,{error:controller.signal.aborted?'审阅等待超时，请稍后重试。':error.message});}finally{clearTimeout(timer);res.off('close',disconnect);activeAI--;}return;
  }
- if(route==='/api/auth/session'&&req.method==='GET'){const current=adminAuth.session(req);sendJSON(res,200,current?{authenticated:true,username:String(process.env.ADMIN_USERNAME||'ly'),csrfToken:current.csrfToken,expiresAt:current.expiresAt}:{authenticated:false});return;}
- if(route==='/api/auth/login'&&req.method==='POST'){assertOrigin(req);const current=await adminAuth.login(req,res,await readJSON(req,4096));sendJSON(res,200,{authenticated:true,username:String(process.env.ADMIN_USERNAME||'ly'),csrfToken:current.csrfToken,expiresAt:current.expiresAt});return;}
+ if(route==='/api/auth/session'&&req.method==='GET'){const current=adminAuth.session(req);sendJSON(res,200,current?{authenticated:true,username:String(process.env.ADMIN_USERNAME||'ly'),csrfToken:current.csrfToken,expiresAt:current.expiresAt,twoFactorEnabled:adminMFA.status().enabled}:{authenticated:false});return;}
+ if(route==='/api/auth/login'&&req.method==='POST'){assertOrigin(req);const current=await adminAuth.login(req,res,await readJSON(req,4096));sendJSON(res,200,{authenticated:true,username:String(process.env.ADMIN_USERNAME||'ly'),csrfToken:current.csrfToken,expiresAt:current.expiresAt,twoFactorEnabled:adminMFA.status().enabled});return;}
  if(route==='/api/auth/logout'&&req.method==='POST'){assertOrigin(req);const current=adminAuth.require(req);adminAuth.csrf(req,current);adminAuth.logout(req,res);sendJSON(res,200,{authenticated:false});return;}
  if(route==='/login'&&req.method==='GET'){res.setHeader('Cache-Control','no-store');res.setHeader('X-Robots-Tag','noindex, nofollow');let html=fs.readFileSync(path.join(publicRoot,'rqly/login.html'),'utf8');if(tool)html=html.replace('/island/','/').replace('登录后进入你的管理平台。','使用主站管理员账号，登录后可进行个人 AI 审阅。').replace('登录管理平台 →','登录七嘴 →');sendHTML(res,html);return;}
  if((route==='/admin'||route.startsWith('/api/admin/'))&&!tool){
@@ -187,6 +189,7 @@ export async function handler(req,res){
   const editorDraftRoute=route.match(/^\/api\/admin\/editor-drafts\/([a-z0-9][a-z0-9-]{0,119})$/);
   if(editorDraftRoute&&req.method==='GET'){const draft=editorDrafts.get(editorDraftRoute[1]);if(!draft){sendJSON(res,404,{error:'没有找到这份编辑草稿。'});return;}sendJSON(res,200,{draft});return;}
   if(route==='/api/admin/island'&&req.method==='GET'){const island=islandStore.read();sendJSON(res,200,{island,rules:{...LAYOUT_RULES,decorationSlots:DECORATION_SLOTS},stats:growthStats(readPosts(),island)});return;}
+  if(route==='/api/admin/mfa'&&req.method==='GET'){sendJSON(res,200,adminMFA.status());return;}
   if(route==='/api/admin/export'&&req.method==='GET'){res.setHeader('Content-Disposition','attachment; filename=ly-content.json');sendJSON(res,200,{schemaVersion:1,exportedAt:new Date().toISOString(),posts:readPosts(),editorDrafts:editorDrafts.read(),history:contentHistory.references(),organization:organizationStore.read(),island:islandStore.read(),media:mediaStore.list()});return;}
   if(['POST','PUT','DELETE'].includes(req.method)){
    assertOrigin(req);adminAuth.csrf(req,currentSession);
@@ -201,6 +204,7 @@ export async function handler(req,res){
    const mailboxTarget=route.match(/^\/api\/admin\/mailbox\/([a-f0-9]{32})$/);
    if(mailboxTarget&&req.method==='PUT'){sendJSON(res,200,mailbox.update(mailboxTarget[1],await readJSON(req,10000)));return;}
    if(mailboxTarget&&req.method==='DELETE'){sendJSON(res,200,mailbox.remove(mailboxTarget[1],await readJSON(req,4096)));return;}
+   const mfaAction=route.match(/^\/api\/admin\/mfa\/(setup|confirm|cancel|disable|recovery)$/);if(mfaAction&&req.method==='POST'){sendJSON(res,200,await adminAuth.manageMFA(req,res,mfaAction[1],await readJSON(req,4096)));return;}
    if(route==='/api/admin/password'&&req.method==='POST'){sendJSON(res,200,await adminAuth.changePassword(req,res,await readJSON(req,4096)));return;}
    if(route==='/api/admin/island'&&req.method==='PUT'){const data=await readJSON(req,20000);sendJSON(res,200,{island:islandStore.save(data.island,data.baseRevision,{enforceGrowth:true,posts:readPosts()}),rules:{...LAYOUT_RULES,decorationSlots:DECORATION_SLOTS}});return;}
    const historyRestore=route.match(/^\/api\/admin\/posts\/([a-z0-9-]+)\/history\/([a-f0-9]{64})\/restore$/);
@@ -238,11 +242,11 @@ export async function handler(req,res){
  if(!tool&&route==='/feed.xml'){const xml=`<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>记录与求索 · LY</title><link>${mainOrigin}</link><description>桥梁、历史与 AI 的持续记录。</description><language>zh-CN</language>${publishedPosts().map(p=>`<item><title>${escapeHtml(p.title)}</title><link>${mainOrigin}/notes/${p.slug}</link><guid>${mainOrigin}/notes/${p.slug}</guid><description>${escapeHtml(p.summary)}</description><pubDate>${new Date(p.date+'T00:00:00+08:00').toUTCString()}</pubDate></item>`).join('')}</channel></rss>`;res.writeHead(200,{'Content-Type':'application/rss+xml; charset=utf-8'});res.end(xml);return;}
  if(route==='/robots.txt'){res.writeHead(200,{'Content-Type':'text/plain; charset=utf-8'});res.end('User-agent: *\nDisallow: /admin\nDisallow: /api/\n'+(!tool?'Sitemap: '+mainOrigin+'/sitemap.xml\n':''));return;}
  if(!tool&&route==='/sitemap.xml'){const routes=['/','/notes','/nantan','/about',...publishedPosts().map(p=>'/notes/'+p.slug)];res.writeHead(200,{'Content-Type':'application/xml; charset=utf-8'});res.end('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+routes.map(r=>'<url><loc>'+mainOrigin+r+'</loc></url>').join('')+'</urlset>');return;}
- const loginAsset=['admin.css','login.js','quota.js'].includes(route.slice(1));const allowed=tool?['qizui.css','qizui.js','review-core.mjs','favicon.svg','admin.css','login.js','quota.js']:['site.css','admin.js','admin.css','ai.js','ai.css','quota.js','login.js','session-nav.js','admin-mailbox.js','preview-sync.js','search-core.mjs','organization-core.mjs','favicon.svg','bridge-study.svg'];const basename=route.slice(1);if(allowed.includes(basename)){const target=path.join(publicRoot,tool&&!loginAsset?'qizui':'rqly',basename);if(!fs.existsSync(target)){sendJSON(res,404,{error:'资源不存在。'});return;}res.writeHead(200,{'Content-Type':STATIC[path.extname(target)],'Cache-Control':'public,max-age=3600'});if(req.method==='HEAD')res.end();else pipeFile(res,target);return;}
+ const loginAsset=['admin.css','login.js','quota.js'].includes(route.slice(1));const allowed=tool?['qizui.css','qizui.js','review-core.mjs','favicon.svg','admin.css','login.js','quota.js']:['site.css','admin.js','admin.css','ai.js','ai.css','quota.js','login.js','session-nav.js','admin-mailbox.js','admin-mfa.js','preview-sync.js','search-core.mjs','organization-core.mjs','favicon.svg','bridge-study.svg'];const basename=route.slice(1);if(allowed.includes(basename)){const target=path.join(publicRoot,tool&&!loginAsset?'qizui':'rqly',basename);if(!fs.existsSync(target)){sendJSON(res,404,{error:'资源不存在。'});return;}res.writeHead(200,{'Content-Type':STATIC[path.extname(target)],'Cache-Control':'public,max-age=3600'});if(req.method==='HEAD')res.end();else pipeFile(res,target);return;}
  if(tool&&route==='/'){sendHTML(res,renderQizui());return;}
  if(!tool){const html=renderRqly(route,url.searchParams.get('topic')||'');if(html){sendHTML(res,html);return;}}
  sendHTML(res,`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>页面未找到</title><link rel="stylesheet" href="${tool?'qizui.css':'/site.css'}"><main style="max-width:700px;margin:12vh auto;padding:30px"><h1>这页还没有留下记录。</h1><p>你可以回到首页，继续阅读其他内容。</p><a href="${tool&&prefix?'/qizui/':'/'}">返回首页</a></main></html>`,404);
- }catch(error){if(!res.headersSent)sendJSON(res,error.status||400,{error:error.message||'操作未能完成。'});else res.end();}
+ }catch(error){if(!res.headersSent)sendJSON(res,error.status||400,{error:error.message||'操作未能完成。',...(error.code==='MFA_REQUIRED'?{code:error.code}:{})});else res.end();}
 }
 const cleanup=setInterval(()=>{const now=Date.now();for(const[key,value]of requestMap)if(!value.some(t=>now-t<3600000))requestMap.delete(key);try{mailbox.maintenance();}catch{console.error('信箱限流维护未完成，请检查数据和密钥权限。');}},300000);cleanup.unref();
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){initializeData();const server=http.createServer(handler);server.requestTimeout=200000;server.headersTimeout=10000;server.listen(port,serverHost,()=>console.log(`RQ/LY & 七嘴 ready on port ${port}.`));const stop=()=>server.close(()=>process.exit(0));process.on('SIGTERM',stop);process.on('SIGINT',stop);}
