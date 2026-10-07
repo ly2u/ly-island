@@ -42,7 +42,7 @@ const siteTemplate=fs.readFileSync(path.join(publicRoot,'rqly/index.html'),'utf8
 const header=siteTemplate.match(/<header class="header wrap">[\s\S]*?<\/header>/)[0];
 const footer=siteTemplate.match(/<footer class="footer wrap">[\s\S]*?<\/footer>/)[0];
 
-export function initializeData(){fs.mkdirSync(DATA_DIR,{recursive:true});if(!fs.existsSync(POSTS))fs.copyFileSync(path.join(ROOT,'content/posts.json'),POSTS);readPosts();islandStore.initialize();adminAuth.initialize();}
+export function initializeData(){fs.mkdirSync(DATA_DIR,{recursive:true});if(!fs.existsSync(POSTS))fs.copyFileSync(path.join(ROOT,'content/posts.json'),POSTS);readPosts();islandStore.initialize();adminAuth.initialize();mailbox.initialize();}
 export function readPosts(){const posts=JSON.parse(fs.readFileSync(POSTS,'utf8'));if(!Array.isArray(posts))throw new Error('记录数据格式无效。');return posts;}
 function writePosts(posts){const before=readPosts();for(const post of posts){const old=before.find(p=>p.slug===post.slug);if(!post.trashedAt&&(!old||JSON.stringify(old.organization)!==JSON.stringify(post.organization)))organizationStore.validate(post,posts);}contentHistory.captureChanges(readPosts(),posts);const backup=path.join(DATA_DIR,'backups');fs.mkdirSync(backup,{recursive:true});const name=new Date().toISOString().replace(/[:.]/g,'-')+'-'+randomBytes(3).toString('hex')+'.json';fs.copyFileSync(POSTS,path.join(backup,name));atomicJSON(POSTS,posts);const previous=fs.readdirSync(backup).filter(name=>!name.startsWith('island-')).sort();for(const name of previous.slice(0,Math.max(0,previous.length-10)))fs.unlinkSync(path.join(backup,name));}
 function atomicJSON(target,value){const temp=target+'.'+randomBytes(5).toString('hex')+'.tmp';try{fs.writeFileSync(temp,JSON.stringify(value,null,2)+'\n',{mode:0o600,flag:'wx'});fs.renameSync(temp,target);}finally{if(fs.existsSync(temp))fs.unlinkSync(temp);}}
@@ -200,6 +200,7 @@ export async function handler(req,res){
    if(editorDraftRoute&&req.method==='DELETE'){const input=await readJSON(req,4096);editorDrafts.remove(editorDraftRoute[1],input.baseRevision);sendJSON(res,200,{removed:true});return;}
    const mailboxTarget=route.match(/^\/api\/admin\/mailbox\/([a-f0-9]{32})$/);
    if(mailboxTarget&&req.method==='PUT'){sendJSON(res,200,mailbox.update(mailboxTarget[1],await readJSON(req,10000)));return;}
+   if(mailboxTarget&&req.method==='DELETE'){sendJSON(res,200,mailbox.remove(mailboxTarget[1],await readJSON(req,4096)));return;}
    if(route==='/api/admin/password'&&req.method==='POST'){sendJSON(res,200,await adminAuth.changePassword(req,res,await readJSON(req,4096)));return;}
    if(route==='/api/admin/island'&&req.method==='PUT'){const data=await readJSON(req,20000);sendJSON(res,200,{island:islandStore.save(data.island,data.baseRevision,{enforceGrowth:true,posts:readPosts()}),rules:{...LAYOUT_RULES,decorationSlots:DECORATION_SLOTS}});return;}
    const historyRestore=route.match(/^\/api\/admin\/posts\/([a-z0-9-]+)\/history\/([a-f0-9]{64})\/restore$/);
@@ -243,5 +244,5 @@ export async function handler(req,res){
  sendHTML(res,`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>页面未找到</title><link rel="stylesheet" href="${tool?'qizui.css':'/site.css'}"><main style="max-width:700px;margin:12vh auto;padding:30px"><h1>这页还没有留下记录。</h1><p>你可以回到首页，继续阅读其他内容。</p><a href="${tool&&prefix?'/qizui/':'/'}">返回首页</a></main></html>`,404);
  }catch(error){if(!res.headersSent)sendJSON(res,error.status||400,{error:error.message||'操作未能完成。'});else res.end();}
 }
-const cleanup=setInterval(()=>{const now=Date.now();for(const[key,value]of requestMap)if(!value.some(t=>now-t<3600000))requestMap.delete(key);},300000);cleanup.unref();
+const cleanup=setInterval(()=>{const now=Date.now();for(const[key,value]of requestMap)if(!value.some(t=>now-t<3600000))requestMap.delete(key);try{mailbox.maintenance();}catch{console.error('信箱限流维护未完成，请检查数据和密钥权限。');}},300000);cleanup.unref();
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){initializeData();const server=http.createServer(handler);server.requestTimeout=200000;server.headersTimeout=10000;server.listen(port,serverHost,()=>console.log(`RQ/LY & 七嘴 ready on port ${port}.`));const stop=()=>server.close(()=>process.exit(0));process.on('SIGTERM',stop);process.on('SIGINT',stop);}

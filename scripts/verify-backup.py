@@ -178,8 +178,16 @@ with tempfile.TemporaryDirectory(prefix='ly-restore-check-') as directory:
                     raise SystemExit('恢复后的信件内容无效。')
             if not message['body'] or not re.fullmatch(r'[a-f0-9]{64}', message.get('submissionKey', '')):
                 raise SystemExit('恢复后的信件正文或重试标识无效。')
-        if not isinstance(mailbox.get('limits'), dict) or any(not re.fullmatch(r'[a-f0-9]{64}', key) or not isinstance(value, list) or any(type(stamp) not in [int, float] for stamp in value) for key, value in mailbox['limits'].items()):
+        if not isinstance(mailbox.get('limits'), dict) or any(not re.fullmatch(r'(?:hmac:)?[a-f0-9]{64}', key) or not isinstance(value, list) or any(type(stamp) not in [int, float] for stamp in value) for key, value in mailbox['limits'].items()):
             raise SystemExit('恢复后的邮局限流记录无效。')
+        key_name = 'srv/ly-data/sites/mailbox-key.json'
+        needs_key = any(key.startswith('hmac:') for key in mailbox['limits']) or any(message.get('submissionKeyVersion') == 'hmac-v1' for message in mailbox['messages'])
+        if needs_key and key_name not in names:
+            raise SystemExit('恢复后的信箱缺少限流密钥。')
+        if key_name in names:
+            key_data = json.loads((Path(directory) / key_name).read_text())
+            if names[key_name].mode & 0o077 or key_data.get('schemaVersion') != 1 or not isinstance(key_data.get('key'), str) or not re.fullmatch(r'[a-f0-9]{64}', key_data['key']):
+                raise SystemExit('恢复后的信箱限流密钥或权限无效。')
     actions_name = 'srv/ly-data/sites/ai-actions.json'
     if actions_name in names:
         actions = json.loads((Path(directory) / actions_name).read_text())
