@@ -12,6 +12,7 @@ export function createMediaStore(dataDir,{withdrawnHashes=[]}={}){
  const metadata=name=>{if(!MEDIA_NAME.test(name))return null;const file=path.join(directory,name),sidecar=file+'.json';if(!fs.existsSync(file)||!fs.existsSync(sidecar))return null;const value=JSON.parse(fs.readFileSync(sidecar,'utf8'));if(value.filename!==name||!Number.isInteger(value.width)||!Number.isInteger(value.height)||value.width<1||value.height<1||typeof value.createdAt!=='string')fail('图片存档暂时无法读取。',503);return value;};
  return {
   metadata,
+  assertIdle(){if(active)fail('正在处理图片，请等待上传完成后再确认导入。',409);},
   summary(){const all=names();return {count:all.length,bytes:all.reduce((sum,name)=>sum+fs.statSync(path.join(directory,name)).size,0),maxBytes:MAX_STORED_BYTES,maxCount:2000};},
   remove(name){if(active)fail('正在处理图片，请稍后再整理。',409);if(!metadata(name))fail('图片不存在。',404);fs.unlinkSync(path.join(directory,name));fs.unlinkSync(path.join(directory,name+'.json'));},
   file(name){return MEDIA_NAME.test(name)?path.join(directory,name):null;},

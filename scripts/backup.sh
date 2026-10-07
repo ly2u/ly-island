@@ -50,12 +50,30 @@ if systemctl is-active --quiet ly-ai.service; then
   ai_resume=true
   systemctl stop ly-ai.service
 fi
+# 用实际运行过的镜像导出一致的 Markdown/图片内容包；旧版镜像尚无此能力。
+# sites 已停止，但 ps -aq 仍能找到容器，固定镜像 ID 避免标签切换。
+sites_container=$(docker compose ps -aq sites)
+if [[ -n "$sites_container" ]]; then
+  sites_image=$(docker inspect --format '{{.Image}}' "$sites_container")
+  if docker run --rm --network none --read-only --tmpfs /tmp "$sites_image" \
+    node -e "process.exit(require('node:fs').existsSync('/app/export-content.mjs')?0:42)"; then
+    docker run --rm --network none --read-only --tmpfs /tmp \
+      -v /srv/ly-data/sites:/app/data "$sites_image" node /app/export-content.mjs
+    python3 scripts/verify-portable-content.py /srv/ly-data/sites/content-export.zip /srv/ly-data/sites
+  else
+    export_check_rc=$?
+    [[ $export_check_rc == 42 ]] || { echo '内容包导出预检查失败。' >&2; exit 1; }
+    # 旧版本回退时不把之前产生的过期内容包当成当前快照。
+    rm -f -- /srv/ly-data/sites/content-export.zip
+    echo '当前镜像尚无可移植导出能力，原有完整备份继续执行。'
+  fi
+fi
 # 发布目录（scripts/release.py）：每个发布的源码导出、岛屿产物和记录，用于恢复和回滚。
 release_paths=()
 if [[ -d /opt/ly-stack/releases ]]; then
   release_paths+=(opt/ly-stack/releases)
 fi
-tar --create --gzip --numeric-owner --exclude='*/node_modules' --exclude='srv/ly-data/sites/admin-sessions.json' \
+tar --create --gzip --numeric-owner --exclude='*/node_modules' --exclude='srv/ly-data/sites/admin-sessions.json' --exclude='srv/ly-data/sites/.content-transfer' --exclude='srv/ly-data/sites/content-export.zip.next' \
   --exclude='opt/ly-stack/releases/*/work' --exclude='opt/ly-stack/releases/.lock' --file "$partial" -C / \
   opt/ly-stack/compose.yaml opt/ly-stack/Caddyfile opt/ly-stack/.env \
   opt/ly-stack/env/sites.env opt/ly-stack/DEPLOYMENT-STATUS.md \

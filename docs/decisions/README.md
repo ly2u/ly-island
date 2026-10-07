@@ -17,7 +17,7 @@
 | [0004](0004-single-source-data-schema.md) | 数据模式只有一个来源，前后版本兼容 | 提议 |
 | [0005](0005-static-public-reads.md) | 公开阅读静态化（读写分离） | 提议 |
 | [0006](0006-trust-boundaries.md) | 后台加第二道门；公开写入与后台、AI 分开 | 可选 TOTP 已实施；进程拆分提议 |
-| [0007](0007-portable-content-format.md) | 内容使用标准格式，并能导出 | 渲染/分享已实施；完整导出待做 |
+| [0007](0007-portable-content-format.md) | 内容使用标准格式，并能导出 | 已实施：渲染/分享、完整 ZIP、草稿导入与本地备份 |
 | [0008](0008-prefer-mature-solutions.md) | 通用能力优先用成熟方案 | 提议；更新提醒已实施 |
 | [0009](0009-architecture-budgets.md) | 用可执行的约束守住架构 | 基础配置已授权推进；架构预算提议 |
 | [0010](0010-backup-and-monitoring.md) | 异地加密备份与应用层监控 | 提议 |
@@ -29,7 +29,7 @@
 **第一批：已授权推进的基础配置，以及需要实际权限或邮件用途确认的项目。**
 
 1. [0009](0009-architecture-budgets.md)：开启 `main` 分支保护，增加 PR 模板。
-2. 安全 S2：先确认合法收发信用途和 DNS 控制权限，再制定 SPF/DMARC；保留 Cloudflare 邮件路由所需 SPF。
+2. 安全 S2：站主已添加 SPF/DMARC，公开 DNS 核对通过；保留 Cloudflare 收信 MX/SPF。未来发信前配置服务商 SPF/DKIM，见 [邮件 DNS](../EMAIL-DNS.md)。
 3. 安全 S4：在 Cloudflare 控制台核对三个域名是否开了代理。如果开了，按审查中的建议处理。
 4. 安全 S3：在 `Caddyfile` 中加 HSTS。`Caddyfile` 的修改需要按 `docs/RELEASE.md` 第 6 节人工安装，发布脚本不会自动应用。
 5. [0008](0008-prefer-mature-solutions.md)：开启 Dependabot 和 secret scanning 推送保护；基础镜像固定到摘要。

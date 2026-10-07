@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import zipfile
 import tempfile
 import threading
 from pathlib import Path
@@ -372,7 +373,7 @@ def main():
         expect(release('deploy', fifth).returncode == 0, 'deploy v1.0.5 应成功')
         archive = base / 'backup.tar.gz'
 
-        def build_archive(mutate=None):
+        def build_archive(mutate=None, omit_portable=False):
             with tarfile.open(archive, 'w:gz') as bundle:
                 def add_file(arcname, data, mode=0o600):
                     info = tarfile.TarInfo(arcname)
@@ -381,6 +382,17 @@ def main():
                 add_file('opt/ly-stack/.env', b'ACME_EMAIL=test@example.invalid\n')
                 add_file('opt/ly-stack/env/sites.env', b'ADMIN_USERNAME=ly\n')
                 add_file('srv/ly-data/sites/posts.json', b'[]\n')
+                if not omit_portable:
+                    content = {'README.md': b'fixture', 'organization.json': b'{"schemaVersion":1,"revision":0,"items":[]}'}
+                    portable = __import__('io').BytesIO()
+                    manifest = {'format':'ly-content','version':1,'records':[],'media':[],
+                                'files':{name:{'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()} for name,data in content.items()}}
+                    with zipfile.ZipFile(portable, 'w') as zipped:
+                        for name,data in content.items():
+                            zipped.writestr(name, data)
+                        zipped.writestr('manifest.json', json.dumps(manifest))
+                    add_file('srv/ly-data/sites/content-export.zip', portable.getvalue())
+                    add_file('opt/ly-stack/scripts/verify-portable-content.py', (REPO_ROOT/'scripts/verify-portable-content.py').read_bytes())
                 for name in ['compose.yaml', 'Caddyfile']:
                     bundle.add(root / name, arcname='opt/ly-stack/' + name)
                 bundle.add(island, arcname='opt/ly-stack/apps/ly-island-preview')
@@ -397,6 +409,10 @@ def main():
         build_archive()
         result = sh(sys.executable, str(REPO_ROOT / 'scripts' / 'verify-backup.py'), str(archive), check=False)
         expect(result.returncode == 0, '包含发布目录的备份应通过校验：\n' + result.stdout)
+        build_archive(omit_portable=True)
+        result = sh(sys.executable, str(REPO_ROOT / 'scripts' / 'verify-backup.py'), str(archive), check=False)
+        expect(result.returncode != 0 and '缺少可移植内容包' in result.stdout,
+               '支持内容导出的当前版本必须包含可移植副本')
         build_archive(mutate='releases/%s/src/apps/rqly-sites/server.mjs' % fifth)
         result = sh(sys.executable, str(REPO_ROOT / 'scripts' / 'verify-backup.py'), str(archive), check=False)
         expect(result.returncode != 0 and '恢复校验不一致' in result.stdout, '被改动的发布源码应使备份校验失败：\n' + result.stdout)
@@ -472,6 +488,16 @@ def main():
         factor.write_text('corrupt')
         expect(release('rollback').returncode != 0, 'Unreadable MFA must fail closed')
         factor.unlink()
+        groups += 1
+
+        pending = data_dir / 'content-import-transaction'
+        pending.mkdir()
+        (pending / 'journal.json').write_text('{}')
+        for arguments in [('rollback',), ('deploy', unsupported)]:
+            result = release(*arguments)
+            expect(result.returncode != 0 and '未完成的内容导入' in result.stdout,
+                   'Unfinished content import must block code changes')
+            expect(state()['running'] == running_before, 'Import recovery guard must not switch sites')
         groups += 1
 
         server.shutdown()

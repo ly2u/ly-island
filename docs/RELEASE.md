@@ -283,3 +283,7 @@ rm -rf $D/src && tar -xf $B/island-source.tar -C $D   # 同时恢复发布前的
 ## 两步验证的版本兼容
 
 管理员可自行开启验证器两步验证，见 [ADMIN-MFA.md](ADMIN-MFA.md)。开启后只能发布或回滚到支持它的版本，须使用 main 中最新的 `scripts/release.py`。备份需要同时包含 `admin-mfa.json` 与 `admin-mfa-key.json`；不要删除配置绕过验证。
+
+## 可移植内容包的运维文件
+
+内容导出版本需配套安装 `scripts/backup.sh`、`scripts/verify-backup.py` 与 `scripts/verify-portable-content.py`。先保存旧脚本，核对差异，再从已合并标签复制；使用旧运行镜像的发布前备份仍兼容，发布后首次备份须生成 ZIP 并通过逐项恢复校验。后台导入遇到中断时，启动恢复记录位于 `DATA_DIR/content-import-transaction`，保留记录与旧文件并用支持本能力的版本启动；没有核实前不要删除记录或直接用旧代码读半完成数据。成功确认后的数据与旧版 JSON 格式兼容，版本回滚不撤销已确认的草稿导入。
