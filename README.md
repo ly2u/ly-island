@@ -15,6 +15,7 @@ rqly.com 的当前网站源码快照：公众以三维浮空岛访问书屋、�
 | `scripts/`、`systemd/` | 当前 VPS 运维脚本；部分依赖服务器独有材料，详见部署说明 |
 | `docs/REVIEW.md` | 审查范围、入口、数据流、测试与已知限制 |
 | `docs/DEPLOYMENT.md` | 本地复现、部署边界和 CivilFlow 获取方式 |
+| `docs/RELEASE.md` | 按 Git 标签发布、预检查、自动回滚与手动撤销 |
 | `docs/provenance/` | VPS 源码摘要与来源记录，旧静态/二进制清单只作为历史证据 |
 
 ## 本地开发
@@ -69,7 +70,7 @@ CivilFlow V2 继续保存在独立私有仓库 [ly2u/midas_vueflow](https://gith
 
 个人维护、单个 Node 服务实例和 JSON 持久化是当前目标。没有多人编辑账号系统、集群文件锁、完善的异地容灾或每座建筑独立成长机制。CivilFlow 项目仍在各浏览器 localStorage。AI 仅供登录站主使用，不是公众共享服务，账号额度与桥接运行文件不在 Git 中。
 
-这是现有网站代码审查快照，不是“一键重装 VPS”的软件包。现有线上服务仍从 `/opt/ly-stack/apps/` 运行，仓库工作树独立在 `/opt/ly-stack/repository`；Git 拉取或合并不会自动替换生产服务。
+这不是“一键重装 VPS”的软件包。Git 是源码的唯一来源：线上通过 `scripts/release.py` 发布已合并到 `main` 并打了标签的提交（见 [发布与回滚](docs/RELEASE.md)）。Git 拉取或合并不会自动替换生产服务。
 
 ## 开源许可
 

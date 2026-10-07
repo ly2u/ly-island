@@ -8,9 +8,10 @@ x-logging: &logging
 
 services:
   sites:
-    image: ly-sites:github-static-fix-20261007
-    build:
-      context: ./apps/rqly-sites
+    # 镜像只由 scripts/release.py 从 Git 标签构建，并切换 ly-sites:current 指向的版本。
+    # 不在这里构建，避免 `docker compose up --build` 用旧目录覆盖已发布的镜像。见 docs/RELEASE.md。
+    image: ly-sites:current
+    pull_policy: never
     restart: unless-stopped
     env_file: ./env/sites.env
     environment:
