@@ -3,8 +3,10 @@
 import datetime
 import hashlib
 import json
+import sys
 from pathlib import Path
-root=Path('/opt/ly-stack/apps/ly-island-preview')
+# Optional argument: the island directory (scripts/release.py passes it; default is the production path).
+root=Path(sys.argv[1] if len(sys.argv)>1 else '/opt/ly-stack/apps/ly-island-preview')
 paths=[root/name for name in ['package.json','package-lock.json','vite.config.js','index.html','README.md']]
 paths.extend(p for name in ['src','dist'] for p in (root/name).rglob('*') if p.is_file())
 for p in paths:

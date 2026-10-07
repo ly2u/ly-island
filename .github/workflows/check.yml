@@ -37,6 +37,12 @@ jobs:
           cache-dependency-path: apps/ly-island-preview/package-lock.json
       - run: npm ci
       - run: npm run build
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Release flow in a simulated environment (fake docker, no network or production paths)
+        run: python3 scripts/check-release.py
   bridge:
     runs-on: ubuntu-latest
     steps:

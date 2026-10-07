@@ -221,6 +221,32 @@ with tempfile.TemporaryDirectory(prefix='ly-restore-check-') as directory:
             expected = changes['changed_files_sha256'].get(name)
             if expected and hashlib.sha256((website / name).read_bytes()).hexdigest() != expected:
                 raise SystemExit('网站更新文件恢复校验不一致：' + name)
+    # scripts/release.py 的当前发布：源码导出与岛屿产物都要能按记录的哈希恢复
+    current_name = 'opt/ly-stack/releases/current.json'
+    if current_name in names:
+        releases_root = Path(directory) / 'opt/ly-stack/releases'
+        current = json.loads((Path(directory) / current_name).read_text())
+        release_id = current.get('releaseId')
+        if release_id is not None:
+            if not isinstance(release_id, str) or not re.fullmatch(r'v[0-9][0-9A-Za-z._-]{0,40}-[0-9a-f]{12}', release_id):
+                raise SystemExit('当前发布编号无效。')
+            record_path = releases_root / release_id / 'release.json'
+            if not record_path.is_file():
+                raise SystemExit('备份缺少当前发布的记录：' + release_id)
+            record = json.loads(record_path.read_text())
+            if record.get('id') != release_id or record.get('commit') != current.get('commit'):
+                raise SystemExit('当前发布记录与 current.json 不一致。')
+            for folder, field in [('src', 'sourceFiles'), ('island-dist', 'islandFiles')]:
+                files = record.get(field)
+                if not isinstance(files, dict) or not files:
+                    raise SystemExit('当前发布记录缺少文件清单：' + field)
+                for name, expected in files.items():
+                    relative = PurePosixPath(name)
+                    if relative.is_absolute() or '..' in relative.parts:
+                        raise SystemExit('发布文件清单路径无效。')
+                    candidate = releases_root / release_id / folder / Path(*relative.parts)
+                    if not candidate.is_file() or hashlib.sha256(candidate.read_bytes()).hexdigest() != expected:
+                        raise SystemExit('当前发布的源码或岛屿产物恢复校验不一致：' + name)
     island = Path(directory) / 'opt/ly-stack/apps/ly-island-preview'
     if island.exists():
         manifest = json.loads((island / 'SOURCE-MANIFEST.json').read_text())

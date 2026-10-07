@@ -21,6 +21,8 @@
 
 ## 构建与发布
 
+**现在由 `scripts/release.py` 按 Git 标签构建并发布岛屿静态资源，见 [发布与回滚](../../docs/RELEASE.md)。** 下面的手工步骤是迁移前的做法，发布脚本按同样的原则实现：新资源只增不删，`admin-scene.js` 与 `index.html` 原子替换，`dist` 目录本身保持不变。
+
 依赖锁定 Three.js 0.186.1 / Vite 8.3.3，构建用 Node.js 24。先保留版本前快照，再构建到暂存目录，不能清空线上 dist：
 
 ```bash
