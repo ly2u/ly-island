@@ -8,7 +8,7 @@ x-logging: &logging
 
 services:
   sites:
-    image: ly-sites:organization-20261007
+    image: ly-sites:github-static-fix-20261007
     build:
       context: ./apps/rqly-sites
     restart: unless-stopped

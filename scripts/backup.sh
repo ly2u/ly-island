@@ -55,7 +55,7 @@ tar --create --gzip --numeric-owner --exclude='*/node_modules' --exclude='srv/ly
   opt/ly-stack/env/sites.env opt/ly-stack/DEPLOYMENT-STATUS.md \
   opt/ly-stack/apps/midas_vueflow/SOURCE-MANIFEST.json \
   opt/ly-stack/apps/rqly-sites/SOURCE-CHANGES.json \
-  opt/ly-stack/apps/rqly-sites/server.mjs opt/ly-stack/apps/rqly-sites/organization-store.mjs opt/ly-stack/apps/rqly-sites/scripts/check-organization.mjs opt/ly-stack/apps/rqly-sites/content-history.mjs opt/ly-stack/apps/rqly-sites/personal-ai.mjs opt/ly-stack/apps/rqly-sites/ai-site-tools.mjs opt/ly-stack/apps/rqly-sites/scripts/check-ai-tools.mjs opt/ly-stack/apps/rqly-sites/scripts/check.mjs \
+  opt/ly-stack/apps/rqly-sites/server.mjs opt/ly-stack/apps/rqly-sites/organization-store.mjs opt/ly-stack/apps/rqly-sites/scripts/check-organization.mjs opt/ly-stack/apps/rqly-sites/scripts/check-static-resilience.mjs opt/ly-stack/apps/rqly-sites/content-history.mjs opt/ly-stack/apps/rqly-sites/personal-ai.mjs opt/ly-stack/apps/rqly-sites/ai-site-tools.mjs opt/ly-stack/apps/rqly-sites/scripts/check-ai-tools.mjs opt/ly-stack/apps/rqly-sites/scripts/check.mjs \
   opt/ly-stack/apps/rqly-sites/mailbox-store.mjs opt/ly-stack/apps/rqly-sites/scripts/check-mailbox.mjs \
   opt/ly-stack/apps/rqly-sites/island-store.mjs opt/ly-stack/apps/rqly-sites/admin-auth.mjs \
   opt/ly-stack/apps/rqly-sites/admin-account.mjs opt/ly-stack/apps/rqly-sites/scripts/check-password.mjs \
