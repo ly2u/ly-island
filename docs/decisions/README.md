@@ -16,8 +16,8 @@
 | [0003](0003-layering-by-lifespan.md) | 按寿命分层：资产层、体验层、工具层 | 提议 |
 | [0004](0004-single-source-data-schema.md) | 数据模式只有一个来源，前后版本兼容 | 提议 |
 | [0005](0005-static-public-reads.md) | 公开阅读静态化（读写分离） | 提议 |
-| [0006](0006-trust-boundaries.md) | 后台加第二道门；公开写入与后台、AI 分开 | 提议，认证方案待确认 |
-| [0007](0007-portable-content-format.md) | 内容使用标准格式，并能导出 | 提议 |
+| [0006](0006-trust-boundaries.md) | 后台加第二道门；公开写入与后台、AI 分开 | 可选 TOTP 已实施；进程拆分提议 |
+| [0007](0007-portable-content-format.md) | 内容使用标准格式，并能导出 | 渲染/分享已实施；完整导出待做 |
 | [0008](0008-prefer-mature-solutions.md) | 通用能力优先用成熟方案 | 提议；更新提醒已实施 |
 | [0009](0009-architecture-budgets.md) | 用可执行的约束守住架构 | 基础配置已授权推进；架构预算提议 |
 | [0010](0010-backup-and-monitoring.md) | 异地加密备份与应用层监控 | 提议 |

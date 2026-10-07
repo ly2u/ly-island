@@ -149,7 +149,7 @@ async function showMedia(purpose){mediaPurpose=purpose;
  catch(error){$('media-status').textContent=error.message;}
 }
 $('close-media').addEventListener('click',()=>$('media-dialog').close());
-const formats={heading:()=>insert('\n\n## ','\n','小标题'),list:()=>insert('\n- ','\n','一条要点'),quote:()=>insert('\n\n> ','\n','想留下的一句话'),code:()=>insert('\n\n```\n','\n```\n',''),link:()=>insert('[','](https://example.com)','链接文字')};
+const formats={table:()=>insert('\n\n| 参数 | 数值 | 单位 |\n| --- | ---: | --- |\n| 跨径 L | 30 | m |\n','\n',''),formula:()=>insert('\n\n$$\n','\n$$\n','M = \\frac{qL^2}{8}'),heading:()=>insert('\n\n## ','\n','小标题'),list:()=>insert('\n- ','\n','一条要点'),quote:()=>insert('\n\n> ','\n','想留下的一句话'),code:()=>insert('\n\n```\n','\n```\n',''),link:()=>insert('[','](https://example.com)','链接文字')};
 for(const b of document.querySelectorAll('[data-format]'))b.addEventListener('click',()=>formats[b.dataset.format]());
 $('project-outline').addEventListener('click',()=>insert('\n\n## 项目背景\n\n\n## 我做了什么\n\n\n## 阶段成果\n\n\n## 经验与反思\n\n'));
 function updatePreviewMeta(){

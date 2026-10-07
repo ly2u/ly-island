@@ -1,0 +1,13 @@
+/* One reading stylesheet for the independent page, island reader and authoring preview. */
+:is(.article-content,.article-body,.live-preview-body,#preview-body) .content-table{max-width:100%;overflow-x:auto;margin:1.6em 0;border:1px solid #80907338;border-radius:8px;scrollbar-gutter:stable}
+:is(.article-content,.article-body,.live-preview-body,#preview-body) table{width:100%;border-collapse:collapse;font-family:"PingFang SC","Microsoft YaHei",sans-serif;font-size:.85em;line-height:1.75;white-space:normal}
+:is(.article-content,.article-body,.live-preview-body,#preview-body) th,:is(.article-content,.article-body,.live-preview-body,#preview-body) td{padding:.75em 1em;border-bottom:1px solid #80907328;text-align:left;min-width:5em;vertical-align:top}
+:is(.article-content,.article-body,.live-preview-body,#preview-body) th{font-weight:600;background:#80907310}
+:is(.article-content,.article-body,.live-preview-body,#preview-body) tr:last-child td{border-bottom:0}
+:is(.article-content,.article-body,.live-preview-body,#preview-body) .align-right{text-align:right}
+:is(.article-content,.article-body,.live-preview-body,#preview-body) .align-center{text-align:center}
+:is(.article-content,.article-body,.live-preview-body,#preview-body) .math-block{overflow-x:auto;max-width:100%;padding:1em .5em;margin:1.5em 0;line-height:1.5}
+:is(.article-content,.article-body,.live-preview-body,#preview-body) math{font-size:1.1em;letter-spacing:normal;line-height:normal}
+:is(.article-content,.article-body,.live-preview-body,#preview-body) .math-error{font-family:ui-monospace,monospace;font-size:.85em;color:#965b40;white-space:pre-wrap;overflow-wrap:anywhere}
+.reader-permalink{display:block;font-size:10px;color:var(--room-accent);margin-top:8px;text-decoration:underline;text-underline-offset:3px}
+@media(max-width:760px){.reader-permalink{font-size:9px;margin:0}:is(.article-content,.article-body,.live-preview-body,#preview-body) th,:is(.article-content,.article-body,.live-preview-body,#preview-body) td{padding:.6em .8em}}

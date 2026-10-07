@@ -26,6 +26,6 @@ export function renderSearch(owner,scope=''){
  queueMicrotask(()=>{if(alive())run();});if(!scope)requestAnimationFrame(()=>input.focus({preventScroll:true}));
 }
 export function highlightArticleMatches(body,query){
- if(!terms(query).length)return null;const walker=document.createTreeWalker(body,NodeFilter.SHOW_TEXT),nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);let first=null,budget=200;
+ if(!terms(query).length)return null;const walker=document.createTreeWalker(body,NodeFilter.SHOW_TEXT),nodes=[];while(walker.nextNode()){if(!walker.currentNode.parentElement?.closest('math'))nodes.push(walker.currentNode);}let first=null,budget=200;
  for(const node of nodes){if(!budget)break;const parts=highlightParts(node.textContent,query,{limit:budget});budget-=parts.filter(p=>p.match).length;if(!parts.some(p=>p.match))continue;const fragment=document.createDocumentFragment();for(const part of parts){const item=part.match?el('mark','reading-match',part.text):document.createTextNode(part.text);if(part.match&&!first)first=item;fragment.append(item);}node.replaceWith(fragment);}return first;
 }
