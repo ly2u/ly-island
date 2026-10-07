@@ -79,3 +79,5 @@ CivilFlow V2 继续保存在独立私有仓库 [ly2u/midas_vueflow](https://gith
 ## 开源许可
 
 原创应用代码使用 [MIT License](LICENSE)，版权署名 ly2u。npm 依赖与运行工具保留各自许可；不对 CivilFlow 独立仓库或用户内容另行授予许可。代码中的账号、域名、种子文章和个人品牌仅用于说明现有实例，部署自己的站点时应自行替换。
+
+内容维护：[完整 ZIP、导入预览与本地备份](docs/CONTENT-PORTABILITY.md)。

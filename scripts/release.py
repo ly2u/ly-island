@@ -60,7 +60,7 @@ ID_PATTERN = re.compile(r'^v[0-9][0-9A-Za-z._-]{0,40}-[0-9a-f]{12}$')
 # 与运行时相关、版本不一致时禁止发布的文件
 RUNTIME_CONFIG = ['compose.yaml', 'Caddyfile']
 # 由人工安装的运维文件；不一致时只提示
-OPS_FILES = ['scripts/backup.sh', 'scripts/verify-backup.py', 'scripts/record-island-source.py',
+OPS_FILES = ['scripts/backup.sh', 'scripts/verify-backup.py', 'scripts/verify-portable-content.py', 'scripts/record-island-source.py',
              'systemd/ly-stack-backup.service', 'systemd/ly-stack-backup.timer', 'systemd/ly-ai.service']
 # 岛屿目录中随源码同步的文件；dist/ 单独处理，node_modules 等不动
 ISLAND_SOURCE_FILES = ['package.json', 'package-lock.json', 'vite.config.js', 'index.html', 'README.md']
@@ -305,6 +305,8 @@ def probe_live():
 
 def require_mfa_compatible(source):
     """Refuse an older image that would silently ignore an enabled administrator factor."""
+    if (DATA_DIR / 'content-import-transaction' / 'journal.json').exists():
+        raise ReleaseError('存在未完成的内容导入，停止发布或回滚；先用当前支持导入的版本启动并核对恢复结果。')
     state_file = DATA_DIR / 'admin-mfa.json'
     if not state_file.exists():
         return

@@ -474,6 +474,16 @@ def main():
         factor.unlink()
         groups += 1
 
+        pending = data_dir / 'content-import-transaction'
+        pending.mkdir()
+        (pending / 'journal.json').write_text('{}')
+        for arguments in [('rollback',), ('deploy', unsupported)]:
+            result = release(*arguments)
+            expect(result.returncode != 0 and '未完成的内容导入' in result.stdout,
+                   'Unfinished content import must block code changes')
+            expect(state()['running'] == running_before, 'Import recovery guard must not switch sites')
+        groups += 1
+
         server.shutdown()
         print('Release flow passed (%d groups): preflight leaves production untouched, tag must be merged, failed checks/'
               'config drift/tampered artifacts/failed backup block deploy, unhealthy sites or broken island roll back '

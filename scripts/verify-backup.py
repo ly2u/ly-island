@@ -7,6 +7,7 @@ import sys
 import tarfile
 import tempfile
 import re
+import importlib.util
 from pathlib import Path, PurePosixPath
 
 archive = Path(sys.argv[1])
@@ -41,6 +42,21 @@ with tempfile.TemporaryDirectory(prefix='ly-restore-check-') as directory:
         raise SystemExit('恢复后的 posts.json 不是数组。')
     if any(not isinstance(post, dict) or not isinstance(post.get('slug'), str) for post in posts):
         raise SystemExit('恢复后的文章数据格式无效。')
+    portable_name = 'srv/ly-data/sites/content-export.zip'
+    if portable_name in names:
+        if names[portable_name].mode & 0o077:
+            raise SystemExit('备份中的可移植内容包权限过宽。')
+        helper_name = 'opt/ly-stack/scripts/verify-portable-content.py'
+        if helper_name not in names:
+            raise SystemExit('备份缺少可移植内容校验器。')
+        # Use the trusted installed checker, never execute a file from the archive.
+        spec = importlib.util.spec_from_file_location('portable_check', Path(__file__).with_name('verify-portable-content.py'))
+        checker = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(checker)
+        try:
+            checker.validate(Path(directory)/portable_name, Path(directory)/'srv/ly-data/sites')
+        except Exception:
+            raise SystemExit('恢复后的可移植内容包与数据不一致。')
     history_dir = Path(directory) / 'srv/ly-data/sites/content-history'
     if history_dir.exists():
         if names['srv/ly-data/sites/content-history'].mode & 0o077:
@@ -271,6 +287,8 @@ with tempfile.TemporaryDirectory(prefix='ly-restore-check-') as directory:
             record = json.loads(record_path.read_text())
             if record.get('id') != release_id or record.get('commit') != current.get('commit'):
                 raise SystemExit('当前发布记录与 current.json 不一致。')
+            if 'apps/rqly-sites/export-content.mjs' in record.get('sourceFiles', {}) and portable_name not in names:
+                raise SystemExit('当前版本备份缺少可移植内容包。')
             for folder, field in [('src', 'sourceFiles'), ('island-dist', 'islandFiles')]:
                 files = record.get(field)
                 if not isinstance(files, dict) or not files:

@@ -46,6 +46,7 @@ jobs:
           python3 scripts/check-release.py
           python3 scripts/check-mailbox-backup.py
           python3 scripts/check-mfa-backup.py
+          python3 scripts/check-portable-backup.py
   bridge:
     runs-on: ubuntu-latest
     steps:
