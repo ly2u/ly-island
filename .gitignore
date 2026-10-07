@@ -34,3 +34,6 @@ validation/
 
 # CivilFlow remains an independent repository
 apps/midas_vueflow/
+
+# Claude Code: per-user approvals saved by "don't ask again" (keeps the release worktree clean)
+.claude/settings.local.json

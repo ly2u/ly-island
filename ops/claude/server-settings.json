@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "defaultMode": "default",
+    "disableAutoMode": "disable",
+    "disableBypassPermissionsMode": "disable",
+    "deny": [
+      "Read(//opt/ly-stack/.env)",
+      "Read(//opt/ly-stack/env/**)",
+      "Read(//opt/ly-stack/apps/rqly-sites/.env)",
+      "Read(//srv/ly-data/**)",
+      "Read(//srv/ly-backups/**)",
+      "Read(//var/lib/ly-ai/**)",
+      "Read(//root/.ssh/**)",
+      "Edit(//opt/ly-stack/repository/**)",
+      "Edit(//opt/ly-stack/.env)",
+      "Edit(//opt/ly-stack/env/**)",
+      "Edit(//srv/**)",
+      "Edit(//var/lib/ly-ai/**)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(docker compose down *)",
+      "Bash(docker system prune *)",
+      "Bash(docker volume rm *)",
+      "Bash(docker volume prune *)",
+      "Bash(reboot *)",
+      "Bash(shutdown *)",
+      "Bash(poweroff *)",
+      "Bash(systemctl reboot *)",
+      "Bash(systemctl poweroff *)"
+    ],
+    "ask": [
+      "Bash(docker inspect *)",
+      "Bash(docker exec *)",
+      "Bash(docker compose exec *)",
+      "Bash(docker compose config *)",
+      "Bash(printenv *)",
+      "Bash(env)"
+    ]
+  }
+}

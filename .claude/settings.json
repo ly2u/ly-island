@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Read(//opt/ly-stack/.env)",
+      "Read(//opt/ly-stack/env/**)",
+      "Read(//opt/ly-stack/apps/rqly-sites/.env)",
+      "Read(//srv/ly-data/**)",
+      "Read(//srv/ly-backups/**)",
+      "Read(//var/lib/ly-ai/**)",
+      "Read(//root/.ssh/**)"
+    ],
+    "ask": [
+      "Bash(docker inspect *)",
+      "Bash(docker exec *)",
+      "Bash(docker compose exec *)",
+      "Bash(docker compose config *)",
+      "Bash(printenv *)",
+      "Bash(env)"
+    ]
+  }
+}
