@@ -1,0 +1,36 @@
+# Credentials and personal/runtime data
+.env
+.env.*
+!.env.example
+!**/.env.example
+env/*.env
+auth.json
+**/auth.json
+**/admin-account.json
+**/admin-sessions.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.sqlite*
+**/data/
+**/backups/
+incoming/
+rollback/
+validation/
+*.tar
+*.tar.gz
+*.zip
+*.log
+
+# Dependencies, builds and local caches
+**/node_modules/
+**/dist/
+**/.next/
+**/preview/
+**/__pycache__/
+*.pyc
+.DS_Store
+
+# CivilFlow remains an independent repository
+apps/midas_vueflow/

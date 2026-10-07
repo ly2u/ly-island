@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily LY stack backup at 03:15 UTC
+
+[Timer]
+OnCalendar=*-*-* 03:15:00 UTC
+RandomizedDelaySec=10min
+Persistent=true
+Unit=ly-stack-backup.service
+
+[Install]
+WantedBy=timers.target

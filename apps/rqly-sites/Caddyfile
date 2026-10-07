@@ -1,0 +1,25 @@
+{
+  email {$ACME_EMAIL}
+}
+
+rqly.com {
+  encode zstd gzip
+  reverse_proxy app:8080 {
+    header_up X-Real-IP {remote_host}
+  }
+}
+
+www.rqly.com {
+  redir https://rqly.com{uri} permanent
+}
+
+7zui.com {
+  encode zstd gzip
+  reverse_proxy app:8080 {
+    header_up X-Real-IP {remote_host}
+  }
+}
+
+www.7zui.com {
+  redir https://7zui.com{uri} permanent
+}

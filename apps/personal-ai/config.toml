@@ -1,0 +1,31 @@
+model = "gpt-6-luna"
+model_reasoning_effort = "medium"
+sandbox_mode = "read-only"
+approval_policy = "on-request"
+web_search = "disabled"
+service_tier = "default"
+disable_response_storage = true
+project_doc_max_bytes = 0
+
+[features]
+shell_tool = false
+unified_exec = false
+code_mode = false
+code_mode_host = true
+multi_agent = false
+apps = false
+plugins = false
+remote_plugin = false
+hooks = false
+goals = false
+memories = false
+shell_snapshot = false
+view_image = false
+sleep_tool = false
+skill_search = false
+
+[agents]
+enabled = false
+
+[analytics]
+enabled = false

@@ -1,0 +1,44 @@
+name: Source checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  sites:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/rqly-sites
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/rqly-sites/package-lock.json
+      - run: npm ci
+      - name: Isolated site checks (no production data or model calls)
+        run: |
+          test ! -f .env
+          for check in scripts/check*.mjs; do node "$check"; done
+  island:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/ly-island-preview
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/ly-island-preview/package-lock.json
+      - run: npm ci
+      - run: npm run build
+  bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m py_compile apps/personal-ai/bridge.py scripts/*.py

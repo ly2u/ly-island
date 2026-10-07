@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>记录与求索 · LY</title>
+  <meta name="description" content="LY 的个人网站。记录桥梁工程、历史研究与数字工具实践。">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/site.css?v=authoring-media-v1">
+</head>
+<body>
+<a class="skip-link" href="#main">跳到正文</a>
+<header class="header wrap">
+  <a class="brand" href="/" aria-label="记录与求索首页"><span class="brand-mark">LY<span class="brand-dot"></span></span><span class="brand-name">记录与求索<span>RECORD & QUEST</span></span></a>
+  <p class="sidebar-intro">桥梁工程从业者。<br>记录实践，也保持好奇。</p>
+  <nav aria-label="主导航">
+    <a href="/" class="home-link"><span aria-hidden="true">⌂</span>首页</a>
+    <a href="/notes"><span aria-hidden="true">≡</span>全部记录</a>
+    <a href="/notes?topic=工程"><span aria-hidden="true">↗</span>工程手记</a>
+    <a href="/notes?topic=探索"><span aria-hidden="true">✳</span>探索与实践</a>
+    <a href="/nantan"><span aria-hidden="true">⌁</span>能滩吊桥</a>
+    <a href="/about"><span aria-hidden="true">○</span>关于 LY</a>
+  </nav>
+  <div class="sidebar-tools"><span class="sidebar-label">我的工具</span><a href="https://midas.rqly.com">CivilFlow <span aria-hidden="true">↗</span></a><a href="{{QIZUI_URL}}">七嘴 <span aria-hidden="true">↗</span></a></div>
+  <div class="sidebar-foot"><a href="/feed.xml">RSS 订阅 <span aria-hidden="true">↗</span></a><span>一点记录，慢慢生长。</span></div>
+</header>
+<main id="main">
+  <section class="hero wrap">
+    <div class="hero-copy">
+      <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span>你好，我是 LY</p>
+      <h1>记录工程，<br>也记录<span class="accent">沿途的发现。</span></h1>
+      <p class="hero-description">从一座桥、一个问题，到一次新的尝试。<br>这里是我的工程手记、研究札记与工具实践。</p>
+      <div class="hero-actions"><a class="button primary" href="/notes">阅读记录 <span aria-hidden="true">↗</span></a><a class="plain-link" href="/about">关于我</a></div>
+    </div>
+    <figure class="bridge-art"><img src="/bridge-study.svg" alt="抽象桥梁结构线稿" width="520" height="360"><figcaption>结构 · 跨越 · 连接</figcaption></figure>
+  </section>
+  <div class="interest-strip wrap"><span>关注的方向</span><a href="/notes?topic=工程">桥梁工程</a><a href="/nantan">桥梁遗产</a><a href="/notes?topic=探索">数字工具</a></div>
+  <section class="notes-section wrap" aria-labelledby="recent-heading">
+    <div class="section-top"><div><p class="eyebrow">最近更新</p><h2 id="recent-heading">写下来的事</h2></div><a class="plain-link" href="/notes">全部记录 <span aria-hidden="true">↗</span></a></div>
+    <div class="note-grid">{{RECENT_POSTS}}</div>
+  </section>
+  <section class="subject-section wrap" aria-labelledby="subject-heading">
+    <div class="section-top"><div><p class="eyebrow">持续关注</p><h2 id="subject-heading">一座桥，四个问题</h2></div><span class="section-note">研究札记</span></div>
+    <a class="subject-card" href="/nantan"><div><span class="project-tag">桥梁遗产</span><h3>能滩吊桥</h3><p>为什么要修，怎么修成，经历了什么，今天怎么认识。<br>把问题留下来，让认识随着资料逐步展开。</p><span class="subject-link">阅读专题 <span aria-hidden="true">↗</span></span></div><svg class="subject-symbol" aria-hidden="true" width="140" height="110" viewBox="0 0 140 110" fill="none"><path d="M7 77h126M27 87V28h8v59M104 87V28h8v59M7 75l24-42c25 44 51 44 77 0l25 42" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M49 58v19M69 66v11M89 59v18" stroke="currentColor" stroke-width="2"/></svg></a>
+  </section>
+  <section class="tools-section wrap" aria-labelledby="tools-heading">
+    <div class="section-top"><div><p class="eyebrow">动手尝试</p><h2 id="tools-heading">自己也在用的小工具</h2></div></div>
+    <div class="tools-grid">
+      <a class="tool-card" href="{{QIZUI_URL}}"><span class="tool-icon" aria-hidden="true">7</span><span class="tool-arrow" aria-hidden="true">↗</span><h3>七嘴</h3><p>写完以后，换个视角再读一遍。<br>让专业人员、听众与编辑帮你检查表达。</p><span class="tool-label">写作与表达</span></a>
+      <a class="tool-card" href="https://midas.rqly.com"><span class="tool-icon flow-icon" aria-hidden="true">⌘</span><span class="tool-arrow" aria-hidden="true">↗</span><h3>CivilFlow</h3><p>把建模过程连接成工作流。<br>编译、校验，导出 Civil 数据。</p><span class="tool-label">工程与建模</span></a>
+    </div>
+  </section>
+</main>
+<footer class="footer wrap"><div><strong>记录与求索 · LY</strong><p>把实践留下，让思考继续。</p></div><div><span>© {{YEAR}} LY</span><a href="/feed.xml">RSS</a><a href="/about">关于本站</a></div></footer>
+</body></html>

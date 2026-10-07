@@ -1,0 +1,41 @@
+[Unit]
+Description=LY private Codex subscription AI bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ly-ai
+Group=ly-ai
+SupplementaryGroups=ly-sites-socket
+WorkingDirectory=/var/lib/ly-ai/work
+Environment=CODEX_HOME=/var/lib/ly-ai/codex
+Environment=LY_AI_WORK=/var/lib/ly-ai/work
+Environment=LY_CODEX_BINARY=/usr/local/lib/ly-ai/codex
+ExecStart=/usr/bin/python3 /usr/local/lib/ly-ai/bridge.py
+Restart=on-failure
+RestartSec=5
+StateDirectory=ly-ai
+StateDirectoryMode=0700
+RuntimeDirectory=ly-ai
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+InaccessiblePaths=-/opt/ly-stack/env -/opt/ly-stack/.env -/srv/ly-data/sites -/srv/ly-data/caddy -/srv/ly-backups
+MemoryMax=768M
+TasksMax=160
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,12 @@
+{
+  "version": "1.1.0",
+  "codexVersion": "0.160.1",
+  "updatedUTC": "2026-10-06T17:14:27.524854+00:00",
+  "files": {
+    "README.md": "dbaa959d6aa37ce791481e7aa70e28bcf534c375b51a59d7ea4b29bfae3605a0",
+    "config.toml": "6a16927ea12a13fe2c02107d9d0b25ab827aed853203d1820681c5c563c45757",
+    "bridge.py": "cab2537c8ef9729f9117021e0610863f5b5e9d2951a2d39bf3f4c7d57d4ea791"
+  },
+  "binarySHA256": "f34a4d2301892ae96c90097786bfe5dc269f187b6f69faf42a7b357b8c081e35",
+  "hostBinarySHA256": "b33e8a5283f3c65c2a0aca6d43a59cfe850f624d8fa16992e3cad4fcc27c14e1"
+}

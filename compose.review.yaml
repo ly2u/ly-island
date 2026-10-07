@@ -1,0 +1,38 @@
+name: ly-review
+services:
+  sites:
+    build:
+      context: ./apps/rqly-sites
+    env_file: ./env/review.env
+    environment:
+      NODE_ENV: test
+      RQLY_URL: http://localhost:4173
+      QIZUI_URL: http://qizui.preview
+      DATA_DIR: /app/data
+      PORT: '8080'
+      TRUST_PROXY: 'true'
+      CODEX_BRIDGE_SOCKET: ''
+      AI_API_KEY: ''
+      AI_MODEL: ''
+    volumes:
+      - review-data:/app/data
+    expose: ['8080']
+    read_only: true
+    tmpfs: ['/tmp']
+    security_opt: ['no-new-privileges:true']
+    healthcheck:
+      test: ['CMD', 'node', '-e', "require('node:http').get({hostname:'127.0.0.1',port:8080,path:'/healthz',headers:{Host:'localhost:4173'}},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  web:
+    build:
+      context: .
+      dockerfile: deploy/island.review.Dockerfile
+    depends_on:
+      sites:
+        condition: service_healthy
+    ports:
+      - '127.0.0.1:4173:80'
+volumes:
+  review-data:

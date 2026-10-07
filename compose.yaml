@@ -1,0 +1,76 @@
+name: ly-stack
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  sites:
+    image: ly-sites:organization-20261007
+    build:
+      context: ./apps/rqly-sites
+    restart: unless-stopped
+    env_file: ./env/sites.env
+    environment:
+      DATA_DIR: /app/data
+      PORT: "8080"
+      TRUST_PROXY: "true"
+      CODEX_BRIDGE_SOCKET: /run/ly-ai/bridge.sock
+      AI_HOURLY_PER_IP: "30"
+      AI_DAILY_LIMIT: "120"
+    volumes:
+      - /srv/ly-data/sites:/app/data
+      - /run/ly-ai:/run/ly-ai:ro
+    expose: ["8080"]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD","node","-e","const http=require('node:http');const request=http.get({hostname:'127.0.0.1',port:8080,path:'/healthz',headers:{Host:new URL(process.env.RQLY_URL||'https://rqly.com').host},timeout:4000},response=>{response.resume();if(response.statusCode!==200)console.error('healthz HTTP '+response.statusCode);process.exit(response.statusCode===200?0:1)});request.on('timeout',()=>request.destroy(new Error('healthz timeout')));request.on('error',error=>{console.error(error.message);process.exit(1)});"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    logging: *logging
+
+  civilflow:
+    image: ly-civilflow:7a56c7a
+    build:
+      context: ./apps/midas_vueflow/civilflow_v2
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3102"
+      HOSTNAME: 0.0.0.0
+    expose: ["3102"]
+    mem_limit: 3g
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3102/api/catalog').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    logging: *logging
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    env_file: ./.env
+    depends_on:
+      sites:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./apps/ly-island-preview/dist:/srv/island:ro
+      - /srv/ly-data/caddy/data:/data
+      - /srv/ly-data/caddy/config:/config
+    mem_limit: 256m
+    logging: *logging

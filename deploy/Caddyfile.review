@@ -1,0 +1,20 @@
+{
+    auto_https off
+    admin off
+}
+:80 {
+    handle / {
+        root * /srv/island
+        rewrite * /index.html
+        file_server
+    }
+    handle_path /island/* {
+        root * /srv/island
+        file_server
+    }
+    handle {
+        reverse_proxy sites:8080 {
+            header_up X-Real-IP {remote_host}
+        }
+    }
+}

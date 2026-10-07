@@ -1,0 +1,15 @@
+[Unit]
+Description=Consistent backup of LY websites and Caddy state
+Requires=docker.service
+After=docker.service
+ConditionPathExists=/opt/ly-stack/env/sites.env
+ConditionPathExists=/srv/ly-data/sites/posts.json
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/ly-stack
+UMask=0077
+ExecStart=/bin/bash /opt/ly-stack/scripts/backup.sh
+TimeoutStartSec=15min
+TimeoutStopSec=120

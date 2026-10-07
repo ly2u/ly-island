@@ -1,0 +1,418 @@
+{
+  "createdUTC": "2026-10-07T05:06:04.153756+00:00",
+  "description": "Source copied from running VPS; runtime data, credentials, generated bundles and binary dependencies excluded. Paths are audit provenance, not deployment secrets.",
+  "files": {
+    "apps/rqly-sites/.dockerignore": {
+      "source": "/opt/ly-stack/apps/rqly-sites/.dockerignore",
+      "sha256": "30fb5b4df5eb90aeb0174bf85595b4a3674091855235db32e82f83cdcf63a176"
+    },
+    "apps/rqly-sites/.env.example": {
+      "source": "/opt/ly-stack/apps/rqly-sites/.env.example",
+      "sha256": "4dcf62f329e39e29484c068e1ab72fd3dc3a48c05020d912c2eae253316c4343"
+    },
+    "apps/rqly-sites/.gitignore": {
+      "source": "/opt/ly-stack/apps/rqly-sites/.gitignore",
+      "sha256": "8ba068c852fcb396b4671736b9822c8460c0c2a13099d648faf5cc43bee1402d"
+    },
+    "apps/rqly-sites/Caddyfile": {
+      "source": "/opt/ly-stack/apps/rqly-sites/Caddyfile",
+      "sha256": "82cd9d0ad14054f997c85b57792bd9fd182be200853055de75fbfda776f781fd"
+    },
+    "apps/rqly-sites/Dockerfile": {
+      "source": "/opt/ly-stack/apps/rqly-sites/Dockerfile",
+      "sha256": "78246dfd5003eb149fea2b889568719f3274c30d30a0d7d130ceb78a91e402bb"
+    },
+    "apps/rqly-sites/README.md": {
+      "source": "/opt/ly-stack/apps/rqly-sites/README.md",
+      "sha256": "3ecc855eeb9940d768d26f80120011bed54f34e6dd1963bed2a41287a0500ee8"
+    },
+    "apps/rqly-sites/SOURCE-CHANGES.json": {
+      "source": "/opt/ly-stack/apps/rqly-sites/SOURCE-CHANGES.json",
+      "sha256": "c6bad9a58bbedc614e71730316fbf1674200997c817aff6fa466b15b2fa4d580"
+    },
+    "apps/rqly-sites/VALIDATION.md": {
+      "source": "/opt/ly-stack/apps/rqly-sites/VALIDATION.md",
+      "sha256": "37de1338739d544ef9ff027e5785fb347e2cf14e246b5b950d9fb03f3ecb9d69"
+    },
+    "apps/rqly-sites/admin-account.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/admin-account.mjs",
+      "sha256": "83cf6396d92733555ba93c76e6cc82d00b37062fcfdb200bbe0275ea7ef94a71"
+    },
+    "apps/rqly-sites/admin-auth.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/admin-auth.mjs",
+      "sha256": "c8a29e44413230d5d53bc5e3fe182713b143c90e79dc3fab716f762eaaede7df"
+    },
+    "apps/rqly-sites/ai-site-tools.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/ai-site-tools.mjs",
+      "sha256": "24eb585613b329ff61fe0fac4cf2a0c835ef2f68a00fa4d9f942d3ea07d79a1d"
+    },
+    "apps/rqly-sites/compose.panel.yaml": {
+      "source": "/opt/ly-stack/apps/rqly-sites/compose.panel.yaml",
+      "sha256": "cb32e22f2762141ba1a3b87452173ce68fb3d7c9ced607e577254dedad831bf1"
+    },
+    "apps/rqly-sites/compose.yaml": {
+      "source": "/opt/ly-stack/apps/rqly-sites/compose.yaml",
+      "sha256": "4d5eb9f9768ef0d7c392acbe50d2bebb1861af067f6ddd1b1c6d5cc1088f81c6"
+    },
+    "apps/rqly-sites/content/posts.json": {
+      "source": "/opt/ly-stack/apps/rqly-sites/content/posts.json",
+      "sha256": "924eed866f088f218c4a9dba98e01f98b86b7518c69d39c0fd7686bf331a6609"
+    },
+    "apps/rqly-sites/content-history.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/content-history.mjs",
+      "sha256": "73cc359fb68553809d8800969bd8a604b6890de108580510abc6d93fcd0c881f"
+    },
+    "apps/rqly-sites/editor-drafts.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/editor-drafts.mjs",
+      "sha256": "bddd1503bd7fffa38ef3a32fb727219cd8aa708bfee0ac403f27355de87a5768"
+    },
+    "apps/rqly-sites/island-store.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/island-store.mjs",
+      "sha256": "0f0fe6b761a2c3202f45de909c779747c56ca7704d6536df93fb96ff21de4bdc"
+    },
+    "apps/rqly-sites/mailbox-store.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/mailbox-store.mjs",
+      "sha256": "ab5e020c24ec17ac34d5118e9bbc8f073cd3f755ae5d3e57bb92df44fcc022a3"
+    },
+    "apps/rqly-sites/media-store.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/media-store.mjs",
+      "sha256": "84d92621aa8d476eb57fd1c9ad41397a6eebda4f3c7d475ec8488ce2f8b8c3d4"
+    },
+    "apps/rqly-sites/organization-store.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/organization-store.mjs",
+      "sha256": "75898b9c0c4b53c18cc429ff0f2df87c89941e570206180da1a30d6df8e918e6"
+    },
+    "apps/rqly-sites/package-lock.json": {
+      "source": "/opt/ly-stack/apps/rqly-sites/package-lock.json",
+      "sha256": "cd89207f25fe4170ce956e1365e0b959b65eb55b74fc9854f6185b56115e46a9"
+    },
+    "apps/rqly-sites/package.json": {
+      "source": "/opt/ly-stack/apps/rqly-sites/package.json",
+      "sha256": "8a4462532a5294e8d20a17fcf0c4ae457c306b4200d5c2772a2d7a8efac6df8b"
+    },
+    "apps/rqly-sites/personal-ai.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/personal-ai.mjs",
+      "sha256": "da838a03fc4c29d57398115a428a54e57fe02e30930acd083748672663263058"
+    },
+    "apps/rqly-sites/public/qizui/favicon.svg": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/qizui/favicon.svg",
+      "sha256": "55615ac28d15c20e7de1b1567a7ec673b39db34de35ef576ff35a892789e4c80"
+    },
+    "apps/rqly-sites/public/qizui/index.html": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/qizui/index.html",
+      "sha256": "dae9278204d3bbb7cf094fb64396163630ca66c92063a500fd1aa17b4829c207"
+    },
+    "apps/rqly-sites/public/qizui/qizui.css": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/qizui/qizui.css",
+      "sha256": "9237674fe7a75d63999fbd61f217ebc1caa0f4081c20916aff3195e4b8487cbd"
+    },
+    "apps/rqly-sites/public/qizui/qizui.js": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/qizui/qizui.js",
+      "sha256": "e7fa3866881b0a1f2c6b0ec4852561f8ad285c89f7115c97bd235bc7ac735ac0"
+    },
+    "apps/rqly-sites/public/qizui/review-core.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/qizui/review-core.mjs",
+      "sha256": "237363b0db2dc7ec055b20b3a8a6675e5dafe28daebe03d16b8aee3d0f0f5080"
+    },
+    "apps/rqly-sites/public/rqly/about.html": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/rqly/about.html",
+      "sha256": "ba5d7e36c783996eff6c8ad25bf85e72a28af2184080365a8bdd6dc01f8e5fcc"
+    },
+    "apps/rqly-sites/public/rqly/admin-mailbox.js": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/rqly/admin-mailbox.js",
+      "sha256": "30d6153f26ac36eedbe2d828d7b17020b2924cc5ae2e5272ec7d98ecf779ba18"
+    },
+    "apps/rqly-sites/public/rqly/admin.css": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/rqly/admin.css",
+      "sha256": "0002a63789fb32d5fe100d425ce864c7a360307cc463de49dc53b31ed00ed262"
+    },
+    "apps/rqly-sites/public/rqly/admin.html": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/rqly/admin.html",
+      "sha256": "40e63b21a2d2e800edcacdbfb5037882827c4ded09660a7cbce26db35cd99e77"
+    },
+    "apps/rqly-sites/public/rqly/admin.js": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/rqly/admin.js",
+      "sha256": "acc08eec70b6a6ad48aa93ed387861e5f30cebbe4c24993c92d8ad070e0bdd9e"
+    },
+    "apps/rqly-sites/public/rqly/ai.css": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/rqly/ai.css",
+      "sha256": "565ba254c593abd001de66fd191722b795a6ffccf4a9e59b62d09f468096cd83"
+    },
+    "apps/rqly-sites/public/rqly/ai.js": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/rqly/ai.js",
+      "sha256": "fa244f45099582a34b862a6225d52d273e0f5cb8977e15a71bd8567cb722b19b"
+    },
+    "apps/rqly-sites/public/rqly/article.html": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/rqly/article.html",
+      "sha256": "babf22a7652273fc59df84951c284f3dbefa7e3fe762e7cd5bb1dbb7eb89b797"
+    },
+    "apps/rqly-sites/public/rqly/bridge-study.svg": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/rqly/bridge-study.svg",
+      "sha256": "660109b2cf9da381f426718b117d1955fff7d72d09afc47b36209420b6bd459c"
+    },
+    "apps/rqly-sites/public/rqly/favicon.svg": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/rqly/favicon.svg",
+      "sha256": "88bfa34fa0e1fa0797e852daa40207906467cede111d809156dbb74e0879fdb2"
+    },
+    "apps/rqly-sites/public/rqly/index.html": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/rqly/index.html",
+      "sha256": "5a33ae444db50ac010e8b2054b31650cb2ef9fe54de3a618769b59fad464b012"
+    },
+    "apps/rqly-sites/public/rqly/login.html": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/rqly/login.html",
+      "sha256": "5f4ffa5c0b102969643739450b8e0cca74967221cfaf163f1828759549298b55"
+    },
+    "apps/rqly-sites/public/rqly/login.js": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/rqly/login.js",
+      "sha256": "0d3eca39a4032d9ddffc498a49bb509708369c6cb7879618a275051328ddbff1"
+    },
+    "apps/rqly-sites/public/rqly/nantan.html": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/rqly/nantan.html",
+      "sha256": "a98e303c32f6a02db7b2e1f3e1ecaf1eda3eaccd8148e5bf46c107f491c8c520"
+    },
+    "apps/rqly-sites/public/rqly/notes.html": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/rqly/notes.html",
+      "sha256": "beceea7e175df005e9869b5841b9a3eff66d7560eaebccee606044069a8ea83c"
+    },
+    "apps/rqly-sites/public/rqly/organization-core.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/rqly/organization-core.mjs",
+      "sha256": "e7af3046dc08629eb7a183bb45fe53a6005571696b1e9d92303c187e120a954f"
+    },
+    "apps/rqly-sites/public/rqly/preview-sync.js": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/rqly/preview-sync.js",
+      "sha256": "80f5b65c4341869ccbdb71d26b8e09d8e555a9bf3f7daa438bd23d7c4c2447c6"
+    },
+    "apps/rqly-sites/public/rqly/quota.js": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/rqly/quota.js",
+      "sha256": "b3387e2245276965694935ead5ced71b95832543feabe38b56a47f001f376c4d"
+    },
+    "apps/rqly-sites/public/rqly/search-core.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/rqly/search-core.mjs",
+      "sha256": "6775deb7a071abfadf4738cd01366eb44ccc1a233d564092c4be02f798f5122b"
+    },
+    "apps/rqly-sites/public/rqly/session-nav.js": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/rqly/session-nav.js",
+      "sha256": "425fec65d95568877b162fceb505f5e916289834cb50f09df289bb96efd60696"
+    },
+    "apps/rqly-sites/public/rqly/site.css": {
+      "source": "/opt/ly-stack/apps/rqly-sites/public/rqly/site.css",
+      "sha256": "ed0b81b431f4cb1bf3977a45483878e4a8d5d530a005978958398ac51b9bc4e6"
+    },
+    "apps/rqly-sites/scripts/check-ai-tools.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/scripts/check-ai-tools.mjs",
+      "sha256": "7b056c686dbe25317d2bd61b769e2ca0ad94360a07944edb892ce9dbe3ca4a03"
+    },
+    "apps/rqly-sites/scripts/check-content-tools.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/scripts/check-content-tools.mjs",
+      "sha256": "3436aaaa4ca4735ae171499bcd4e6e244b779e3bb49803c07ba4477f9cd29580"
+    },
+    "apps/rqly-sites/scripts/check-editor-drafts.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/scripts/check-editor-drafts.mjs",
+      "sha256": "ed698cea3b2a22529dc9c5d7b59171154dc680f3d801777e0b0f484ff82b101a"
+    },
+    "apps/rqly-sites/scripts/check-island-scenery.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/scripts/check-island-scenery.mjs",
+      "sha256": "7e0da6efb0613104845c3d4c44ac2709516d6b9363c028a03750947b1fc00bf7"
+    },
+    "apps/rqly-sites/scripts/check-mailbox.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/scripts/check-mailbox.mjs",
+      "sha256": "e406b507f4aaacbf7b7b66ed2685fff82c4c00602b095b08842f60f53e66b843"
+    },
+    "apps/rqly-sites/scripts/check-media.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/scripts/check-media.mjs",
+      "sha256": "3f51510ac6f39f3acb7163422e9073218b557add9d9843b1cd5e3cd42124a498"
+    },
+    "apps/rqly-sites/scripts/check-organization.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/scripts/check-organization.mjs",
+      "sha256": "aadbf573195149fb4daa6f1d39bd714b5e65b068cd5209b0a29f00d3af9b3917"
+    },
+    "apps/rqly-sites/scripts/check-password.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/scripts/check-password.mjs",
+      "sha256": "0235122db9fe18bea3ce56360a899f19981ce8063737ac31fda1fdbd6803838d"
+    },
+    "apps/rqly-sites/scripts/check-preview-map.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/scripts/check-preview-map.mjs",
+      "sha256": "12a6b041fd2ecdfbda90043987f3396ccb501a0df91e1789d464f896d0b99332"
+    },
+    "apps/rqly-sites/scripts/check-product.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/scripts/check-product.mjs",
+      "sha256": "a3e7e95907ed56e08d10702eb6536c8b37d0b513d37986ea1635fd4239fe9192"
+    },
+    "apps/rqly-sites/scripts/check.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/scripts/check.mjs",
+      "sha256": "f2ffd43787fa8d9058fba7a7614d80c7e291184ed71ac383eb32430979cb0791"
+    },
+    "apps/rqly-sites/scripts/export-preview.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/scripts/export-preview.mjs",
+      "sha256": "7265b6bdd9455de15a17ac4009a4466104e6919b800458107751f0a257db71ae"
+    },
+    "apps/rqly-sites/scripts/import-content-history.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/scripts/import-content-history.mjs",
+      "sha256": "623c12bc550d1762443f34c1d047fbbbb86804419a21a22a9d25cc301b79b9e1"
+    },
+    "apps/rqly-sites/scripts/setup.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/scripts/setup.mjs",
+      "sha256": "f201d3f289d486c3e2b37441363c39df990844c7a004cf6e45cef77b0b0ea6b9"
+    },
+    "apps/rqly-sites/server.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/server.mjs",
+      "sha256": "42b9b06be3ee2aa66da58c1ce0b218734eb977e462ec9b6038abab7b427ed34a"
+    },
+    "apps/rqly-sites/withdrawn-images.mjs": {
+      "source": "/opt/ly-stack/apps/rqly-sites/withdrawn-images.mjs",
+      "sha256": "338bb89881c19d7dae4c2b5a8091908d1faf95d3db0d5efa5b8b9045beca6d30"
+    },
+    "apps/ly-island-preview/package.json": {
+      "source": "/opt/ly-stack/apps/ly-island-preview/package.json",
+      "sha256": "9e61d5606d903edb0492aa535d06a2605e90b0666831ed5439f2775cc901b860"
+    },
+    "apps/ly-island-preview/package-lock.json": {
+      "source": "/opt/ly-stack/apps/ly-island-preview/package-lock.json",
+      "sha256": "6558c5c86752c1e99a51e17507a69708632a8c2cf0d11f7578740db2657443c3"
+    },
+    "apps/ly-island-preview/vite.config.js": {
+      "source": "/opt/ly-stack/apps/ly-island-preview/vite.config.js",
+      "sha256": "395fcd5991f6923b71f033742baf9232049c6f0e45d521ff9b7d65cfd29fe51f"
+    },
+    "apps/ly-island-preview/index.html": {
+      "source": "/opt/ly-stack/apps/ly-island-preview/index.html",
+      "sha256": "ba9907b3d260e68fd778d9505a70275eab92ae499611f200f2449dbbdc036a76"
+    },
+    "apps/ly-island-preview/README.md": {
+      "source": "/opt/ly-stack/apps/ly-island-preview/README.md",
+      "sha256": "6428aa9b6cbfb55be861b290c926e4b982ef4ff1858e12ed39daa2e795fb1b19"
+    },
+    "apps/ly-island-preview/src/admin-scene.js": {
+      "source": "/opt/ly-stack/apps/ly-island-preview/src/admin-scene.js",
+      "sha256": "04684667094f0c9632335b3502f1805c39b426ad38750579e54c9e704eb893d9"
+    },
+    "apps/ly-island-preview/src/main.js": {
+      "source": "/opt/ly-stack/apps/ly-island-preview/src/main.js",
+      "sha256": "3efa223468598f6b386f2bcb1df28fcfb1592158adb289c59a6ca392956a3376"
+    },
+    "apps/ly-island-preview/src/organization.css": {
+      "source": "/opt/ly-stack/apps/ly-island-preview/src/organization.css",
+      "sha256": "e5bfc330a6bc5dbac37b8382159c222619f0cfec4d88ddf27f78a8f149ba88da"
+    },
+    "apps/ly-island-preview/src/owner.css": {
+      "source": "/opt/ly-stack/apps/ly-island-preview/src/owner.css",
+      "sha256": "f715c5dafdc78a6eba0e661b63acff5fc5a315d86c71f0b6d79484e51f101c14"
+    },
+    "apps/ly-island-preview/src/owner.js": {
+      "source": "/opt/ly-stack/apps/ly-island-preview/src/owner.js",
+      "sha256": "c8bb93f92c1f2ece5e2946af4899afb4411c6c6b707cff7494d137b170f48fbb"
+    },
+    "apps/ly-island-preview/src/paths.js": {
+      "source": "/opt/ly-stack/apps/ly-island-preview/src/paths.js",
+      "sha256": "0d5c0e1d06c1189c1097694f9f940d213f8d8c01395bb5abe0240b7ed05ed9d8"
+    },
+    "apps/ly-island-preview/src/postoffice.css": {
+      "source": "/opt/ly-stack/apps/ly-island-preview/src/postoffice.css",
+      "sha256": "68bbb9e3799a8850281d32ffa3038cd2d459f196211d8fd34b461effdfce5892"
+    },
+    "apps/ly-island-preview/src/postoffice.js": {
+      "source": "/opt/ly-stack/apps/ly-island-preview/src/postoffice.js",
+      "sha256": "167d9865edf609d2d8b8864dc287845fec5a05fe4cdf7336e683d9a6a40bc44f"
+    },
+    "apps/ly-island-preview/src/rooms.css": {
+      "source": "/opt/ly-stack/apps/ly-island-preview/src/rooms.css",
+      "sha256": "e06ff11fbf5c3b9db240951d0705aa569371cb812941cc608db4a63ef3502495"
+    },
+    "apps/ly-island-preview/src/rooms.js": {
+      "source": "/opt/ly-stack/apps/ly-island-preview/src/rooms.js",
+      "sha256": "94dad95d12d953c49a7472b81d1529700d4ecc94fbcc5979d3ce2e2b4314ca6a"
+    },
+    "apps/ly-island-preview/src/scene.js": {
+      "source": "/opt/ly-stack/apps/ly-island-preview/src/scene.js",
+      "sha256": "697b0b56b82fbc251e833b11b943e3b3dd6b3ad4bf0821a446ffd1a738f1ddfc"
+    },
+    "apps/ly-island-preview/src/search.css": {
+      "source": "/opt/ly-stack/apps/ly-island-preview/src/search.css",
+      "sha256": "e9e63891379084f3066bd9eab4ac9bb09334f1defa05c9d8b1b54be252a45958"
+    },
+    "apps/ly-island-preview/src/search.js": {
+      "source": "/opt/ly-stack/apps/ly-island-preview/src/search.js",
+      "sha256": "60b7598cba15a51ca94cd8d2408f731273ffef26c1d4f68233a5c250f37d0aba"
+    },
+    "apps/ly-island-preview/src/style.css": {
+      "source": "/opt/ly-stack/apps/ly-island-preview/src/style.css",
+      "sha256": "d9b5289d5052416941ee18759bae386ed4ca8f4fe7ad8c4334207cc497fec371"
+    },
+    "apps/personal-ai/bridge.py": {
+      "source": "/opt/ly-stack/apps/personal-ai/bridge.py",
+      "sha256": "cab2537c8ef9729f9117021e0610863f5b5e9d2951a2d39bf3f4c7d57d4ea791"
+    },
+    "apps/personal-ai/config.toml": {
+      "source": "/opt/ly-stack/apps/personal-ai/config.toml",
+      "sha256": "6a16927ea12a13fe2c02107d9d0b25ab827aed853203d1820681c5c563c45757"
+    },
+    "apps/personal-ai/README.md": {
+      "source": "/opt/ly-stack/apps/personal-ai/README.md",
+      "sha256": "dbaa959d6aa37ce791481e7aa70e28bcf534c375b51a59d7ea4b29bfae3605a0"
+    },
+    "compose.yaml": {
+      "source": "/opt/ly-stack/compose.yaml",
+      "sha256": "24ab981698bd0df38fefcbd15bbfaba7a82245c2bebc00577e36d3ace3ac97f1"
+    },
+    "Caddyfile": {
+      "source": "/opt/ly-stack/Caddyfile",
+      "sha256": "d86b1fc65663f300e9715200794790f891da704e751ec93113e17242368868ef"
+    },
+    ".env.example": {
+      "source": "/opt/ly-stack/.env.example",
+      "sha256": "62d1912a1a15ea36ae0d5c23ee63b1488ba422432f1cf314e994d41c792369d7"
+    },
+    "scripts/backup.sh": {
+      "source": "/opt/ly-stack/scripts/backup.sh",
+      "sha256": "3b3cb1d55a435283250e8a154cb49f222c9a80b6cb7fde67b0d4e307a3fe6fea"
+    },
+    "scripts/bootstrap-host.sh": {
+      "source": "/opt/ly-stack/scripts/bootstrap-host.sh",
+      "sha256": "8837c749cd2a6616ec40065c03f107c444ffc5586f039fe4e902a0620901f3f2"
+    },
+    "scripts/configure-secrets.py": {
+      "source": "/opt/ly-stack/scripts/configure-secrets.py",
+      "sha256": "09138d9a4df9eb4d35664d41675d604bc016710aec3d985cfcdc495ef6e198bf"
+    },
+    "scripts/deploy-host.sh": {
+      "source": "/opt/ly-stack/scripts/deploy-host.sh",
+      "sha256": "70eea4f4cdcd7bbcbf0453b0def4b5ebbf26b46450379bc469581ae239686b38"
+    },
+    "scripts/install-personal-ai.sh": {
+      "source": "/opt/ly-stack/scripts/install-personal-ai.sh",
+      "sha256": "0c29dd7ea683dd7cdd02809aaa346a33e7c5e1f0a8879beac05437017e0f3435"
+    },
+    "scripts/record-island-source.py": {
+      "source": "/opt/ly-stack/scripts/record-island-source.py",
+      "sha256": "323c10a56f48bdc338ad9caec68a094db90cec1941dae2de5ca900b85828cb57"
+    },
+    "scripts/verify-backup.py": {
+      "source": "/opt/ly-stack/scripts/verify-backup.py",
+      "sha256": "632a43617b3d9f0cfe0ec0e7180abf81558ed296e79519dc6ec2efe5f5180ace"
+    },
+    "scripts/verify-sources.py": {
+      "source": "/opt/ly-stack/scripts/verify-sources.py",
+      "sha256": "97acca4715a0aa5c2060aa052baa23835e57dd6a55ea093958b158caf0cc3878"
+    },
+    "systemd/ly-ai.service": {
+      "source": "/opt/ly-stack/systemd/ly-ai.service",
+      "sha256": "34f6ff207ba662ce71068c0eccf95381e472dae00c2e119538a9a62e7f81eee9"
+    },
+    "systemd/ly-stack-backup.service": {
+      "source": "/opt/ly-stack/systemd/ly-stack-backup.service",
+      "sha256": "383c45f87942d640199202688ddc99f528908fbcf35426020ba1a4738e477e07"
+    },
+    "systemd/ly-stack-backup.timer": {
+      "source": "/opt/ly-stack/systemd/ly-stack-backup.timer",
+      "sha256": "4eeb6fd1897bf50defda95780ade40c2fd40e01d81217e350345ade85134d279"
+    },
+    "docs/provenance/island-vps-manifest.json": {
+      "source": "/opt/ly-stack/apps/ly-island-preview/SOURCE-MANIFEST.json",
+      "sha256": "5a19e75c363774794d7469eb28c03eb114a1d237b186f7bd5ed50555a69d5436"
+    },
+    "docs/provenance/ai-vps-manifest.json": {
+      "source": "/opt/ly-stack/apps/personal-ai/SOURCE-MANIFEST.json",
+      "sha256": "62c8e551805695487ad5067d9dd37d2691c58c671d826799659cae4b7f4b70a4"
+    }
+  }
+}

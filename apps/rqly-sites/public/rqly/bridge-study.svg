@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 360" fill="none">
+<title>抽象桥梁结构线稿</title><desc>以桥塔、悬索和桥面组成的概念线稿，不描绘具体历史桥梁。</desc>
+<defs><pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r=".8" fill="#cbd9d5"/></pattern><linearGradient id="fade" x1="20" y1="0" x2="500" y2="360" gradientUnits="userSpaceOnUse"><stop stop-color="#eef5f1"/><stop offset="1" stop-color="#f8faf9"/></linearGradient></defs>
+<rect x="8" y="8" width="504" height="344" rx="28" fill="url(#fade)"/><rect x="24" y="24" width="472" height="312" rx="20" fill="url(#grid)"/>
+<circle cx="399" cy="85" r="30" fill="#dcebe3"/><path d="M38 263c35-7 52-7 77 0s40 7 68 0 39-7 67 0 42 7 69 0 43-7 68 0 54 7 95-1M40 279c35-7 52-7 77 0s40 7 68 0 39-7 67 0 42 7 69 0 43-7 68 0 54 7 95-1" stroke="#b8d4cd" stroke-width="2"/>
+<path d="M40 231h440M45 242h430" stroke="#52756b" stroke-width="3" stroke-linecap="round"/>
+<path d="M145 252V100h16v152M359 252V100h16v152M139 103h28M353 103h28" stroke="#46685e" stroke-width="3" stroke-linejoin="round"/>
+<path d="M40 226 153 108c71 115 143 115 214 0l113 118" stroke="#689587" stroke-width="3" stroke-linecap="round"/>
+<path d="M71 194v37M96 169v62M120 143v88M186 153v78M218 180v51M250 191v40M282 188v43M315 167v64M343 136v95M401 144v87M426 171v60M451 197v34" stroke="#91b2a6" stroke-width="1.5"/>
+<path d="M65 315h390M65 310v10M455 310v10M70 314l7-3v6M450 314l-7-3v6" stroke="#acbeb6" stroke-width="1"/>
+<rect x="228" y="302" width="64" height="25" rx="5" fill="#f4f8f5"/><text x="260" y="319" text-anchor="middle" font-family="Arial,sans-serif" font-size="10" letter-spacing="2" fill="#708d80">BRIDGE</text>
+<path d="m50 79 14-8 14 8v17l-14 8-14-8Z" stroke="#a2bdb0"/><path d="m57 91 7-12 7 12" stroke="#6d9481" stroke-width="1.5"/>
+</svg>

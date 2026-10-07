@@ -1,0 +1,19 @@
+{
+  "name": "rqly-and-qizui",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node server.mjs --preview",
+    "check": "node scripts/check.mjs",
+    "setup": "node scripts/setup.mjs",
+    "preview-files": "node scripts/export-preview.mjs"
+  },
+  "dependencies": {
+    "sharp": "0.35.5"
+  }
+}

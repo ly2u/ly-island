@@ -1,0 +1,63 @@
+{
+    email {$ACME_EMAIL}
+}
+
+rqly.com {
+    @withdrawn_photo path /bridge.jpg /bridge.jpg/* /rqly/bridge.jpg
+    header @withdrawn_photo Cache-Control "no-store"
+    respond @withdrawn_photo 404
+    encode zstd gzip
+    @legacy_island path /island /island/
+    redir @legacy_island /{?query} 308
+    handle / {
+        root * /srv/island
+        rewrite * /index.html
+        header Cache-Control "no-cache"
+        header X-Content-Type-Options "nosniff"
+        header X-Frame-Options "DENY"
+        header Referrer-Policy "strict-origin-when-cross-origin"
+        header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+        file_server
+    }
+    handle /classic {
+        header X-Robots-Tag "noindex, follow"
+        rewrite * /
+        reverse_proxy sites:8080 {
+            header_up X-Real-IP {remote_host}
+        }
+    }
+    handle_path /island/* {
+        root * /srv/island
+        header Cache-Control "no-cache"
+        header X-Content-Type-Options "nosniff"
+        file_server
+    }
+    handle {
+        reverse_proxy sites:8080 {
+            header_up X-Real-IP {remote_host}
+        }
+    }
+}
+
+www.rqly.com {
+    redir https://rqly.com{uri} permanent
+}
+
+7zui.com {
+    encode zstd gzip
+    reverse_proxy sites:8080 {
+        header_up X-Real-IP {remote_host}
+    }
+}
+
+www.7zui.com {
+    redir https://7zui.com{uri} permanent
+}
+
+midas.rqly.com {
+    encode zstd gzip
+    basic_auth {
+        {$CIVIL_USERNAME} {$CIVIL_PASSWORD_HASH}
+    }
+    reverse_proxy civilflow:3102
+}

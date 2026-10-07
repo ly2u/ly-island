@@ -1,0 +1,15 @@
+.git
+**/node_modules
+**/dist
+**/.next
+**/__pycache__
+**/.env
+**/.env.*
+!**/.env.example
+env
+incoming
+rollback
+validation
+*.log
+*.zip
+*.tar*
