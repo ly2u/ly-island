@@ -15,6 +15,7 @@ rqly.com 的当前网站源码快照：公众以三维浮空岛访问书屋、�
 | `scripts/`、`systemd/` | 当前 VPS 运维脚本；部分依赖服务器独有材料，详见部署说明 |
 | `docs/REVIEW.md` | 审查范围、入口、数据流、测试与已知限制 |
 | `docs/DEPLOYMENT.md` | 本地复现、部署边界和 CivilFlow 获取方式 |
+| `docs/SERVER-CLAUDE.md`、`CLAUDE.md`、`.claude/`、`ops/claude/` | 在服务器上用 Claude Code 做运维时的规则与权限限制 |
 | `docs/provenance/` | VPS 源码摘要与来源记录，旧静态/二进制清单只作为历史证据 |
 
 ## 本地开发
