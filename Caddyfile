@@ -3,9 +3,14 @@
 }
 
 rqly.com {
+    # Start with one week; wildcard subdomains have not all been verified.
+    header Strict-Transport-Security "max-age=604800"
+    header >Strict-Transport-Security "max-age=604800"
     @withdrawn_photo path /bridge.jpg /bridge.jpg/* /rqly/bridge.jpg
-    header @withdrawn_photo Cache-Control "no-store"
-    respond @withdrawn_photo 404
+    handle @withdrawn_photo {
+        header Cache-Control "no-store"
+        respond 404
+    }
     encode zstd gzip
     @legacy_island path /island /island/
     redir @legacy_island /{?query} 308
@@ -40,10 +45,16 @@ rqly.com {
 }
 
 www.rqly.com {
+    # Start with one week; wildcard subdomains have not all been verified.
+    header Strict-Transport-Security "max-age=604800"
+    header >Strict-Transport-Security "max-age=604800"
     redir https://rqly.com{uri} permanent
 }
 
 7zui.com {
+    # Start with one week; wildcard subdomains have not all been verified.
+    header Strict-Transport-Security "max-age=604800"
+    header >Strict-Transport-Security "max-age=604800"
     encode zstd gzip
     reverse_proxy sites:8080 {
         header_up X-Real-IP {remote_host}
@@ -51,10 +62,16 @@ www.rqly.com {
 }
 
 www.7zui.com {
+    # Start with one week; wildcard subdomains have not all been verified.
+    header Strict-Transport-Security "max-age=604800"
+    header >Strict-Transport-Security "max-age=604800"
     redir https://7zui.com{uri} permanent
 }
 
 midas.rqly.com {
+    # Start with one week; wildcard subdomains have not all been verified.
+    header Strict-Transport-Security "max-age=604800"
+    header >Strict-Transport-Security "max-age=604800"
     encode zstd gzip
     basic_auth {
         {$CIVIL_USERNAME} {$CIVIL_PASSWORD_HASH}
