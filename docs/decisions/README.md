@@ -11,14 +11,14 @@
 
 | 编号 | 决定 | 状态 |
 |---|---|---|
-| [0001](0001-git-as-source-of-truth.md) | Git 是源码的唯一来源，按标签发布 | 已实施；分支保护待做 |
+| [0001](0001-git-as-source-of-truth.md) | Git 是源码的唯一来源，按标签发布 | 已实施；分支保护待做；PR 模板已增加 |
 | [0002](0002-product-direction.md) | 岛屿为首页，浏览器后台写作，功能暂不删减 | 已采纳 |
 | [0003](0003-layering-by-lifespan.md) | 按寿命分层：资产层、体验层、工具层 | 提议 |
 | [0004](0004-single-source-data-schema.md) | 数据模式只有一个来源，前后版本兼容 | 提议 |
 | [0005](0005-static-public-reads.md) | 公开阅读静态化（读写分离） | 提议 |
 | [0006](0006-trust-boundaries.md) | 后台加第二道门；公开写入与后台、AI 分开 | 提议，认证方案待确认 |
 | [0007](0007-portable-content-format.md) | 内容使用标准格式，并能导出 | 提议 |
-| [0008](0008-prefer-mature-solutions.md) | 通用能力优先用成熟方案 | 提议；更新提醒已授权推进 |
+| [0008](0008-prefer-mature-solutions.md) | 通用能力优先用成熟方案 | 提议；更新提醒已实施 |
 | [0009](0009-architecture-budgets.md) | 用可执行的约束守住架构 | 基础配置已授权推进；架构预算提议 |
 | [0010](0010-backup-and-monitoring.md) | 异地加密备份与应用层监控 | 提议 |
 
@@ -48,7 +48,7 @@
 **随时，或等站主确认后：**
 
 - [0009](0009-architecture-budgets.md) 中的各项预算，随对应决策逐步加入 CI；
-- 安全 P1、P2：隐私说明、IP 哈希加密钥、信件保留期限、信箱容量；
+- 安全 P1、P2：已补隐私说明、HMAC 限流/重试键、定时清理、容量提示、归档后确认删除与私信预留额度；来信保留至管理员手动删除，不自动清除历史来信。详见 [信箱维护](../MAILBOX-PRIVACY.md)。
 - [0010](0010-backup-and-monitoring.md)：站主确认后实施。
 
 ## 约定
