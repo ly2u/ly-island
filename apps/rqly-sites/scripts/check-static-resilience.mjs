@@ -4,5 +4,8 @@ const {handler,initializeData}=await import('../server.mjs');initializeData();co
 try{
  for(const route of ['/admin-organization.js','/missing-resource.js','/.env','/node_modules/sharp/package.json']){const response=await fetch(base+route);assert.equal(response.status,404,route);await response.arrayBuffer();assert.equal((await fetch(base+'/healthz')).status,200,'Unknown resource must not terminate the server');}
  for(const route of ['/admin.js','/organization-core.mjs','/favicon.svg','/qizui/qizui.js']){const response=await fetch(base+route,{method:'HEAD'});assert.equal(response.status,200,route);assert.equal((await response.arrayBuffer()).byteLength,0);}
+ // An allowlisted file that cannot be opened at request time must not terminate the process.
+ const asset=new URL('../public/rqly/ai.css',import.meta.url),moved=new URL('../public/rqly/ai.css.bak',import.meta.url);fs.renameSync(asset,moved);
+ try{const response=await fetch(base+'/ai.css');assert.equal(response.status,404);await response.arrayBuffer();assert.equal((await fetch(base+'/healthz')).status,200,'Missing allowlisted asset must not terminate the server');}finally{fs.renameSync(moved,asset);}
  assert.equal((await fetch(base+'/api/posts')).status,200);console.log('Static route resilience passed: missing resources return 404, service survives and HEAD assets remain available.');
 }finally{await new Promise(r=>server.close(r));fs.rmSync(folder,{recursive:true,force:true});}
