@@ -17,6 +17,19 @@
 - **不引用 `main` 上的代码：** 需要复用 rqly.com 的部分（例如 3D 岛屿场景）时，复制过来，并在提交说明里写明来源。
 - **改动走 PR：** 目标分支是 `framework`。
 
+## 文档
+
+第 0 阶段，只有设计文档，还没有代码。
+
+| 文档 | 内容 |
+|---|---|
+| [概念与定位](docs/concept.md) | 解决什么问题，和现有平台比，核心循环，原则，不做什么，成功标准 |
+| [协议 v0](docs/protocol-v0.md) | 身份、名片、动态、签名、收件箱、漂流瓶、灯塔、隐私 |
+| [扩展接口](docs/extensions.md) | 主题、成长规则、通知、AI 管家 |
+| [部署](docs/deployment.md) | Cloudflare 免费档、自托管、测试环境 dev.rqly.com |
+| [路线](docs/roadmap.md) | 各阶段的内容和验收，拆成独立仓库的步骤 |
+| [待确认的决定](docs/decisions.md) | 需要站主确认的事项 |
+
 ## 许可证
 
 MIT，与 ly-island 相同。
