@@ -154,6 +154,12 @@ export function pause(history, reason) {
 /**
  * Applies the entries of a key log that come after the anchored head.
  * `keyLog` must already pass validateKeyLog().
+ *
+ * All or nothing: if any entry fails, the result is the history exactly as
+ * it was given, with only `status` and `pauseReason` changed, and
+ * `applied` is 0. Entries that verified before the failure are not kept:
+ * a paused history verifies nothing anyway, and after the owner confirms,
+ * trust starts over from the manifest (retrust).
  * @param {KeyHistory} history
  * @param {{ owner: string, items: Record<string, any>[] }} keyLog
  * @returns {Promise<{ history: KeyHistory, outcome: 'up-to-date' | 'applied' | 'paused', applied: number, reason?: string }>}
@@ -191,9 +197,7 @@ export async function syncKeyLog(history, keyLog) {
   for (let i = start; i < keyLog.items.length; i += 1) {
     const entry = keyLog.items[i];
     const result = await applyEntry(next, entry);
-    if (result.reason !== undefined) {
-      return { history: paused(next, result.reason), outcome: 'paused', applied, reason: result.reason };
-    }
+    if (result.reason !== undefined) return stop(result.reason);
     next = result.history;
     digest = await step(digest, entry);
     next.logHead = { id: entry.id, index: i, digest: encode(digest) };

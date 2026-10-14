@@ -231,6 +231,61 @@ describe('key history', () => {
     assert.equal(compareManifest(fresh, manifestFor(A, [{ ...k3, keyId: k2.keyId }])).status, 'mismatch');
   });
 
+  describe('a failed sync keeps the history it was given', () => {
+    /**
+     * @param {Awaited<ReturnType<typeof trustOnFirstUse>>} before
+     * @param {Awaited<ReturnType<typeof syncKeyLog>>} result
+     * @param {string} reason
+     */
+    function assertUnchangedButPaused(before, result, reason) {
+      assert.equal(result.outcome, 'paused');
+      assert.equal(result.reason, reason);
+      assert.equal(result.applied, 0);
+      assert.deepEqual(result.history, { ...before, status: 'paused', pauseReason: reason });
+    }
+
+    it('when a valid entry is followed by one with a bad signature', async () => {
+      const { k1, k2, k3 } = await keys();
+      const history = await trustOnFirstUse(manifestFor(A, [k1]), { now: NOW });
+      const snapshot = structuredClone(history);
+      const r1 = await keyChange(k1, 'r1', '2026-10-02T00:00:00Z', { add: added(k2), revoke: k1.keyId });
+      const signedByK2 = await keyChange(k2, 'r2', '2026-10-03T00:00:00Z', { add: added(k3) });
+      // Well-formed, but the signature belongs to other bytes.
+      const r2 = { ...signedByK2, proof: { key: k2.keyId, value: r1.proof.value } };
+      const result = await syncKeyLog(history, keyLog([r1, r2]));
+      assertUnchangedButPaused(snapshot, result, 'chain-broken');
+      assert.deepEqual(history, snapshot);
+    });
+
+    it('when a valid entry is followed by a key id clash', async () => {
+      const { k1, k2, k3 } = await keys();
+      const history = await trustOnFirstUse(manifestFor(A, [k1]), { now: NOW });
+      const r1 = await keyChange(k1, 'r1', '2026-10-02T00:00:00Z', { add: added(k2) });
+      const r2 = await keyChange(k1, 'r2', '2026-10-03T00:00:00Z', { add: { ...added(k3), id: k2.keyId } });
+      assertUnchangedButPaused(history, await syncKeyLog(history, keyLog([r1, r2])), 'key-mismatch');
+    });
+
+    it('when a valid rotation is followed by a change signed with the revoked key', async () => {
+      const { k1, k2, attacker } = await keys();
+      const history = await trustOnFirstUse(manifestFor(A, [k1]), { now: NOW });
+      const r1 = await keyChange(k1, 'r1', '2026-10-02T00:00:00Z', { add: added(k2), revoke: k1.keyId });
+      const r2 = await keyChange(k1, 'r2', '2026-10-03T00:00:00Z', { add: added(attacker) });
+      assertUnchangedButPaused(history, await syncKeyLog(history, keyLog([r1, r2])), 'fork');
+    });
+
+    it('when the failure comes after entries appended to an anchored head', async () => {
+      const { k1, k2, k3 } = await keys();
+      const r1 = await keyChange(k1, 'r1', '2026-10-02T00:00:00Z', { add: added(k2) });
+      const { history } = await syncKeyLog(await trustOnFirstUse(manifestFor(A, [k1]), { now: NOW }), keyLog([r1]));
+      const r2 = await keyChange(k1, 'r2', '2026-10-03T00:00:00Z', { add: added(k3) });
+      const r3 = { ...(await keyChange(k2, 'r3', '2026-10-04T00:00:00Z', { revoke: k1.keyId })), proof: { key: k2.keyId, value: r1.proof.value } };
+      const result = await syncKeyLog(history, keyLog([r1, r2, r3]));
+      assertUnchangedButPaused(history, result, 'chain-broken');
+      assert.equal(result.history.logHead?.id, r1.id);
+      assert.equal(result.history.keys.some((key) => key.id === k3.keyId), false);
+    });
+  });
+
   it('stays paused until the owner confirms, then starts over', async () => {
     const { k1, k2 } = await keys();
     const paused = pause(await trustOnFirstUse(manifestFor(A, [k1]), { now: NOW }), 'unknown-key');
