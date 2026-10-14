@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.islands.invalid/0/keylog.schema.json",
+  "title": "islands/0 key log",
+  "description": "Every key activity of an island, oldest first. Order, authorship and the signature chain are checked by the protocol core.",
+  "allOf": [
+    {
+      "$ref": "common.schema.json#/$defs/documentHeader"
+    }
+  ],
+  "properties": {
+    "items": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "allOf": [
+          {
+            "$ref": "activity.schema.json"
+          }
+        ],
+        "properties": {
+          "type": {
+            "const": "key"
+          }
+        }
+      }
+    }
+  }
+}

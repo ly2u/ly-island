@@ -27,9 +27,23 @@
 
 详见[决定 F15](docs/decisions.md#f15-分工已定)。
 
-## 文档
+## 代码
 
-第 0 阶段，只有设计文档，还没有代码。
+第 1 阶段进行中。
+
+| 目录 | 内容 |
+|---|---|
+| [`packages/protocol`](packages/protocol/README.md) | 协议核心：格式校验、签名、密钥历史、撤回归属、出站校验、收件箱预检查。没有依赖 |
+
+在仓库根目录运行检查：
+
+```bash
+node --test
+python3 packages/protocol/scripts/check_schemas.py   # 需要 jsonschema 和 cryptography
+python3 scripts/check_docs.py
+```
+
+## 文档
 
 | 文档 | 内容 |
 |---|---|

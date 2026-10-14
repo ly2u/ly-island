@@ -1,0 +1,278 @@
+{
+  "description": "Address syntax cases. The protocol core (isHttpsOrigin, parseHttpsUrl, keyIdOrigin) and the JSON Schema definitions (origin, url, keyId in common.schema.json) must both give these results.",
+  "cases": [
+    {
+      "value": "https://example.org",
+      "origin": true,
+      "url": true,
+      "keyId": false,
+      "note": "plain origin"
+    },
+    {
+      "value": "https://sub.example.co.uk",
+      "origin": true,
+      "url": true,
+      "keyId": false,
+      "note": "several labels"
+    },
+    {
+      "value": "https://a.bc",
+      "origin": true,
+      "url": true,
+      "keyId": false,
+      "note": "shortest"
+    },
+    {
+      "value": "https://ex--ample.org",
+      "origin": true,
+      "url": true,
+      "keyId": false,
+      "note": "inner double hyphen"
+    },
+    {
+      "value": "https://9lives.example",
+      "origin": true,
+      "url": true,
+      "keyId": false,
+      "note": "label starting with a digit"
+    },
+    {
+      "value": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example",
+      "origin": true,
+      "url": true,
+      "keyId": false,
+      "note": "63-character label"
+    },
+    {
+      "value": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "64-character label"
+    },
+    {
+      "value": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc.ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "origin": true,
+      "url": true,
+      "keyId": false,
+      "note": "253-character host"
+    },
+    {
+      "value": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "254-character host"
+    },
+    {
+      "value": "https://example.org/",
+      "origin": false,
+      "url": true,
+      "keyId": false,
+      "note": "trailing slash is a URL, not an origin"
+    },
+    {
+      "value": "https://example.org/notes/a?x=1#y",
+      "origin": false,
+      "url": true,
+      "keyId": false,
+      "note": "path, query and fragment"
+    },
+    {
+      "value": "https://example.org/a%20b",
+      "origin": false,
+      "url": true,
+      "keyId": false,
+      "note": "percent-encoded space"
+    },
+    {
+      "value": "https://example.org/%E7%AC%94%E8%AE%B0",
+      "origin": false,
+      "url": true,
+      "keyId": false,
+      "note": "percent-encoded Chinese"
+    },
+    {
+      "value": "https://example.org/笔记",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "raw non-ASCII path"
+    },
+    {
+      "value": "https://example.org/a b",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "raw space"
+    },
+    {
+      "value": "https://example.org\n",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "trailing newline"
+    },
+    {
+      "value": "https://example.org#k1",
+      "origin": false,
+      "url": true,
+      "keyId": true,
+      "note": "key id"
+    },
+    {
+      "value": "https://example.org#k 1",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "space in key name"
+    },
+    {
+      "value": "https://example.org/#k1",
+      "origin": false,
+      "url": true,
+      "keyId": false,
+      "note": "key id with a path"
+    },
+    {
+      "value": "https://example.org#kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+      "origin": false,
+      "url": true,
+      "keyId": false,
+      "note": "key name too long"
+    },
+    {
+      "value": "https://bad_name.example",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "underscore"
+    },
+    {
+      "value": "https://-bad.example",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "leading hyphen"
+    },
+    {
+      "value": "https://bad-.example",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "trailing hyphen"
+    },
+    {
+      "value": "https://Example.org",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "uppercase"
+    },
+    {
+      "value": "https://example.org.",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "trailing dot"
+    },
+    {
+      "value": "https://example.org:443",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "explicit port"
+    },
+    {
+      "value": "https://user@example.org",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "credentials"
+    },
+    {
+      "value": "http://example.org",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "http"
+    },
+    {
+      "value": "https://localhost",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "single label"
+    },
+    {
+      "value": "https://example",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "single label"
+    },
+    {
+      "value": "https://1.2.3.4",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "IPv4 literal"
+    },
+    {
+      "value": "https://[2606:4700:4700::1111]",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "IPv6 literal"
+    },
+    {
+      "value": "https://example.123",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "numeric last label"
+    },
+    {
+      "value": "https://example.0x1",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "hex-looking last label"
+    },
+    {
+      "value": "https://example.c0m",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "digit in last label"
+    },
+    {
+      "value": "https://xn--fsqu00a.example",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "internationalised label (not in v0)"
+    },
+    {
+      "value": "https://example.org\\evil",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "backslash after host"
+    },
+    {
+      "value": "https://example.org/a\\b",
+      "origin": false,
+      "url": true,
+      "keyId": false,
+      "note": "backslash in path"
+    },
+    {
+      "value": "",
+      "origin": false,
+      "url": false,
+      "keyId": false,
+      "note": "empty"
+    }
+  ]
+}

@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.islands.invalid/0/common.schema.json",
+  "title": "islands/0 shared definitions",
+  "description": "Structure only. Rules that compare fields (same origin, calendar dates, signatures, time windows) are checked by the protocol core.",
+  "$defs": {
+    "protocol": {
+      "const": "islands/0"
+    },
+    "origin": {
+      "description": "Canonical https origin. Host: a DNS name of two or more labels (lowercase letters, digits, inner hyphens; 1-63 characters each; the last label letters only; 253 characters at most), no IP literals, no xn-- labels in v0, no trailing dot. No port, path or credentials. Same rule as isProtocolHost() in src/util.js.",
+      "type": "string",
+      "maxLength": 261,
+      "pattern": "^https://(?=[^/?#]{1,253}(?![\\s\\S]))(?:(?!xn--)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}(?![\\s\\S])"
+    },
+    "url": {
+      "description": "https URL: a canonical origin followed by nothing or by a path, query or fragment in printable ASCII.",
+      "type": "string",
+      "maxLength": 2048,
+      "pattern": "^https://(?=[^/?#]{1,253}(?:[/?#]|(?![\\s\\S])))(?:(?!xn--)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}(?:[/?#][\\x21-\\x7e]*)?(?![\\s\\S])"
+    },
+    "keyId": {
+      "description": "\"<origin>#<name>\", the name being 1 to 64 of [A-Za-z0-9._-].",
+      "type": "string",
+      "maxLength": 2048,
+      "pattern": "^https://(?=[^/?#]{1,253}#)(?:(?!xn--)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}#[A-Za-z0-9._-]{1,64}(?![\\s\\S])"
+    },
+    "dateTime": {
+      "description": "RFC 3339 date-time with a time zone. Calendar validity is checked by the protocol core.",
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?(Z|[+-]\\d{2}:\\d{2})(?![\\s\\S])"
+    },
+    "date": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}(?![\\s\\S])"
+    },
+    "isoWeek": {
+      "type": "string",
+      "pattern": "^\\d{4}-W(0[1-9]|[1-4]\\d|5[0-3])(?![\\s\\S])"
+    },
+    "languageTag": {
+      "type": "string",
+      "maxLength": 35,
+      "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*(?![\\s\\S])"
+    },
+    "color": {
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{6}(?![\\s\\S])"
+    },
+    "publicKey": {
+      "description": "Base64url (no padding) of a 32-byte Ed25519 public key.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048](?![\\s\\S])"
+    },
+    "signature": {
+      "description": "Base64url (no padding) of a 64-byte Ed25519 signature.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{85}[AQgw](?![\\s\\S])"
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000000
+    },
+    "key": {
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "publicKey"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/keyId"
+        },
+        "type": {
+          "const": "Ed25519"
+        },
+        "publicKey": {
+          "$ref": "#/$defs/publicKey"
+        }
+      }
+    },
+    "documentHeader": {
+      "type": "object",
+      "required": [
+        "protocol",
+        "id",
+        "owner",
+        "updated",
+        "items"
+      ],
+      "properties": {
+        "protocol": {
+          "$ref": "#/$defs/protocol"
+        },
+        "id": {
+          "$ref": "#/$defs/url"
+        },
+        "owner": {
+          "$ref": "#/$defs/origin"
+        },
+        "updated": {
+          "$ref": "#/$defs/dateTime"
+        },
+        "items": {
+          "type": "array"
+        }
+      }
+    }
+  }
+}

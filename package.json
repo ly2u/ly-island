@@ -1,0 +1,15 @@
+{
+  "name": "islands-framework",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test",
+    "check:schemas": "python3 packages/protocol/scripts/check_schemas.py",
+    "check:docs": "python3 scripts/check_docs.py",
+    "check": "npm test && npm run check:schemas && npm run check:docs"
+  }
+}
