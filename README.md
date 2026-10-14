@@ -34,6 +34,7 @@
 | 目录 | 内容 |
 |---|---|
 | [`packages/protocol`](packages/protocol/README.md) | 协议核心：格式校验、签名、密钥历史、撤回归属、出站校验、收件箱预检查。没有依赖 |
+| `spikes/ssg-compare` | Astro 与 Eleventy 的对比实验，结果见[静态生成器对比](docs/ssg-comparison.md) |
 
 在仓库根目录运行检查：
 
@@ -53,6 +54,7 @@ python3 scripts/check_docs.py
 | [部署](docs/deployment.md) | Cloudflare 免费档、自托管、测试环境 dev.rqly.com |
 | [路线](docs/roadmap.md) | 各阶段的内容和验收，拆成独立仓库的步骤 |
 | [决定记录](docs/decisions.md) | 已定和待定的事项 |
+| [静态生成器对比](docs/ssg-comparison.md) | Astro 与 Eleventy 的实测对比和建议 |
 
 ## 许可证
 
