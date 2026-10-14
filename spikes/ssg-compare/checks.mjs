@@ -12,7 +12,7 @@ import {
   verifyActivity,
 } from '../../packages/protocol/src/index.js';
 import { SITE } from './shared/island-data.mjs';
-import { attributeOf, childElements, parseXml, textOf } from './xml.mjs';
+import { attributeOf, childElements, parseXml, textOf } from '../../tools/xml/xml.mjs';
 
 export const CONTENT = new URL('./content/', import.meta.url);
 export const PROTOCOL_FILES = ['.well-known/island.json', 'island/outbox.json', 'island/friends.json'];
@@ -154,7 +154,7 @@ export function checkFeed(bytes, notes) {
   if (channels.length !== 1) return [`feed.xml: expected one <channel>, found ${channels.length}`];
   const channel = channels[0];
 
-  /** @param {import('./xml.mjs').XmlElement} parent @param {string} name @param {string} where */
+  /** @param {import('../../tools/xml/xml.mjs').XmlElement} parent @param {string} name @param {string} where */
   const field = (parent, name, where) => {
     const found = childElements(parent, name);
     if (found.length !== 1) {

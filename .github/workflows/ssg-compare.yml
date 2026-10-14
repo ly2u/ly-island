@@ -6,6 +6,7 @@ on:
     paths:
       - 'spikes/ssg-compare/**'
       - 'packages/protocol/**'
+      - 'tools/xml/**'
       - '.github/workflows/ssg-compare.yml'
   workflow_dispatch:
 
@@ -23,7 +24,7 @@ jobs:
         with:
           node-version: 22
       - name: check the XML checker against expat
-        run: python3 spikes/ssg-compare/xml-oracle.py 20000
+        run: python3 tools/xml/xml-oracle.py 20000
       - run: node spikes/ssg-compare/measure.mjs
       - name: post the report on the pull request
         if: always() && github.event_name == 'pull_request' && hashFiles('spikes/ssg-compare/report.md') != ''

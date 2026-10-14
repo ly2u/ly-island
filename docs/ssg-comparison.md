@@ -1,6 +1,6 @@
 # 静态生成器对比：Astro 与 Eleventy
 
-- **状态：** 建议采用 Astro，等站主确认（[决定 F13](decisions.md#f13-静态生成器建议-astro等确认)）
+- **状态：** 已定，采用 Astro（[决定 F13](decisions.md#f13-静态生成器已定astro)，站主 2026-10-14 确认）
 - **日期：** 2026-10-14，同日按审查意见修订
 
 **结论：** 两者生成的网站几乎一样：
@@ -43,7 +43,7 @@ Eleventy 这次的页面用 JavaScript 模板写，订阅源用 Nunjucks 模板�
 **检查本身也有测试：**
 
 - `checks.test.mjs` 覆盖审查提出的负例：协议文件为 `null`、`false`、`0`，以及订阅源有三条但不是合法 XML。它还确认这些情况下命令的退出码是 1；
-- XML 解析器 `xml.mjs` 没有依赖。`xml-oracle.py` 用 Python 自带的 expat 对照了 2 万个随机文档，结论一致。`xml.mjs` 有意更严的地方（不支持 DTD、只接受 ASCII 名字）单独计数。
+- XML 解析器 `tools/xml/xml.mjs` 没有依赖，后来也用于正式构建的检查。`tools/xml/xml-oracle.py` 用 Python 自带的 expat 对照了 2 万个随机文档，结论一致。`xml.mjs` 有意更严的地方（不支持 DTD、只接受 ASCII 名字）单独计数。
 
 **复现：**
 

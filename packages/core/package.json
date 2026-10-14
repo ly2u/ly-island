@@ -1,0 +1,21 @@
+{
+  "name": "@islands/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Build-time core for an island: records, statistics, growth rules, signed protocol documents, the feed and the island picture. No dependencies besides @islands/protocol.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./growth": "./src/growth/index.js"
+  },
+  "files": [
+    "src"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

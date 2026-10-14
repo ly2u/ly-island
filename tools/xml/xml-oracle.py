@@ -4,7 +4,7 @@ Generates random mutations of a few feed-like documents and checks that
 xml.mjs accepts exactly what expat (with namespace processing, as used by
 xml.etree.ElementTree) accepts. Exits with 1 on any disagreement or crash.
 
-    python3 spikes/ssg-compare/xml-oracle.py [count]
+    python3 tools/xml/xml-oracle.py [count]
 
 xml.mjs is deliberately stricter in a few ways (see its header). The generator
 never produces document type declarations or other encodings; documents that
