@@ -172,8 +172,9 @@ interface GrowthView extends GrowthState {
 
 | 事件 | 默认 | 说明 |
 |---|---|---|
-| `message.received` | 立即 | 收到留言或回复 |
+| `message.received` | 立即 | 收到邻居的留言或回复；朋友的朋友的只进摘要 |
 | `bottle.picked` | 立即 | 你的瓶子被捡到了 |
+| `stranger.pending` | 摘要 | "陌生来信"里有几封新信，只显示数量，见[协议](protocol-v0.md#签名不等于可信按关系分级) |
 | `key.changed` | 立即 | 关注的岛密钥变了，需要你确认 |
 | `visit.received` | 摘要 | 谁来拜访过 |
 | `water.received` | 摘要 | 谁浇过水 |
@@ -186,7 +187,7 @@ interface GrowthView extends GrowthState {
 **延迟：**
 
 - 投递到你收件箱的事件是即时的，因为 Worker 收到请求时就能发通知；
-- `neighbor.posted` 和 `bottle.arrived` 取决于定时任务的间隔，默认 30 分钟。
+- `neighbor.posted` 和 `bottle.arrived` 取决于抓取间隔：活跃的邻居最多晚 1 小时，很久没更新的最多晚 1 天（见[协议的抓取规则](protocol-v0.md#抓取规则)）。
 
 ### 渠道
 
