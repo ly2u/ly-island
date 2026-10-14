@@ -109,14 +109,31 @@ rqly.com 的现状可以作参照：阅读模式的 JS 和 CSS 合计 gzip 后�
 interface GrowthRules {
   id: string;   // 例如 "default@0"
 
-  // 构建时运行：只依赖记录本身，结果写进名片的 stats.growth
-  accumulate(records: RecordFact[], config: object): GrowthState;
+  // 构建时运行：输入只来自仓库，结果写进名片的 stats.growth
+  accumulate(input: GrowthInput, config: GrowthConfig): GrowthState;
 
   // 浏览器里运行：依赖"今天"，所以不能在构建时算死
-  present(stats: Stats, today: string, config: object): GrowthView;
+  present(stats: Stats, today: string, config: GrowthConfig): GrowthView;
 }
 
-interface RecordFact { kind: string; published: string; done?: boolean }
+interface GrowthInput {
+  records: RecordFact[];   // 全部记录，包括已撤回的
+  ledger: UnlockLedger;    // 解锁台账，见下文；没有台账时传空台账
+}
+
+interface RecordFact {
+  kind: string;
+  published: string;
+  done?: string;           // 项目完成的日期
+  withdrawn?: string;      // 撤回的日期。撤回的记录留在仓库里，只是不再公开
+}
+
+interface UnlockLedger {
+  unlocked: { id: string; since: string; rules: string }[];
+}
+
+// 规则自己的参数，例如各阶段的阈值。有固定的 Schema，不用来藏历史状态
+type GrowthConfig = Record<string, number | string | boolean>;
 
 interface GrowthState {
   points: number;
@@ -141,6 +158,30 @@ interface GrowthView extends GrowthState {
 
 如果它用了你不认识的规则，就退回默认规则。反正只是装饰。
 
+### 已解锁的外观怎么保住
+
+"不收回"需要记得过去，而纯函数只能看到输入。所以过去的状态必须是**显式的输入**，并且存在仓库里：
+
+- **积分**只按当前没有撤回的记录计算。
+- **已解锁**取两部分的并集：
+  - **台账里记着的；**
+  - **按记录历史曾经达到的：** 按日期累加积分，撤回的记录在撤回日期之前照常计入。所以到过 100 点、后来撤回了文章，重新构建时仍然知道曾经到过 100 点。
+- **撤回是标记，不是删除：** 在文件头里写 `withdrawn: <日期>`，文件留在仓库里，只是不再公开。
+- **解锁台账**是仓库里的 `island/unlocks.json`，随仓库一起导出和迁移，清空构建缓存也不受影响。
+  - 构建只读台账，不写台账。
+  - 只有两种情况要写台账，都由岛主的工具（命令行或编辑器）显式完成，作为一次普通提交：
+    1. 换成别的成长规则之前，把当前已解锁的写进去；
+    2. 彻底删除一篇记录的文件之前，同样先写进去。
+  - 如果跳过工具直接删了文件，这篇记录带来的解锁会在下次构建时消失。这是唯一的例外，编辑器要提示。
+- 台账里有当前主题不认识的外观时，保留但不显示。
+
+**验收：** 以下每种情况发生后，已解锁项都还在，积分始终只按当前记录计算：
+
+- 达到阈值后撤回文章，再重新构建；
+- 清空构建缓存；
+- 换到别的主机；
+- 用工具换规则。
+
 ### 默认规则 `default@0`
 
 | 项目 | 规则 |
@@ -149,7 +190,7 @@ interface GrowthView extends GrowthState {
 | 文章 | 3 点 |
 | 项目 | 5 点；标记完成再加 10 点 |
 | 阶段 | 0 点"初生"、30 点"成形"、100 点"繁盛"；之后每 100 点解锁一件小装饰 |
-| 撤回 | 积分相应减少，已解锁的外观保留 |
+| 撤回 | 积分相应减少，已解锁的外观保留（见上一节） |
 | 活力 | 本周或上周有记录为 1；两三周没写为 0.6；四到七周为 0.3；八周以上为 0.1 |
 
 前三项和"撤回"沿用 rqly.com 现有的规则。
@@ -187,7 +228,7 @@ interface GrowthView extends GrowthState {
 **延迟：**
 
 - 投递到你收件箱的事件是即时的，因为 Worker 收到请求时就能发通知；
-- `neighbor.posted` 和 `bottle.arrived` 取决于抓取间隔：活跃的邻居最多晚 1 小时，很久没更新的最多晚 1 天（见[协议的抓取规则](protocol-v0.md#抓取规则)）。
+- `neighbor.posted` 和 `bottle.arrived` 取决于抓取间隔：活跃的邻居最多晚 1 小时，很久没更新的最多晚 1 天（见[协议的频率与批次](protocol-v0.md#频率与批次)）。
 
 ### 渠道
 
