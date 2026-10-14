@@ -1,7 +1,7 @@
 # 部署
 
-- **状态：** 第 0 阶段草案，待站主确认
-- **日期：** 2026-10-13
+- **状态：** 第 1 阶段，静态部分已实现（`site/`）
+- **日期：** 2026-10-13，2026-10-15 更新
 
 **目标：** 普通人点一个按钮，就能在 Cloudflare 免费档上拥有一座岛；想自己托管的人，用同一套代码跑在自己的服务器上。
 
@@ -167,9 +167,64 @@ Cloudflare 是"推荐的一键部署"，不是"唯一能跑的地方"。
 
 - 一个独立的 Cloudflare Worker 项目，从 `framework` 分支构建部署，绑定自定义域名 dev.rqly.com。
 - rqly.com 的 DNS 已经在 Cloudflare，加一个子域名不影响 rqly.com 本身，也不经过 VPS、Caddy 和 `scripts/release.py`。
-- 再部署一座测试岛（例如 dev2.rqly.com 或一个 `workers.dev` 子域名），用来测试邻居、投递和漂流瓶。
-- 后台路径用 Cloudflare Access 保护，只允许站主。
-- 测试数据只用合成内容，不用真实文章和私信，这和 ly-island 仓库现有的规则一致。
+- 第 2 阶段再部署第二座测试岛（例如 dev2.rqly.com），用来测试邻居、投递和漂流瓶。
+- 后台路径（第 2 阶段才有）用 Cloudflare Access 保护，只允许站主。
+- 测试数据只用合成内容，不用真实文章和私信，这和 ly-island 仓库现有的规则一致。dev.rqly.com 显示的就是 `site/content/` 里的示例记录。
+
+### 站主操作清单
+
+第 1 阶段的模块 PR 合并进 `framework` 之后做。全程只在 Cloudflare 控制台操作，不碰 VPS。界面名称以 2026 年 10 月为准。
+
+**1. 生成 dev.rqly.com 专用的签名钥匙（一次）。** 在自己的电脑上（需要 Node.js 22.12 以上）：
+
+```bash
+git clone -b framework https://github.com/ly2u/ly-island.git
+cd ly-island/site
+npm ci
+npm run keygen
+```
+
+记下打印的 `ISLAND_SIGNING_KEY=…` 和公钥。这把钥匙只给 dev.rqly.com 用，存进密码管理器，不要发到 issue、PR 或聊天里。
+
+**2. 创建 Worker 并连接仓库：** Workers & Pages → Create → 从 Git 仓库导入 → 选 `ly2u/ly-island`。
+
+| 设置 | 值 |
+|---|---|
+| Worker 名称 | `island`（必须和 `site/wrangler.jsonc` 的 `name` 一致） |
+| 生产分支 | `framework` |
+| 根目录 | `site` |
+| 构建命令 | `npm run build` |
+| 部署命令 | `npx wrangler deploy` |
+| 非生产分支的构建 | 关闭 |
+| 构建监视路径（如果有这个选项） | `site/**`、`packages/**` |
+
+**3. 构建变量和密钥：** Worker → Settings → Build → Variables and secrets。
+
+| 名称 | 类型 | 值 |
+|---|---|---|
+| `ISLAND_ORIGIN` | Text | `https://dev.rqly.com` |
+| `ISLAND_SIGNING_KEY` | Secret | 第 1 步打印的 64 位十六进制 |
+
+**4. 触发一次部署：** 在 Deployments 里重试，或者等下一次合并进 `framework`。
+
+**5. 绑定域名：** Worker → Settings → Domains & Routes → Add → Custom domain → `dev.rqly.com`。DNS 记录由 Cloudflare 自动添加，不要改 rqly.com 的其他记录。
+
+**6. 检查：**
+
+- 打开 https://dev.rqly.com/，能看到示例岛。
+- 打开 https://dev.rqly.com/.well-known/island.json：
+  - `id` 是 `https://dev.rqly.com`；
+  - `keys` 里的公钥和第 1 步打印的一致。
+- 在任意电脑上：
+
+  ```bash
+  curl -sI https://dev.rqly.com/island/outbox.json   # 应有 access-control-allow-origin: * 和 etag
+  curl -sI https://dev.rqly.com/                     # 应有 content-security-policy
+  ```
+
+- 下一次合并进 `framework`、自动部署之后，确认 dev.rqly.com 仍然绑定在这个 Worker 上。这一点在[待核实](#待核实)里。
+
+**出了问题：** 在 Deployments 里回滚到上一个版本即可。静态岛没有数据库，回滚不丢东西。
 
 ## rqly.com 以后怎么迁移
 
@@ -185,15 +240,27 @@ Cloudflare 是"推荐的一键部署"，不是"唯一能跑的地方"。
 - rqly.com 是浏览器后台写作；框架默认以 Git 为内容源。迁移前要决定 rqly.com 是改用 Git 写作，还是接一个浏览器编辑器。
 - rqly.com 现有的三座建筑和岛主雕塑，要做成 `floating-island` 主题的配置。
 
+## 已核实
+
+2026-10-15 按 Cloudflare 官方文档核对：
+
+- **构建时的密钥：** Workers Builds 支持只在构建时可用的变量和密钥，运行时访问不到。签名私钥 `ISLAND_SIGNING_KEY` 就按构建密钥提供。
+  - 文档没有说明构建日志会不会遮蔽密钥，所以构建代码从不打印它；
+  - CI 检查构建产物里没有密钥。
+- **依赖安装：** Workers Builds 会自动安装依赖（可以用 `SKIP_DEPENDENCY_INSTALL` 关闭）。
+- **Node 版本：** 构建镜像预装 Node 22 和 24，默认 24，可以用 `NODE_VERSION` 或 `.node-version` 指定。模板要求 22.12 以上，两个版本都满足。
+- **响应头：** 静态资源支持 `_headers` 文件（最多 100 条规则），用来加跨域头和 Content-Security-Policy。默认带 `ETag`。
+- **Deploy to Cloudflare 按钮：**
+  - 会提示用户填写 Worker 的密钥（从 `.dev.vars.example` 读取），但构建密钥不在其中；
+  - 要求部署的子目录完全自包含，包括依赖。
+  - 现在的 `site/` 引用了仓库里的 `packages/`，所以一键部署留到第 4 阶段的模板仓库解决：要么把依赖打包进模板，要么改成由 Worker 在请求时签名并缓存动态。
+
 ## 待核实
 
-第 1 阶段开始前，用官方文档或实测确认：
-
-- Cloudflare Access 免费档的人数和功能。第三方资料显示 2026 年 8 月仍是 50 人以内免费，正式依赖前要以官方页面为准；
+- Cloudflare Access 免费档的人数和功能。第三方资料显示 2026 年 8 月仍是 50 人以内免费，第 2 阶段依赖它之前要以官方页面为准；
 - Worker 在免费档发送邮件的条件（只能发给已验证地址，还是可以发给任意地址）；
-- Workers 的 WebCrypto 对 Ed25519 签名和验签的支持情况，以及在 10 ms CPU 内一次验签的实际耗时；
-- Deploy to Cloudflare 按钮能否在部署时提示用户填写 secret（例如签名私钥），还是需要部署后单独设置；
-- Workers Builds 怎么提供构建时的 secret，确保签名私钥不会进入构建日志和产物。如果做不到，改为由 Worker 在请求时签名并缓存动态。
+- Workers 的 WebCrypto 对 Ed25519 签名和验签的支持情况，以及在 10 ms CPU 内一次验签的实际耗时（第 2 阶段）；
+- `wrangler deploy` 是否保留在控制台里添加的自定义域名。第一次部署 dev.rqly.com 后实测；如果不保留，改为在 `wrangler.jsonc` 里声明 `routes`，地址由部署方提供。
 
 ## 参考
 
@@ -203,3 +270,7 @@ Cloudflare 是"推荐的一键部署"，不是"唯一能跑的地方"。
 - [Workers Builds 的额度](https://developers.cloudflare.com/workers/ci-cd/builds/limits-and-pricing/)
 - [Deploy to Cloudflare 按钮](https://developers.cloudflare.com/changelog/post/2025-04-08-deploy-to-cloudflare-button/)
 - [GitHub：停用和启用工作流（60 天规则）](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows)
+- [Workers Builds 的配置：构建命令、根目录、构建变量和密钥](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/)
+- [Workers Builds 的构建镜像：Node 版本、自动安装依赖](https://developers.cloudflare.com/workers/ci-cd/builds/build-image/)
+- [静态资源的 `_headers`](https://developers.cloudflare.com/workers/static-assets/headers/)
+- [Deploy to Cloudflare 按钮：密钥和子目录](https://developers.cloudflare.com/workers/platform/deploy-buttons/)
