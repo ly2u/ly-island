@@ -1,0 +1,22 @@
+---
+interface Props {
+  trees: number;
+  houses: number;
+  towers: number;
+}
+const { trees, houses, towers } = Astro.props;
+---
+<svg class="island" viewBox="0 0 320 200" role="img" aria-label={`岛上有 ${houses} 座房子、${trees} 棵树、${towers} 座塔`}>
+  <polygon class="ground" points="160,60 300,120 160,180 20,120" />
+  {Array.from({ length: houses }, (_, i) => <rect class="house" x={110 + i * 30} y="95" width="20" height="20" />)}
+  {Array.from({ length: trees }, (_, i) => <circle class="tree" cx={80 + i * 25} cy="125" r="9" />)}
+  {Array.from({ length: towers }, (_, i) => <rect class="tower" x={210 + i * 20} y="70" width="10" height="45" />)}
+</svg>
+
+<style>
+  .island { width: 100%; max-width: 32rem; }
+  .ground { fill: #cfe3c4; stroke: #7a9c6a; }
+  .house { fill: #e8b07a; }
+  .tree { fill: #4f8a4b; }
+  .tower { fill: #8aa0b8; }
+</style>

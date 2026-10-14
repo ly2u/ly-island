@@ -1,0 +1,33 @@
+name: ssg-compare
+
+on:
+  pull_request:
+    branches: [framework]
+    paths:
+      - 'spikes/ssg-compare/**'
+      - 'packages/protocol/**'
+      - '.github/workflows/ssg-compare.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    name: build and measure Astro and Eleventy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node spikes/ssg-compare/measure.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ssg-compare
+          path: |
+            spikes/ssg-compare/results.json
+            spikes/ssg-compare/astro/dist
+            spikes/ssg-compare/eleventy/dist
+          if-no-files-found: warn

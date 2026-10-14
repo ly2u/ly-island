@@ -1,0 +1,12 @@
+{
+  "name": "ssg-compare-eleventy",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node ../copy-content.mjs src/notes && eleventy"
+  },
+  "dependencies": {
+    "@11ty/eleventy": "3.1.6",
+    "@11ty/eleventy-plugin-rss": "3.1.0"
+  }
+}

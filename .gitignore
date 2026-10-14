@@ -2,3 +2,7 @@ node_modules/
 __pycache__/
 *.pyc
 .DS_Store
+dist/
+.astro/
+spikes/ssg-compare/results.json
+spikes/ssg-compare/*/package-lock.json
