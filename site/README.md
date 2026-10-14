@@ -1,0 +1,179 @@
+# 岛屿模板
+
+这个文件夹是一座完整的岛：Markdown 记录、设置、两个主题，以及部署到 Cloudflare 的配置。构建出来的是纯静态文件，访问不经过任何服务器代码。
+
+> 这里的示例内容都是虚构的。做自己的岛时，删掉 `content/records/` 里的示例，改 `island.config.json`。
+
+**目录：**
+
+- [本地预览](#本地预览)
+- [写记录](#写记录)
+- [设置](#设置)
+- [签名密钥](#签名密钥)
+- [部署到 Cloudflare](#部署到-cloudflare)
+- [成长和解锁台账](#成长和解锁台账)
+- [检查](#检查)
+
+## 本地预览
+
+需要 Node.js 22.12 或更高版本。在这个文件夹里运行：
+
+```bash
+npm ci
+npm run dev
+```
+
+本地预览自动使用公开的测试密钥，不需要设置任何东西。
+
+## 写记录
+
+每条记录是 `content/records/` 下的一个 Markdown 文件。**文件名就是网址：**
+
+- 只能用小写字母、数字和 `-`，例如 `first-bridge.md`；
+- 对应的网址是 `/records/first-bridge/`。
+
+文件开头的设置：
+
+```yaml
+---
+title: 第一座桥的点云
+date: 2026-09-14
+kind: article
+summary: 一两句话的摘要，会出现在列表、订阅源和动态里。
+tags: [点云, BIM]
+---
+```
+
+| 字段 | 必须 | 说明 |
+|---|---|---|
+| `title` | 短记录以外必须 | 最多 200 字。短记录可以不写，列表里显示摘要或正文开头 |
+| `date` | 是 | 写日期即可，例如 `2026-09-14`。写了时间的，按设置里的时区换算成当地日期 |
+| `kind` | 是 | `article`（文章）、`note`（短记录）或 `project`（项目） |
+| `summary` | 否 | 最多 1,000 字 |
+| `tags` | 否 | 最多 32 个，每个最多 64 字 |
+| `done` | 否 | 项目完成的日期，只有项目能写 |
+| `updated` | 否 | 修改过的日期 |
+| `language` | 否 | 这条记录的语言，缺省用设置里的第一种语言 |
+| `withdrawn` | 否 | 撤回的日期，见下文 |
+| `draft` | 否 | `true` 表示草稿：不构建，也不计入成长 |
+
+**撤回一条记录：** 加上 `withdrawn: <日期>`，文件留在仓库里。构建后：
+
+- 这条记录的页面、列表项和订阅条目都消失；
+- 动态里多一条撤回活动，关注你的岛会据此删除它；
+- 积分随之减少，但已经解锁的外观保留。
+
+写错的地方会让构建失败，并一次列出所有问题。
+
+## 设置
+
+`island.config.json`：
+
+| 字段 | 说明 |
+|---|---|
+| `origin` | 岛的地址，例如 `https://example.org`。也可以在构建时用环境变量 `ISLAND_ORIGIN` 覆盖 |
+| `name`、`summary` | 名字（最多 100 字）和简介 |
+| `language` | 语言列表，例如 `["zh-CN", "en"]`。第一种决定界面语言 |
+| `timeZone` | 时区，例如 `Asia/Shanghai`，用来换算记录的日期 |
+| `theme` | `isometric`（默认，2.5D 小岛）或 `text`（纯文字，没有图和脚本）。也可以用 `ISLAND_THEME` 覆盖 |
+| `appearance` | `seed` 决定小岛的形状，`colors` 是主色。别人的岛会按它们把你的岛画出来 |
+| `growth` | 成长规则，默认 `default@0`，见[扩展接口](../docs/extensions.md#成长规则) |
+| `discoverable` | 是否允许灯塔收录，默认 `false` |
+| `ai` | `read`：是否允许 AI 读取来回答问题；`train`：是否允许用于训练。`robots.txt` 随之生成 |
+| `keyName` | 钥匙的名字，默认 `k1` |
+
+关注的岛写在 `island/friends.json` 里：
+
+```json
+[{ "id": "https://neighbor.example", "name": "邻居的岛", "since": "2026-09-01" }]
+```
+
+普通博客加上 `feed` 字段，指向它的 RSS 或 Atom 地址。
+
+## 签名密钥
+
+公开的记录在构建时签名。别的岛用名片里的公钥验证，确认记录真的是你发的。
+
+**生成一次：**
+
+```bash
+npm run keygen
+```
+
+它会打印一行 `ISLAND_SIGNING_KEY=…`：
+
+- 把这一行设成部署平台的**构建密钥**（见下文）；
+- 同时存进密码管理器；
+- **不要**提交到仓库，也不要发给任何人。
+
+**没有密钥时：**
+
+- 构建会失败；
+- 只有地址是 `https://example.org` 并且设置了 `ISLAND_ALLOW_TEST_KEY=1` 时，才会改用公开的测试密钥，这只给 CI 用；
+- 测试密钥谁都能用，所以不能用在真实的岛上。
+
+## 部署到 Cloudflare
+
+岛部署成一个只有静态资源的 Worker：访问不计入 Worker 的请求额度，免费档就够用。以下是 2026 年 10 月的界面，名称可能会变。
+
+1. **导入仓库：** 在 Cloudflare 控制台创建一个 Worker，选择从 Git 仓库导入，连接你的 GitHub 仓库。
+2. **构建设置：**
+
+   | 设置 | 值 |
+   |---|---|
+   | Worker 名称 | 和 `wrangler.jsonc` 里的 `name` 一致（默认 `island`） |
+   | 生产分支 | 你写记录的分支 |
+   | 根目录（Root directory） | 这个文件夹，例如 `site` |
+   | 构建命令 | `npm run build` |
+   | 部署命令 | `npx wrangler deploy` |
+
+   依赖由 Cloudflare 按 `package-lock.json` 自动安装。
+
+3. **构建变量和密钥：** 在 Worker 的 Settings → Build → Variables and secrets 里：
+   - 添加 `ISLAND_SIGNING_KEY`，类型选 **Secret**；
+   - 如果 `island.config.json` 里的 `origin` 不是你的域名，再添加 `ISLAND_ORIGIN`，例如 `https://example.org`。
+4. **绑定域名：** Worker → Settings → Domains & Routes → 添加 Custom domain。`wrangler.jsonc` 关掉了 `workers.dev` 和预览地址，所以岛只能通过你自己的域名访问。
+5. **部署后检查：**
+   - 打开 `https://<你的域名>/.well-known/island.json`，`id` 应该是你的地址，`keys` 里的公钥和 `npm run keygen` 打印的一致；
+   - 打开 `/feed.xml` 和 `/island/outbox.json`，能看到内容。
+
+之后每次推送到生产分支，Cloudflare 都会自动构建和部署。
+
+## 成长和解锁台账
+
+积分和阶段在构建时算出来，写进名片的 `stats.growth`。"有多久没写"在访客的浏览器里算，所以很久不写，小岛会起雾；写一篇就放晴。
+
+**已解锁的外观不会收回。** 有两种情况，要先把当前的解锁存进台账 `island/unlocks.json`：
+
+- 换成别的成长规则之前；
+- 彻底删除一篇记录的文件之前。撤回不需要这样做。
+
+存的方法：
+
+```bash
+npm run build
+npm run unlocks:save
+```
+
+然后提交 `island/unlocks.json`。
+
+## 检查
+
+仓库的 CI 会构建这个模板的两个主题，并检查：
+
+- 协议文件：通过校验；每一条动态都能验签，并由 Python 实现再验一次；
+- 订阅源：严格解析的 XML；
+- 关掉 JavaScript：从首页出发能读到每一条记录；
+- 首屏：压缩后不超过 200 KB；
+- 安全：
+  - 不加载第三方资源；
+  - 页面里没有会被 Content-Security-Policy 拦下的内联脚本和样式；
+  - 构建产物里没有签名密钥；
+- 可重复：同样的源文件，两次构建出的协议文件逐字节一致。
+
+在本地检查自己的构建：
+
+```bash
+npm run build
+node ../tools/site-check/cli.mjs dist
+```

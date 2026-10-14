@@ -35,7 +35,12 @@ def anchors(text: str) -> set[str]:
 
 
 def main() -> int:
-    files = sorted(p for p in ROOT.rglob("*.md") if "node_modules" not in p.parts)
+    # Records under site/content are web pages: their links are site URLs, not repository paths.
+    content = ROOT / "site" / "content"
+    files = sorted(
+        p for p in ROOT.rglob("*.md")
+        if "node_modules" not in p.parts and content not in p.parents
+    )
     texts = {p: p.read_text(encoding="utf-8") for p in files}
     errors: list[str] = []
     for path, text in texts.items():
