@@ -366,11 +366,14 @@ export function validateKeyLog(keyLog) {
     return { ok: false, issues: issues.list };
   }
   let previous = -Infinity;
+  const ids = new Set();
   keyLog.items.forEach((/** @type {unknown} */ item, index) => {
     const path = `items/${index}`;
     const result = validateActivity(item);
     for (const issue of result.issues) issues.add(`${path}/${issue.path}`, issue.code, issue.message);
     if (!isPlainObject(item)) return;
+    if (ids.has(item.id)) issues.add(`${path}/id`, 'duplicate-id', 'every key activity needs its own id');
+    ids.add(item.id);
     if (item.type !== 'key') issues.add(`${path}/type`, 'not-key-activity', 'the key log only holds key activities');
     if (ownerOk && item.actor !== keyLog.owner) issues.add(`${path}/actor`, 'foreign-item', 'key activities must be written by the owner');
     if (isDateTime(item.published)) {

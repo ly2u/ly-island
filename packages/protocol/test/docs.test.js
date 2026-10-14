@@ -51,7 +51,7 @@ describe('protocol document examples', () => {
 
   it('have real signatures from the example key', async () => {
     const manifest = examples.find((example) => example.kind === 'manifest')?.value;
-    const history = trustOnFirstUse(manifest, { now: '2026-10-13T00:00:00Z' });
+    const history = await trustOnFirstUse(manifest, { now: '2026-10-13T00:00:00Z' });
     for (const { value } of examples.filter((example) => example.kind === 'activity')) {
       assert.deepEqual(await verifyActivity(history, value, { source: 'origin', delivery: false }), { ok: true }, value.id);
     }

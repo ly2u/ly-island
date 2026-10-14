@@ -26,25 +26,41 @@ export function isText(value, { min = 0, max }) {
   return length >= min && length <= max;
 }
 
+// Address syntax (protocol section "地址的写法"). The JSON Schemas use the
+// same rule (schema/common.schema.json); fixtures/addresses.json keeps the two
+// in step.
+//
+// Host: a DNS name of at least two labels, lowercase letters, digits and
+// inner hyphens, each label 1 to 63 characters, the last label letters only,
+// 253 characters at most. No IP literals, no internationalised (xn--) labels
+// in v0, no trailing dot. The rest of a URL is printable ASCII.
+const LABEL = '(?!xn--)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?';
+const HOST = new RegExp(`^(?:${LABEL}\\.)+[a-z]{2,63}$`);
+
+/** @param {string} host */
+export function isProtocolHost(host) {
+  return host.length <= 253 && HOST.test(host);
+}
+
 /**
- * Parses an https URL as the protocol writes them: no credentials, no port,
- * no whitespace, and the origin spelled canonically (lowercase host,
- * punycode for international names, no trailing dot).
+ * Parses an https URL written the way the protocol requires: printable
+ * ASCII, a canonical origin (see isProtocolHost), no credentials, no port,
+ * then nothing or a path, query or fragment.
  * @param {unknown} value
  * @returns {URL | null}
  */
 export function parseHttpsUrl(value) {
-  if (typeof value !== 'string' || value.length > 2048 || /\s/.test(value)) return null;
+  if (typeof value !== 'string' || value.length > 2048 || !/^[\x21-\x7e]+$/.test(value)) return null;
+  const match = /^https:\/\/([^/?#]*)(.*)$/.exec(value);
+  if (!match || !isProtocolHost(match[1]) || (match[2] !== '' && !/^[/?#]/.test(match[2]))) return null;
   let url;
   try {
     url = new URL(value);
   } catch {
     return null;
   }
-  if (url.protocol !== 'https:' || url.username !== '' || url.password !== '' || url.port !== '') return null;
-  if (url.hostname.endsWith('.')) return null;
-  const rest = value.slice(url.origin.length);
-  if (!value.startsWith(url.origin) || (rest !== '' && !/^[/?#]/.test(rest))) return null;
+  // Belt and braces: the URL parser must agree on the origin.
+  if (url.origin !== `https://${match[1]}`) return null;
   return url;
 }
 

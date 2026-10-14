@@ -8,8 +8,20 @@ import { describe, it } from 'node:test';
 
 import { validateActivity } from '../src/activity.js';
 import { validateFriends, validateKeyLog, validateManifest, validateOutbox } from '../src/documents.js';
+import { isHttpsOrigin, keyIdOrigin, parseHttpsUrl } from '../src/util.js';
 
 const { cases } = JSON.parse(readFileSync(new URL('../fixtures/cases.json', import.meta.url), 'utf8'));
+const addresses = JSON.parse(readFileSync(new URL('../fixtures/addresses.json', import.meta.url), 'utf8')).cases;
+
+describe('shared address syntax', () => {
+  for (const { value, origin, url, keyId, note } of addresses) {
+    it(`${note}: ${JSON.stringify(value).slice(0, 60)}`, () => {
+      assert.equal(isHttpsOrigin(value), origin, 'origin');
+      assert.equal(parseHttpsUrl(value) !== null, url, 'url');
+      assert.equal(keyIdOrigin(value) !== null, keyId, 'keyId');
+    });
+  }
+});
 
 /**
  * All issue codes the protocol core reports for a case.

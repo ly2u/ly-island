@@ -1274,6 +1274,53 @@
           }
         ]
       }
+    },
+    {
+      "name": "key log reusing an activity id",
+      "kind": "keylog",
+      "expect": "invalid",
+      "layer": "rules",
+      "code": "duplicate-id",
+      "data": {
+        "protocol": "islands/0",
+        "id": "https://example.org/island/keys.json",
+        "owner": "https://example.org",
+        "updated": "2026-10-13T12:00:00Z",
+        "items": [
+          {
+            "id": "https://example.org/island/keys/r1",
+            "actor": "https://example.org",
+            "published": "2026-10-01T00:00:00Z",
+            "proof": {
+              "key": "https://example.org#k1",
+              "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            },
+            "type": "key",
+            "to": "public",
+            "object": {
+              "add": {
+                "id": "https://example.org#k2",
+                "type": "Ed25519",
+                "publicKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+              }
+            }
+          },
+          {
+            "id": "https://example.org/island/keys/r1",
+            "actor": "https://example.org",
+            "published": "2026-10-02T00:00:00Z",
+            "proof": {
+              "key": "https://example.org#k2",
+              "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            },
+            "type": "key",
+            "to": "public",
+            "object": {
+              "revoke": "https://example.org#k1"
+            }
+          }
+        ]
+      }
     }
   ]
 }

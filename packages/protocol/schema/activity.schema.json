@@ -4,147 +4,405 @@
   "title": "islands/0 activity",
   "description": "Envelope for every activity, plus the object shape of each known type. Unknown types only need a valid envelope. Same-origin rules, calendar validity, signatures and key trust are checked by the protocol core.",
   "type": "object",
-  "required": ["id", "type", "actor", "published", "to", "object", "proof"],
+  "required": [
+    "id",
+    "type",
+    "actor",
+    "published",
+    "to",
+    "object",
+    "proof"
+  ],
   "properties": {
-    "id": { "$ref": "common.schema.json#/$defs/url" },
-    "type": { "type": "string", "pattern": "^[a-z][a-z0-9.-]{0,63}$" },
-    "actor": { "$ref": "common.schema.json#/$defs/origin" },
-    "published": { "$ref": "common.schema.json#/$defs/dateTime" },
-    "updated": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "id": {
+      "$ref": "common.schema.json#/$defs/url"
+    },
+    "type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9.-]{0,63}(?![\\s\\S])"
+    },
+    "actor": {
+      "$ref": "common.schema.json#/$defs/origin"
+    },
+    "published": {
+      "$ref": "common.schema.json#/$defs/dateTime"
+    },
+    "updated": {
+      "$ref": "common.schema.json#/$defs/dateTime"
+    },
     "to": {
       "oneOf": [
-        { "const": "public" },
+        {
+          "const": "public"
+        },
         {
           "type": "array",
           "minItems": 1,
           "maxItems": 32,
           "uniqueItems": true,
-          "items": { "$ref": "common.schema.json#/$defs/origin" }
+          "items": {
+            "$ref": "common.schema.json#/$defs/origin"
+          }
         }
       ]
     },
-    "object": { "type": "object" },
+    "object": {
+      "type": "object"
+    },
     "proof": {
       "type": "object",
-      "required": ["key", "value"],
+      "required": [
+        "key",
+        "value"
+      ],
       "properties": {
-        "key": { "$ref": "common.schema.json#/$defs/keyId" },
-        "value": { "$ref": "common.schema.json#/$defs/signature" }
+        "key": {
+          "$ref": "common.schema.json#/$defs/keyId"
+        },
+        "value": {
+          "$ref": "common.schema.json#/$defs/signature"
+        }
       }
     }
   },
   "allOf": [
     {
-      "if": { "properties": { "type": { "enum": ["follow", "visit", "message", "water", "pickup"] } }, "required": ["type"] },
-      "then": { "properties": { "to": { "type": "array" } } }
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "follow",
+              "visit",
+              "message",
+              "water",
+              "pickup"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "to": {
+            "type": "array"
+          }
+        }
+      }
     },
     {
-      "if": { "properties": { "type": { "enum": ["post", "delete", "bottle", "move", "key"] } }, "required": ["type"] },
-      "then": { "properties": { "to": { "const": "public" } } }
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "post",
+              "delete",
+              "bottle",
+              "move",
+              "key"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "to": {
+            "const": "public"
+          }
+        }
+      }
     },
     {
-      "if": { "properties": { "type": { "const": "post" } }, "required": ["type"] },
+      "if": {
+        "properties": {
+          "type": {
+            "const": "post"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
       "then": {
         "properties": {
           "object": {
-            "required": ["url", "kind"],
+            "required": [
+              "url",
+              "kind"
+            ],
             "properties": {
-              "url": { "$ref": "common.schema.json#/$defs/url" },
-              "kind": { "enum": ["article", "note", "project", "album"] },
-              "title": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "summary": { "type": "string", "minLength": 1, "maxLength": 1000 },
-              "language": { "$ref": "common.schema.json#/$defs/languageTag" },
+              "url": {
+                "$ref": "common.schema.json#/$defs/url"
+              },
+              "kind": {
+                "enum": [
+                  "article",
+                  "note",
+                  "project",
+                  "album"
+                ]
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "language": {
+                "$ref": "common.schema.json#/$defs/languageTag"
+              },
               "tags": {
                 "type": "array",
                 "maxItems": 32,
-                "items": { "type": "string", "minLength": 1, "maxLength": 64 }
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                }
               },
-              "image": { "$ref": "common.schema.json#/$defs/url" }
+              "image": {
+                "$ref": "common.schema.json#/$defs/url"
+              }
             }
           }
         }
       }
     },
     {
-      "if": { "properties": { "type": { "const": "delete" } }, "required": ["type"] },
-      "then": {
+      "if": {
         "properties": {
-          "object": { "required": ["of"], "properties": { "of": { "$ref": "common.schema.json#/$defs/url" } } }
-        }
-      }
-    },
-    {
-      "if": { "properties": { "type": { "const": "bottle" } }, "required": ["type"] },
+          "type": {
+            "const": "delete"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
       "then": {
         "properties": {
           "object": {
-            "required": ["text"],
+            "required": [
+              "of"
+            ],
             "properties": {
-              "text": { "type": "string", "minLength": 1, "maxLength": 500 },
-              "url": { "$ref": "common.schema.json#/$defs/url" },
-              "language": { "$ref": "common.schema.json#/$defs/languageTag" },
-              "expires": { "$ref": "common.schema.json#/$defs/dateTime" }
+              "of": {
+                "$ref": "common.schema.json#/$defs/url"
+              }
             }
           }
         }
       }
     },
     {
-      "if": { "properties": { "type": { "const": "message" } }, "required": ["type"] },
+      "if": {
+        "properties": {
+          "type": {
+            "const": "bottle"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
       "then": {
         "properties": {
           "object": {
-            "required": ["text"],
+            "required": [
+              "text"
+            ],
             "properties": {
-              "text": { "type": "string", "minLength": 1, "maxLength": 2000 },
-              "inReplyTo": { "$ref": "common.schema.json#/$defs/url" },
-              "public": { "type": "boolean" }
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "url": {
+                "$ref": "common.schema.json#/$defs/url"
+              },
+              "language": {
+                "$ref": "common.schema.json#/$defs/languageTag"
+              },
+              "expires": {
+                "$ref": "common.schema.json#/$defs/dateTime"
+              }
             }
           }
         }
       }
     },
     {
-      "if": { "properties": { "type": { "const": "water" } }, "required": ["type"] },
-      "then": {
-        "properties": { "object": { "properties": { "target": { "$ref": "common.schema.json#/$defs/url" } } } }
-      }
-    },
-    {
-      "if": { "properties": { "type": { "const": "pickup" } }, "required": ["type"] },
+      "if": {
+        "properties": {
+          "type": {
+            "const": "message"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
       "then": {
         "properties": {
-          "to": { "type": "array", "minItems": 1, "maxItems": 1 },
           "object": {
-            "required": ["of"],
+            "required": [
+              "text"
+            ],
             "properties": {
-              "of": { "$ref": "common.schema.json#/$defs/url" },
-              "text": { "type": "string", "minLength": 1, "maxLength": 500 }
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              },
+              "inReplyTo": {
+                "$ref": "common.schema.json#/$defs/url"
+              },
+              "public": {
+                "type": "boolean"
+              }
             }
           }
         }
       }
     },
     {
-      "if": { "properties": { "type": { "const": "move" } }, "required": ["type"] },
+      "if": {
+        "properties": {
+          "type": {
+            "const": "water"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
       "then": {
         "properties": {
-          "object": { "required": ["to"], "properties": { "to": { "$ref": "common.schema.json#/$defs/origin" } } }
+          "object": {
+            "properties": {
+              "target": {
+                "$ref": "common.schema.json#/$defs/url"
+              }
+            }
+          }
         }
       }
     },
     {
-      "if": { "properties": { "type": { "const": "key" } }, "required": ["type"] },
+      "if": {
+        "properties": {
+          "type": {
+            "const": "pickup"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "to": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1
+          },
+          "object": {
+            "required": [
+              "of"
+            ],
+            "properties": {
+              "of": {
+                "$ref": "common.schema.json#/$defs/url"
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "move"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
       "then": {
         "properties": {
           "object": {
-            "anyOf": [{ "required": ["add"] }, { "required": ["revoke"] }],
+            "required": [
+              "to"
+            ],
             "properties": {
-              "add": { "$ref": "common.schema.json#/$defs/key" },
-              "revoke": { "$ref": "common.schema.json#/$defs/keyId" },
-              "reason": { "enum": ["retired", "compromised"] }
+              "to": {
+                "$ref": "common.schema.json#/$defs/origin"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "key"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "object": {
+            "anyOf": [
+              {
+                "required": [
+                  "add"
+                ]
+              },
+              {
+                "required": [
+                  "revoke"
+                ]
+              }
+            ],
+            "properties": {
+              "add": {
+                "$ref": "common.schema.json#/$defs/key"
+              },
+              "revoke": {
+                "$ref": "common.schema.json#/$defs/keyId"
+              },
+              "reason": {
+                "enum": [
+                  "retired",
+                  "compromised"
+                ]
+              }
             },
-            "dependentRequired": { "reason": ["revoke"] }
+            "dependentRequired": {
+              "reason": [
+                "revoke"
+              ]
+            }
           }
         }
       }

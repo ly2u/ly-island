@@ -3,17 +3,21 @@
 // A receiver keeps one history per island and verifies signatures only
 // against it, never against whatever keys the current manifest lists.
 //
-// - First contact trusts the manifest keys and remembers the head of the
-//   island's key log (if it has one).
+// - First contact trusts the manifest keys and anchors the island's key log
+//   (if it has one): the id and position of its newest entry, plus a running
+//   digest of every entry up to it.
 // - Key changes are applied only from the key log, strictly in log order,
-//   starting after the remembered head. A `key` activity seen in an outbox is
+//   starting after the anchored head. A `key` activity seen in an outbox is
 //   just a hint to sync the log.
+// - The log is append-only. If anything up to the head changed (an entry
+//   removed, reordered, or rewritten under the same id), the history pauses.
 // - Any entry that cannot be verified, or a valid signature from a key that
 //   is already revoked, pauses the history until the owner confirms.
 //
 // Histories are plain JSON so they can be stored as they are.
 
-import { decode } from './base64url.js';
+import { decode, encode } from './base64url.js';
+import { canonicalBytes } from './canonicalize.js';
 import { verifySignature } from './sign.js';
 import { isPlainObject, timeOf } from './util.js';
 
@@ -27,13 +31,52 @@ import { isPlainObject, timeOf } from './util.js';
  * }} KeyRecord
  *
  * @typedef {{
+ *   id: string,
+ *   index: number,
+ *   digest: string,
+ * }} LogHead
+ *   id and position of the newest entry applied or anchored, and the running
+ *   digest of entries 0..index (see chainDigest).
+ *
+ * @typedef {{
  *   origin: string,
  *   status: 'trusted' | 'paused',
  *   pauseReason?: string,
  *   keys: KeyRecord[],
- *   logHead: string | null,
+ *   logHead: LogHead | null,
  * }} KeyHistory
  */
+
+/**
+ * Running digest over log entries: d(-1) is empty, and
+ * d(i) = SHA-256(d(i-1) || canonical bytes of entry i, proof included).
+ * @param {Uint8Array} previous
+ * @param {unknown} entry
+ */
+async function step(previous, entry) {
+  const bytes = canonicalBytes(entry);
+  const input = new Uint8Array(previous.length + bytes.length);
+  input.set(previous);
+  input.set(bytes, previous.length);
+  return new Uint8Array(await crypto.subtle.digest('SHA-256', input));
+}
+
+/**
+ * The running digest of entries 0..last of a key log, base64url encoded.
+ * @param {unknown[]} items
+ * @param {number} last
+ */
+export async function chainDigest(items, last) {
+  let digest = new Uint8Array(0);
+  for (let i = 0; i <= last; i += 1) digest = await step(digest, items[i]);
+  return encode(digest);
+}
+
+/** @param {{ items: Record<string, any>[] }} keyLog */
+function hasDuplicateIds(keyLog) {
+  const ids = keyLog.items.map((item) => item?.id);
+  return new Set(ids).size !== ids.length;
+}
 
 /** @param {KeyHistory} history @returns {KeyHistory} */
 function copy(history) {
@@ -47,26 +90,33 @@ function paused(history, reason) {
 
 /**
  * First contact. `manifest` must already pass validateManifest().
+ * When the manifest has `links.keys`, read the key log first and pass it,
+ * so later syncs can tell appended entries from rewritten ones.
  * @param {{ id: string, keys: { id: string, publicKey: string }[] }} manifest
- * @param {{ now: string, keyLogHead?: string | null }} context
- *   keyLogHead: id of the newest entry of the island's key log at this moment,
- *   or null when the island has no key log yet.
- * @returns {KeyHistory}
+ * @param {{ now: string, keyLog?: { owner: string, items: Record<string, any>[] } | null }} context
+ *   keyLog: the island's key log as read now (must pass validateKeyLog), or null
+ * @returns {Promise<KeyHistory>}
  */
-export function trustOnFirstUse(manifest, { now, keyLogHead = null }) {
-  return {
+export async function trustOnFirstUse(manifest, { now, keyLog = null }) {
+  /** @type {KeyHistory} */
+  const history = {
     origin: manifest.id,
     status: 'trusted',
     keys: manifest.keys.map((key) => ({ id: key.id, publicKey: key.publicKey, trustedAt: now })),
-    logHead: keyLogHead,
+    logHead: null,
   };
+  if (keyLog === null || keyLog.items.length === 0) return history;
+  if (keyLog.owner !== manifest.id || hasDuplicateIds(keyLog)) return paused(history, 'invalid-key-log');
+  const last = keyLog.items.length - 1;
+  history.logHead = { id: keyLog.items[last].id, index: last, digest: await chainDigest(keyLog.items, last) };
+  return history;
 }
 
 /**
  * Starts over after the owner confirmed a key change by hand.
  * Old keys are dropped; activities signed by them can no longer be verified.
  * @param {{ id: string, keys: { id: string, publicKey: string }[] }} manifest
- * @param {{ now: string, keyLogHead?: string | null }} context
+ * @param {{ now: string, keyLog?: { owner: string, items: Record<string, any>[] } | null }} context
  */
 export function retrust(manifest, context) {
   return trustOnFirstUse(manifest, context);
@@ -102,39 +152,51 @@ export function pause(history, reason) {
 }
 
 /**
- * Applies the entries of a key log that come after the remembered head.
+ * Applies the entries of a key log that come after the anchored head.
  * `keyLog` must already pass validateKeyLog().
  * @param {KeyHistory} history
  * @param {{ owner: string, items: Record<string, any>[] }} keyLog
  * @returns {Promise<{ history: KeyHistory, outcome: 'up-to-date' | 'applied' | 'paused', applied: number, reason?: string }>}
  */
 export async function syncKeyLog(history, keyLog) {
+  /** @param {string} reason */
+  const stop = (reason) => ({ history: paused(history, reason), outcome: /** @type {'paused'} */ ('paused'), applied: 0, reason });
+
   if (history.status === 'paused') {
     return { history, outcome: 'paused', applied: 0, reason: history.pauseReason };
   }
-  if (keyLog.owner !== history.origin) {
-    return { history: paused(history, 'foreign-key-log'), outcome: 'paused', applied: 0, reason: 'foreign-key-log' };
-  }
+  if (keyLog.owner !== history.origin) return stop('foreign-key-log');
+  // Ids locate the head, so they must be unique. Checked before anything changes.
+  if (hasDuplicateIds(keyLog)) return stop('invalid-key-log');
 
   let start = 0;
+  let digest = new Uint8Array(0);
   if (history.logHead !== null) {
-    const index = keyLog.items.findIndex((item) => item.id === history.logHead);
-    if (index < 0) {
-      return { history: paused(history, 'log-rewritten'), outcome: 'paused', applied: 0, reason: 'log-rewritten' };
+    const { id, index, digest: expected } = history.logHead;
+    if (keyLog.items[index]?.id !== id) return stop('log-rewritten');
+    let observed;
+    try {
+      observed = await chainDigest(keyLog.items, index);
+    } catch {
+      return stop('invalid-key-log');
     }
+    if (observed !== expected) return stop('log-rewritten');
+    digest = decode(expected);
     start = index + 1;
   }
   if (start >= keyLog.items.length) return { history, outcome: 'up-to-date', applied: 0 };
 
   let next = copy(history);
   let applied = 0;
-  for (const entry of keyLog.items.slice(start)) {
+  for (let i = start; i < keyLog.items.length; i += 1) {
+    const entry = keyLog.items[i];
     const result = await applyEntry(next, entry);
     if (result.reason !== undefined) {
       return { history: paused(next, result.reason), outcome: 'paused', applied, reason: result.reason };
     }
     next = result.history;
-    next.logHead = entry.id;
+    digest = await step(digest, entry);
+    next.logHead = { id: entry.id, index: i, digest: encode(digest) };
     applied += 1;
   }
   return { history: next, outcome: 'applied', applied };

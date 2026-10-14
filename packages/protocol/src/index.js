@@ -1,6 +1,6 @@
 // Protocol core for islands/0. See docs/protocol-v0.md.
 
-export { PROTOCOL } from './util.js';
+export { PROTOCOL, isProtocolHost } from './util.js';
 export { encode as encodeBase64url, decode as decodeBase64url } from './base64url.js';
 export { canonicalize, canonicalBytes, CanonicalizationError } from './canonicalize.js';
 export {
@@ -36,6 +36,7 @@ export {
   validateOutbox,
 } from './documents.js';
 export {
+  chainDigest,
   compareManifest,
   pause,
   resolveKey,
@@ -46,8 +47,10 @@ export {
 } from './keyhistory.js';
 export { canReplace, checkDelete, confirmMove, recordMigration, speaksFor, tombstoneKey } from './authorship.js';
 export {
+  ALLOWED_HEADERS,
   MAX_REDIRECTS,
   TIMEOUT_MS,
+  buildOutboundHeaders,
   checkOutboundHeaders,
   checkOutboundUrl,
   checkRedirect,

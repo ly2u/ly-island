@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  buildOutboundHeaders,
   checkOutboundHeaders,
   checkOutboundUrl,
   checkRedirect,
@@ -142,11 +143,75 @@ describe('redirects', () => {
 });
 
 describe('outbound headers', () => {
-  it('refuses any credential of this island', () => {
-    assert.deepEqual(checkOutboundHeaders({ 'content-type': 'application/json', 'user-agent': 'islands/0' }), { ok: true });
-    for (const name of ['Cookie', 'Authorization', 'Proxy-Authorization', 'Cf-Access-Jwt-Assertion', 'CF-Access-Client-Secret']) {
-      assert.equal(checkOutboundHeaders({ [name]: 'x' }).ok, false, name);
+  const self = 'https://example.org';
+
+  it('builds conditional reads, feed reads and JSON deliveries that pass the check', () => {
+    const read = buildOutboundHeaders({ kind: 'read', self, etag: '"abc"', lastModified: 'Tue, 13 Oct 2026 12:00:00 GMT' });
+    assert.deepEqual(read, {
+      accept: 'application/json',
+      'user-agent': 'islands/0 (+https://example.org)',
+      'if-none-match': '"abc"',
+      'if-modified-since': 'Tue, 13 Oct 2026 12:00:00 GMT',
+    });
+    const deliver = buildOutboundHeaders({ kind: 'deliver', self });
+    assert.equal(deliver['content-type'], 'application/json');
+    assert.ok(buildOutboundHeaders({ kind: 'feed', self }).accept.includes('application/atom+xml'));
+    for (const headers of [read, deliver, new Headers(deliver)]) assert.deepEqual(checkOutboundHeaders(headers), { ok: true });
+  });
+
+  it('refuses every header outside the allowlist, credentials and custom tokens included', () => {
+    for (const name of [
+      'Cookie',
+      'Authorization',
+      'Proxy-Authorization',
+      'Cf-Access-Jwt-Assertion',
+      'CF-Access-Client-Secret',
+      'X-API-Key',
+      'X-Auth-Token',
+      'X-Islands-Token',
+      'X-Forwarded-For',
+      'Origin',
+    ]) {
+      assert.deepEqual(checkOutboundHeaders({ [name]: 'synthetic-secret' }), { ok: false, reason: 'header-not-allowed', header: name });
     }
     assert.equal(checkOutboundHeaders(new Headers({ authorization: 'Bearer x' })).ok, false);
+  });
+
+  it('refuses forwarded incoming headers wholesale', () => {
+    const incoming = new Headers({ accept: 'application/json', cookie: 'session=1', 'user-agent': 'Mozilla/5.0' });
+    assert.equal(checkOutboundHeaders(incoming).ok, false);
+  });
+
+  it('refuses unsafe values and bad arguments', () => {
+    assert.equal(checkOutboundHeaders({ accept: '' }).ok, false);
+    assert.equal(checkOutboundHeaders({ 'user-agent': 'x'.repeat(2000) }).ok, false);
+    assert.throws(() => buildOutboundHeaders({ kind: 'read', self, etag: 'a\r\nX-API-Key: 1' }));
+    assert.throws(() => buildOutboundHeaders({ kind: 'read', self: 'https://Example.org' }));
+    assert.throws(() => buildOutboundHeaders({ kind: /** @type {any} */ ('post'), self }));
+  });
+});
+
+describe('address policy boundaries', () => {
+  it('allows the public neighbours of refused IPv4 blocks', () => {
+    for (const ip of ['9.255.255.255', '11.0.0.0', '100.63.255.255', '100.128.0.0', '126.255.255.255', '128.0.0.0',
+      '169.253.255.255', '169.255.0.0', '172.15.255.255', '172.32.0.0', '192.0.1.0', '192.167.255.255', '192.169.0.0',
+      '198.17.255.255', '198.20.0.0', '223.255.255.255']) {
+      assert.equal(isForbiddenAddress(ip), false, ip);
+    }
+  });
+
+  it('refuses the edges of refused IPv4 blocks, including documented exceptions', () => {
+    for (const ip of ['10.0.0.0', '10.255.255.255', '100.64.0.0', '100.127.255.255', '172.16.0.0', '172.31.255.255',
+      '192.0.0.9', '192.0.0.10', '198.18.0.0', '198.19.255.255', '224.0.0.0', '239.255.255.255', '240.0.0.0']) {
+      assert.equal(isForbiddenAddress(ip), true, ip);
+    }
+  });
+
+  it('draws the IPv6 lines where the policy says', () => {
+    const allowed = ['2000::1', '2001:200::1', '2001:4860:4860::8888', '2002:808:808::1', '3ffe::1', '3fff:1000::1'];
+    const refused = ['1fff:ffff::1', '2001:1ff:ffff::1', '2001:db8:ffff::1', '2002:a00:1::', '3fff:fff:ffff::1', '4000::1',
+      '64:ff9b::a00:1', '64:ff9b:1::808:808', '::ffff:192.168.0.1'];
+    for (const ip of allowed) assert.equal(isForbiddenAddress(ip), false, ip);
+    for (const ip of refused) assert.equal(isForbiddenAddress(ip), true, ip);
   });
 });

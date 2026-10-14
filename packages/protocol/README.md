@@ -26,6 +26,7 @@
 - **`fixtures/cases.json`：** 共用的正例和反例。
   - `node --test` 用 JavaScript 检查；
   - `scripts/check_schemas.py` 用 Python 的 jsonschema 和 cryptography 再检查一遍，同时检查文档示例和签名向量。
+- **`fixtures/addresses.json`：** 地址写法的共用用例。`check_schemas.py` 还会生成几千个地址，通过 `scripts/address-oracle.mjs` 交给 JavaScript 判断，要求和 Schema 的结果完全一致。
 
   标为 `schema` 层的反例两边都必须拒绝；标为 `rules` 层的，Schema 接受，协议核心必须拒绝。
 - **`fixtures/vectors/signing.json`：** 签名向量，由 `scripts/make-examples.mjs` 生成。用的是公开的测试密钥（种子为 32 个 `0x11` 字节），不要用在真实的岛上。
@@ -43,9 +44,10 @@ python3 scripts/check_docs.py
 这些不在协议核心里，但协议要求必须做到：
 
 - **按序调用：** 收件箱先调用 `precheckDelivery()`，再用 `verifyActivity()` 验签，最后执行接收策略。只有接受后才记录 `id`。
-- **首次信任：** 调用 `trustOnFirstUse()` 时，如果名片有 `links.keys`，要先读取密钥日志，把最新一条的 `id` 作为 `keyLogHead` 传入。
+- **首次信任：** 调用 `trustOnFirstUse()` 时，如果名片有 `links.keys`，要先读取密钥日志，通过 `validateKeyLog()` 后作为 `keyLog` 传入。这样才能锚定日志头，之后的同步才能发现改写。
+- **保存密钥历史：** `KeyHistory` 是普通 JSON，原样存储。其中 `logHead` 包括 `id`、`index` 和累计摘要 `digest`，三项都要保存。
 - **出站请求：**
   - 每次请求前调用 `checkOutboundUrl()`，每次重定向调用 `checkRedirect()`；
   - 自托管时，先解析域名、用 `checkResolvedAddresses()` 检查，再连接检查过的 IP；
-  - 请求头先用 `checkOutboundHeaders()` 检查。
+  - 请求头一律用 `buildOutboundHeaders()` 从头构造，不复制收到的请求的请求头；发送前再用 `checkOutboundHeaders()` 检查。它只放行白名单里的五个请求头。
 - **撤回：** 只在 `checkDelete()` 返回 `ok` 时写删除标记。

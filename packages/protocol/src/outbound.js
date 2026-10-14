@@ -3,6 +3,21 @@
 // Every request whose address comes from someone else's data goes through
 // these checks: manifests, outboxes, next pages, key logs, blog feeds and
 // inbox deliveries. They fail closed: anything that cannot be parsed is refused.
+//
+// Address policy, checked against the IANA IPv4 and IPv6 Special-Purpose
+// Address Registries as of 2026-10:
+// - It is deliberately conservative. Whole blocks are refused even where
+//   the registry marks a few addresses inside them as globally reachable,
+//   for example 192.0.0.9 and 192.0.0.10 inside 192.0.0.0/24, and some
+//   anycast assignments inside 2001::/23. Islands never need those.
+// - IPv6 is allowed only inside global unicast 2000::/3, plus IPv4-mapped
+//   addresses and the well-known NAT64 prefix 64:ff9b::/96, which are judged
+//   by the IPv4 address they carry.
+// - Networks with their own NAT64 or tunnel prefixes cannot be recognised
+//   from an address alone. Self-hosted adapters must also restrict egress at
+//   the network level.
+
+import { isHttpsOrigin } from './util.js';
 
 export const MAX_REDIRECTS = 3;
 export const TIMEOUT_MS = 10_000;
@@ -188,20 +203,68 @@ export function checkRedirect({ method, from, location, hops }) {
   return checkOutboundUrl(target.href, { sameOriginAs: new URL(from).origin });
 }
 
-const FORBIDDEN_HEADERS = ['cookie', 'authorization', 'proxy-authorization'];
+// The only headers a protocol request may carry. Everything else is refused:
+// Cookie, Authorization, Cloudflare Access headers, custom API or AI tokens,
+// forwarding headers. Requests are built from this list, never by copying
+// the headers of an incoming request.
+export const ALLOWED_HEADERS = Object.freeze(['accept', 'content-type', 'if-modified-since', 'if-none-match', 'user-agent']);
+
+const ACCEPT = Object.freeze({
+  read: 'application/json',
+  feed: 'application/atom+xml, application/rss+xml, application/feed+json, application/xml;q=0.9, text/xml;q=0.8',
+  deliver: 'application/json',
+});
+
+/** @param {unknown} value */
+function isSafeHeaderValue(value) {
+  return typeof value === 'string' && value.length > 0 && value.length <= 1024 && /^[\x20-\x7e]+$/.test(value);
+}
 
 /**
- * Outbound requests must never carry this island's credentials.
+ * Builds the headers of a protocol request from scratch.
+ * @param {{
+ *   kind: 'read' | 'feed' | 'deliver',
+ *   self: string,
+ *   etag?: string | null,
+ *   lastModified?: string | null,
+ * }} options
+ *   kind: "read" for manifests, outboxes, friends lists and key logs; "feed"
+ *   for RSS, Atom or JSON Feed of plain blogs; "deliver" for an inbox POST.
+ *   self: this island's origin, named in the User-Agent.
+ *   etag, lastModified: from the previous response, for conditional reads.
+ * @returns {Record<string, string>}
+ */
+export function buildOutboundHeaders({ kind, self, etag = null, lastModified = null }) {
+  if (!Object.hasOwn(ACCEPT, kind)) throw new TypeError('kind must be "read", "feed" or "deliver"');
+  if (!isHttpsOrigin(self)) throw new TypeError('self must be this island origin');
+  /** @type {Record<string, string>} */
+  const headers = { accept: ACCEPT[/** @type {keyof typeof ACCEPT} */ (kind)], 'user-agent': `islands/0 (+${self})` };
+  if (kind === 'deliver') {
+    headers['content-type'] = 'application/json';
+  } else {
+    if (etag !== null) {
+      if (!isSafeHeaderValue(etag)) throw new TypeError('etag is not a safe header value');
+      headers['if-none-match'] = etag;
+    }
+    if (lastModified !== null) {
+      if (!isSafeHeaderValue(lastModified)) throw new TypeError('lastModified is not a safe header value');
+      headers['if-modified-since'] = lastModified;
+    }
+  }
+  return headers;
+}
+
+/**
+ * Last check before sending: only headers from ALLOWED_HEADERS, with plain
+ * printable values. Use buildOutboundHeaders() to make them.
  * @param {Record<string, string> | Iterable<[string, string]>} headers
  * @returns {{ ok: true } | { ok: false, reason: string, header: string }}
  */
 export function checkOutboundHeaders(headers) {
   const entries = Symbol.iterator in Object(headers) ? [.../** @type {Iterable<[string, string]>} */ (headers)] : Object.entries(headers);
-  for (const [name] of entries) {
-    const lower = name.toLowerCase();
-    if (FORBIDDEN_HEADERS.includes(lower) || lower.startsWith('cf-access-')) {
-      return { ok: false, reason: 'credential-header', header: name };
-    }
+  for (const [name, value] of entries) {
+    if (!ALLOWED_HEADERS.includes(String(name).toLowerCase())) return { ok: false, reason: 'header-not-allowed', header: name };
+    if (!isSafeHeaderValue(value)) return { ok: false, reason: 'unsafe-header-value', header: name };
   }
   return { ok: true };
 }

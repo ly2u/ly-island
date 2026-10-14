@@ -9,15 +9,20 @@
    examples verify with the example key, using Python's own canonical JSON
    and Ed25519 (the cryptography package).
 4. The committed signing vector verifies.
+5. Address syntax: the shared cases in fixtures/addresses.json, plus a few
+   thousand generated strings that are run through both the schema patterns
+   and the JavaScript rules (via node) and must get the same answers.
 
-Requires: jsonschema, cryptography.
+Requires: jsonschema, cryptography, and node on PATH.
 """
 
 from __future__ import annotations
 
 import base64
 import json
+import random
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -44,6 +49,9 @@ def fail(message: str) -> None:
     print(f"FAIL {message}")
 
 
+COMMON = "https://schema.islands.invalid/0/common.schema.json"
+
+
 def load_validators() -> dict[str, Draft202012Validator]:
     registry = Registry()
     documents = {}
@@ -52,7 +60,20 @@ def load_validators() -> dict[str, Draft202012Validator]:
         Draft202012Validator.check_schema(document)
         documents[path.name] = document
         registry = registry.with_resource(document["$id"], Resource.from_contents(document))
-    return {kind: Draft202012Validator(documents[name], registry=registry) for kind, name in SCHEMAS.items()}
+    validators = {kind: Draft202012Validator(documents[name], registry=registry) for kind, name in SCHEMAS.items()}
+    for definition in ("origin", "url", "keyId"):
+        validators[definition] = Draft202012Validator({"$ref": f"{COMMON}#/$defs/{definition}"}, registry=registry)
+    return validators
+
+
+def check_addresses(validators: dict[str, Draft202012Validator]) -> int:
+    cases = json.loads((PACKAGE / "fixtures" / "addresses.json").read_text(encoding="utf-8"))["cases"]
+    for case in cases:
+        for definition in ("origin", "url", "keyId"):
+            accepted = validators[definition].is_valid(case["value"])
+            if accepted != case[definition]:
+                fail(f"address {case['value']!r} ({case['note']}): schema {definition} gives {accepted}")
+    return len(cases)
 
 
 def schema_errors(validators: dict[str, Draft202012Validator], kind: str, data: object) -> list[str]:
@@ -70,6 +91,57 @@ def check_fixtures(validators: dict[str, Draft202012Validator]) -> int:
         if not rejects and errors:
             fail(f"{label}: the schema should accept it: {errors[:3]}")
     return len(cases)
+
+
+def generated_addresses(count: int = 4000) -> list[str]:
+    """Deterministic address-like strings: mostly well-formed, with one
+    defect injected here and there, so both outcomes are well exercised."""
+    rng = random.Random(20261014)
+    letters = "abcdefghijklmnopqrstuvwxyz"
+    plain = letters + "0123456789"
+    tricky = ["-", "_", "A", "é", ".", "%", ":", "@", " ", "xn--"]
+
+    def label(length: int) -> str:
+        text = "".join(rng.choice(plain) for _ in range(length))
+        if rng.random() < 0.15:
+            spot = rng.randrange(len(text) + 1)
+            text = text[:spot] + rng.choice(tricky) + text[spot:]
+        if rng.random() < 0.05:
+            text = "xn--" + text
+        return text
+
+    def tld() -> str:
+        if rng.random() < 0.8:
+            return "".join(rng.choice(letters) for _ in range(rng.choice([2, 3, 4, 6, 63, 64])))
+        return rng.choice(["123", "0x1", "c0m", "co-m", "", "a", "-com", "com-"])
+
+    schemes = ["https://"] * 16 + ["http://", "HTTPS://", "https:/", "https:///"]
+    suffixes = ["", "", "", "", "/", "/a/b", "?q=1", "#k1", "#k_2.x-y", "#k 1", "#" + "k" * 64, "#" + "k" * 65,
+                ":443", ":8443", ".", "/笔", " ", "\n", "\\x", "/%41", "/a\\b", "/#k1", "#k1/x", "?#", "/~!$&'()*+,;=:@"]
+    out = []
+    for _ in range(count):
+        count_labels = rng.choices([0, 1, 2, 3], weights=[1, 6, 3, 1])[0]
+        lengths = [rng.choice([1, 2, 3, 5, 10, 61, 62, 63, 64]) for _ in range(count_labels)]
+        host = ".".join([label(n) for n in lengths] + [tld()])
+        if rng.random() < 0.03:
+            host = rng.choice(["1.2.3.4", "[::1]", "[2606:4700::1]", "localhost", "example.0x1", "example.123"])
+        out.append(rng.choice(schemes) + host + rng.choice(suffixes))
+    return out
+
+
+def check_address_differential(validators: dict[str, Draft202012Validator]) -> int:
+    """Runs the JavaScript rules on the same generated strings and compares."""
+    values = generated_addresses()
+    oracle = PACKAGE / "scripts" / "address-oracle.mjs"
+    completed = subprocess.run(
+        ["node", str(oracle)], input=json.dumps(values), capture_output=True, text=True, check=True
+    )
+    for value, (origin, url, key_id) in zip(values, json.loads(completed.stdout)):
+        expected = {"origin": origin, "url": url, "keyId": key_id}
+        for definition, js_result in expected.items():
+            if validators[definition].is_valid(value) != js_result:
+                fail(f"address {value!r}: JavaScript {definition}={js_result}, schema disagrees")
+    return len(values)
 
 
 def canonical(value: object) -> str:
@@ -139,9 +211,14 @@ def check_vector() -> None:
 def main() -> int:
     validators = load_validators()
     fixtures = check_fixtures(validators)
+    addresses = check_addresses(validators)
+    generated = check_address_differential(validators)
     examples = check_docs(validators)
     check_vector()
-    print(f"schemas: {len(SCHEMAS)} documents, {fixtures} fixtures, {examples} docs examples, 1 signing vector")
+    print(
+        f"schemas: {len(SCHEMAS)} documents, {fixtures} fixtures, {addresses} addresses, "
+        f"{generated} generated addresses compared with JavaScript, {examples} docs examples, 1 signing vector"
+    )
     if failures:
         print(f"{len(failures)} failure(s)")
         return 1

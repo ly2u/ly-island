@@ -4,43 +4,113 @@
   "title": "islands/0 manifest (/.well-known/island.json)",
   "description": "Structure only. That every link and key is on the island origin, and that id equals the origin the manifest was read from, is checked by the protocol core.",
   "type": "object",
-  "required": ["protocol", "id", "name", "keys", "links", "updated"],
+  "required": [
+    "protocol",
+    "id",
+    "name",
+    "keys",
+    "links",
+    "updated"
+  ],
   "properties": {
-    "protocol": { "$ref": "common.schema.json#/$defs/protocol" },
-    "id": { "$ref": "common.schema.json#/$defs/origin" },
-    "name": { "type": "string", "minLength": 1, "maxLength": 100 },
-    "summary": { "type": "string", "minLength": 1, "maxLength": 1000 },
-    "language": { "type": "array", "maxItems": 10, "items": { "$ref": "common.schema.json#/$defs/languageTag" } },
-    "icon": { "$ref": "common.schema.json#/$defs/url" },
-    "keys": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "$ref": "common.schema.json#/$defs/key" } },
+    "protocol": {
+      "$ref": "common.schema.json#/$defs/protocol"
+    },
+    "id": {
+      "$ref": "common.schema.json#/$defs/origin"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    },
+    "language": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "$ref": "common.schema.json#/$defs/languageTag"
+      }
+    },
+    "icon": {
+      "$ref": "common.schema.json#/$defs/url"
+    },
+    "keys": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "$ref": "common.schema.json#/$defs/key"
+      }
+    },
     "links": {
       "type": "object",
-      "required": ["outbox"],
+      "required": [
+        "outbox"
+      ],
       "properties": {
-        "home": { "$ref": "common.schema.json#/$defs/url" },
-        "outbox": { "$ref": "common.schema.json#/$defs/url" },
-        "friends": { "$ref": "common.schema.json#/$defs/url" },
-        "feed": { "$ref": "common.schema.json#/$defs/url" },
-        "inbox": { "$ref": "common.schema.json#/$defs/url" },
-        "compose": { "$ref": "common.schema.json#/$defs/url" },
-        "keys": { "$ref": "common.schema.json#/$defs/url" }
+        "home": {
+          "$ref": "common.schema.json#/$defs/url"
+        },
+        "outbox": {
+          "$ref": "common.schema.json#/$defs/url"
+        },
+        "friends": {
+          "$ref": "common.schema.json#/$defs/url"
+        },
+        "feed": {
+          "$ref": "common.schema.json#/$defs/url"
+        },
+        "inbox": {
+          "$ref": "common.schema.json#/$defs/url"
+        },
+        "compose": {
+          "$ref": "common.schema.json#/$defs/url"
+        },
+        "keys": {
+          "$ref": "common.schema.json#/$defs/url"
+        }
       }
     },
     "accepts": {
       "type": "object",
       "properties": {
-        "follow": { "$ref": "#/$defs/accept" },
-        "visit": { "$ref": "#/$defs/accept" },
-        "message": { "$ref": "#/$defs/accept" },
-        "water": { "$ref": "#/$defs/accept" },
-        "pickup": { "$ref": "#/$defs/accept" }
+        "follow": {
+          "$ref": "#/$defs/accept"
+        },
+        "visit": {
+          "$ref": "#/$defs/accept"
+        },
+        "message": {
+          "$ref": "#/$defs/accept"
+        },
+        "water": {
+          "$ref": "#/$defs/accept"
+        },
+        "pickup": {
+          "$ref": "#/$defs/accept"
+        }
       }
     },
     "appearance": {
       "type": "object",
       "properties": {
-        "seed": { "type": "string", "minLength": 1, "maxLength": 64 },
-        "colors": { "type": "array", "maxItems": 8, "items": { "$ref": "common.schema.json#/$defs/color" } }
+        "seed": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "colors": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "common.schema.json#/$defs/color"
+          }
+        }
       }
     },
     "stats": {
@@ -48,35 +118,98 @@
       "properties": {
         "records": {
           "type": "object",
-          "propertyNames": { "pattern": "^[a-z][a-z0-9-]{0,31}$" },
-          "additionalProperties": { "$ref": "common.schema.json#/$defs/count" }
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9-]{0,31}(?![\\s\\S])"
+          },
+          "additionalProperties": {
+            "$ref": "common.schema.json#/$defs/count"
+          }
         },
-        "bottles": { "$ref": "common.schema.json#/$defs/count" },
-        "firstRecord": { "$ref": "common.schema.json#/$defs/date" },
-        "lastRecord": { "$ref": "common.schema.json#/$defs/date" },
-        "activeWeeks": { "type": "array", "maxItems": 60, "items": { "$ref": "common.schema.json#/$defs/isoWeek" } },
+        "bottles": {
+          "$ref": "common.schema.json#/$defs/count"
+        },
+        "firstRecord": {
+          "$ref": "common.schema.json#/$defs/date"
+        },
+        "lastRecord": {
+          "$ref": "common.schema.json#/$defs/date"
+        },
+        "activeWeeks": {
+          "type": "array",
+          "maxItems": 60,
+          "items": {
+            "$ref": "common.schema.json#/$defs/isoWeek"
+          }
+        },
         "growth": {
           "type": "object",
-          "required": ["rules", "points", "stage"],
+          "required": [
+            "rules",
+            "points",
+            "stage"
+          ],
           "properties": {
-            "rules": { "type": "string", "minLength": 1, "maxLength": 64 },
-            "points": { "$ref": "common.schema.json#/$defs/count" },
-            "stage": { "type": "string", "minLength": 1, "maxLength": 32 },
-            "unlocked": { "type": "array", "maxItems": 256, "items": { "type": "string", "minLength": 1, "maxLength": 64 } }
+            "rules": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "points": {
+              "$ref": "common.schema.json#/$defs/count"
+            },
+            "stage": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32
+            },
+            "unlocked": {
+              "type": "array",
+              "maxItems": 256,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              }
+            }
           }
         }
       }
     },
-    "discoverable": { "type": "boolean" },
+    "discoverable": {
+      "type": "boolean"
+    },
     "ai": {
       "type": "object",
-      "properties": { "read": { "type": "boolean" }, "train": { "type": "boolean" } }
+      "properties": {
+        "read": {
+          "type": "boolean"
+        },
+        "train": {
+          "type": "boolean"
+        }
+      }
     },
-    "alsoKnownAs": { "type": "array", "maxItems": 8, "items": { "$ref": "common.schema.json#/$defs/origin" } },
-    "movedTo": { "$ref": "common.schema.json#/$defs/origin" },
-    "updated": { "$ref": "common.schema.json#/$defs/dateTime" }
+    "alsoKnownAs": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "$ref": "common.schema.json#/$defs/origin"
+      }
+    },
+    "movedTo": {
+      "$ref": "common.schema.json#/$defs/origin"
+    },
+    "updated": {
+      "$ref": "common.schema.json#/$defs/dateTime"
+    }
   },
   "$defs": {
-    "accept": { "enum": ["none", "friends", "signed"] }
+    "accept": {
+      "enum": [
+        "none",
+        "friends",
+        "signed"
+      ]
+    }
   }
 }
