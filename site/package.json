@@ -1,0 +1,23 @@
+{
+  "name": "island-site",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "deploy": "wrangler deploy",
+    "keygen": "node scripts/keygen.mjs",
+    "unlocks:save": "node scripts/unlocks.mjs"
+  },
+  "dependencies": {
+    "astro": "7.3.8"
+  },
+  "devDependencies": {
+    "wrangler": "^4.111.0"
+  }
+}
