@@ -1,21 +1,17 @@
-import { feedPlugin } from '@11ty/eleventy-plugin-rss';
+import { rssPlugin } from '@11ty/eleventy-plugin-rss';
 import { SITE, SITE_NAME, SITE_SUMMARY } from '../shared/island-data.mjs';
 
 export default function (eleventyConfig) {
-  // The notes are copied in at build time and kept out of Git, so Eleventy
-  // must not skip what .gitignore lists.
+  // The notes are copied in at build time and listed in .gitignore, so
+  // Eleventy must not skip what .gitignore lists (.eleventyignore still applies).
   eleventyConfig.setUseGitIgnore(false);
-  eleventyConfig.addPlugin(feedPlugin, {
-    type: 'rss',
-    outputPath: '/feed.xml',
-    collection: { name: 'notes', limit: 0 },
-    metadata: {
-      language: 'zh-CN',
-      title: SITE_NAME,
-      subtitle: SITE_SUMMARY,
-      base: `${SITE}/`,
-      author: { name: SITE_NAME },
-    },
-  });
+
+  // The feed is a Nunjucks template (src/feed.njk) using the plugin's filters,
+  // so that it is summary-only like the Astro feed. The plugin's ready-made RSS
+  // template (feedPlugin, 3.1.0) writes <content:encoded> without declaring the
+  // content namespace when notes have a summary, which is not well-formed XML.
+  eleventyConfig.addPlugin(rssPlugin);
+  eleventyConfig.addGlobalData('site', { url: SITE, name: SITE_NAME, summary: SITE_SUMMARY });
+
   return { dir: { input: 'src', output: 'dist' } };
 }
