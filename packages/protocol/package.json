@@ -1,0 +1,22 @@
+{
+  "name": "@islands/protocol",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Protocol core for the islands framework: validation, canonical JSON, Ed25519 signatures, key history, authorship and outbound request rules.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./schema/*": "./schema/*"
+  },
+  "files": [
+    "src",
+    "schema"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

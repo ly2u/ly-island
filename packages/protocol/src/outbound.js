@@ -1,0 +1,207 @@
+// Outbound request rules (protocol section "出站请求").
+//
+// Every request whose address comes from someone else's data goes through
+// these checks: manifests, outboxes, next pages, key logs, blog feeds and
+// inbox deliveries. They fail closed: anything that cannot be parsed is refused.
+
+export const MAX_REDIRECTS = 3;
+export const TIMEOUT_MS = 10_000;
+
+const FORBIDDEN_SUFFIXES = ['localhost', 'local', 'internal', 'home.arpa'];
+
+// IPv4 ranges that are private, shared, loopback, link-local, reserved,
+// documentation, benchmarking or multicast.
+const IPV4_FORBIDDEN = [
+  ['0.0.0.0', 8],
+  ['10.0.0.0', 8],
+  ['100.64.0.0', 10],
+  ['127.0.0.0', 8],
+  ['169.254.0.0', 16],
+  ['172.16.0.0', 12],
+  ['192.0.0.0', 24],
+  ['192.0.2.0', 24],
+  ['192.88.99.0', 24],
+  ['192.168.0.0', 16],
+  ['198.18.0.0', 15],
+  ['198.51.100.0', 24],
+  ['203.0.113.0', 24],
+  ['224.0.0.0', 4],
+  ['240.0.0.0', 4],
+].map(([base, prefix]) => ({ base: /** @type {number} */ (parseIPv4(/** @type {string} */ (base))), prefix: /** @type {number} */ (prefix) }));
+
+/**
+ * Strict dotted-quad: four decimal parts, no leading zeros.
+ * @param {string} text
+ * @returns {number | null} the address as an unsigned 32-bit number
+ */
+export function parseIPv4(text) {
+  const parts = text.split('.');
+  if (parts.length !== 4) return null;
+  let value = 0;
+  for (const part of parts) {
+    if (!/^(0|[1-9]\d{0,2})$/.test(part)) return null;
+    const octet = Number(part);
+    if (octet > 255) return null;
+    value = value * 256 + octet;
+  }
+  return value >>> 0;
+}
+
+/**
+ * @param {string} text with or without brackets; zone ids are refused
+ * @returns {number[] | null} eight 16-bit groups
+ */
+export function parseIPv6(text) {
+  let s = text;
+  if (s.startsWith('[') && s.endsWith(']')) s = s.slice(1, -1);
+  if (s.length === 0 || s.includes('%')) return null;
+  const halves = s.split('::');
+  if (halves.length > 2) return null;
+  const split = (/** @type {string} */ part) => (part === '' ? [] : part.split(':'));
+  const head = split(halves[0]);
+  const tail = halves.length === 2 ? split(halves[1]) : [];
+  const last = halves.length === 2 ? tail : head;
+  if (last.length > 0 && last[last.length - 1].includes('.')) {
+    const v4 = parseIPv4(/** @type {string} */ (last.pop()));
+    if (v4 === null) return null;
+    last.push(((v4 >>> 16) & 0xffff).toString(16), (v4 & 0xffff).toString(16));
+  }
+  const groups = [...head, ...tail];
+  if (!groups.every((group) => /^[0-9a-fA-F]{1,4}$/.test(group))) return null;
+  const values = groups.map((group) => parseInt(group, 16));
+  if (halves.length === 1) return values.length === 8 ? values : null;
+  if (values.length > 7) return null;
+  return [
+    ...head.map((group) => parseInt(group, 16)),
+    ...new Array(8 - values.length).fill(0),
+    ...tail.map((group) => parseInt(group, 16)),
+  ];
+}
+
+/** @param {number} address */
+function isForbiddenIPv4(address) {
+  return IPV4_FORBIDDEN.some(({ base, prefix }) => {
+    const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
+    return ((address & mask) >>> 0) === ((base & mask) >>> 0);
+  });
+}
+
+/** @param {number} high @param {number} low */
+function embeddedIPv4(high, low) {
+  return ((high << 16) | low) >>> 0;
+}
+
+/** @param {number[]} g */
+function isForbiddenIPv6(g) {
+  const zeros = (/** @type {number} */ from, /** @type {number} */ to) => g.slice(from, to).every((x) => x === 0);
+  // IPv4-mapped ::ffff:0:0/96 and NAT64 64:ff9b::/96 carry an IPv4 address.
+  if (zeros(0, 5) && g[5] === 0xffff) return isForbiddenIPv4(embeddedIPv4(g[6], g[7]));
+  if (g[0] === 0x64 && g[1] === 0xff9b && zeros(2, 6)) return isForbiddenIPv4(embeddedIPv4(g[6], g[7]));
+  // Everything outside global unicast 2000::/3 is refused (loopback,
+  // unspecified, unique local, link-local, multicast, discard, ...).
+  if ((g[0] & 0xe000) !== 0x2000) return true;
+  if (g[0] === 0x2001 && g[1] < 0x0200) return true; // 2001::/23 protocol assignments, incl. Teredo
+  if (g[0] === 0x2001 && g[1] === 0x0db8) return true; // 2001:db8::/32 documentation
+  if (g[0] === 0x3fff && g[1] < 0x1000) return true; // 3fff::/20 documentation
+  if (g[0] === 0x2002) return isForbiddenIPv4(embeddedIPv4(g[1], g[2])); // 6to4
+  return false;
+}
+
+/**
+ * True when an IP address must not be contacted. Unparseable input counts as forbidden.
+ * @param {string} address IPv4 dotted-quad or IPv6 (brackets allowed)
+ */
+export function isForbiddenAddress(address) {
+  if (typeof address !== 'string') return true;
+  const v4 = parseIPv4(address);
+  if (v4 !== null) return isForbiddenIPv4(v4);
+  const v6 = parseIPv6(address);
+  if (v6 !== null) return isForbiddenIPv6(v6);
+  return true;
+}
+
+/**
+ * @param {unknown} value
+ * @param {{ sameOriginAs?: string }} [options]
+ * @returns {{ ok: true, url: URL } | { ok: false, reason: string }}
+ */
+export function checkOutboundUrl(value, { sameOriginAs } = {}) {
+  if (typeof value !== 'string' || value.length > 2048) return { ok: false, reason: 'invalid-url' };
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return { ok: false, reason: 'invalid-url' };
+  }
+  if (url.protocol !== 'https:') return { ok: false, reason: 'not-https' };
+  if (url.username !== '' || url.password !== '') return { ok: false, reason: 'credentials-in-url' };
+  if (url.port !== '') return { ok: false, reason: 'non-default-port' };
+
+  const host = url.hostname;
+  if (host.startsWith('[')) {
+    if (isForbiddenAddress(host)) return { ok: false, reason: 'forbidden-address' };
+  } else if (/^[\d.]+$/.test(host)) {
+    // The URL parser already turned forms like 0x7f.1 or 2130706433 into dotted-quad.
+    if (isForbiddenAddress(host)) return { ok: false, reason: 'forbidden-address' };
+  } else {
+    if (host.endsWith('.')) return { ok: false, reason: 'trailing-dot-host' };
+    if (!host.includes('.') && !FORBIDDEN_SUFFIXES.includes(host)) return { ok: false, reason: 'single-label-host' };
+    if (FORBIDDEN_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`))) {
+      return { ok: false, reason: 'forbidden-host' };
+    }
+  }
+
+  if (sameOriginAs !== undefined && url.origin !== sameOriginAs) return { ok: false, reason: 'cross-origin' };
+  return { ok: true, url };
+}
+
+/**
+ * For self-hosted adapters: check every address a host name resolved to,
+ * then connect to one of these checked addresses (never resolve again),
+ * which defeats DNS rebinding.
+ * @param {string[]} addresses
+ * @returns {{ ok: true } | { ok: false, reason: string }}
+ */
+export function checkResolvedAddresses(addresses) {
+  if (!Array.isArray(addresses) || addresses.length === 0) return { ok: false, reason: 'no-address' };
+  if (addresses.some(isForbiddenAddress)) return { ok: false, reason: 'forbidden-address' };
+  return { ok: true };
+}
+
+/**
+ * Inbox deliveries (POST) never follow redirects. GET follows at most
+ * MAX_REDIRECTS, each on the same origin and checked again.
+ * @param {{ method: string, from: string, location: string | null, hops: number }} redirect
+ *   hops: redirects already followed for this request
+ * @returns {{ ok: true, url: URL } | { ok: false, reason: string }}
+ */
+export function checkRedirect({ method, from, location, hops }) {
+  if (method.toUpperCase() !== 'GET') return { ok: false, reason: 'redirect-not-followed' };
+  if (hops >= MAX_REDIRECTS) return { ok: false, reason: 'too-many-redirects' };
+  if (typeof location !== 'string' || location === '') return { ok: false, reason: 'invalid-url' };
+  let target;
+  try {
+    target = new URL(location, from);
+  } catch {
+    return { ok: false, reason: 'invalid-url' };
+  }
+  return checkOutboundUrl(target.href, { sameOriginAs: new URL(from).origin });
+}
+
+const FORBIDDEN_HEADERS = ['cookie', 'authorization', 'proxy-authorization'];
+
+/**
+ * Outbound requests must never carry this island's credentials.
+ * @param {Record<string, string> | Iterable<[string, string]>} headers
+ * @returns {{ ok: true } | { ok: false, reason: string, header: string }}
+ */
+export function checkOutboundHeaders(headers) {
+  const entries = Symbol.iterator in Object(headers) ? [.../** @type {Iterable<[string, string]>} */ (headers)] : Object.entries(headers);
+  for (const [name] of entries) {
+    const lower = name.toLowerCase();
+    if (FORBIDDEN_HEADERS.includes(lower) || lower.startsWith('cf-access-')) {
+      return { ok: false, reason: 'credential-header', header: name };
+    }
+  }
+  return { ok: true };
+}

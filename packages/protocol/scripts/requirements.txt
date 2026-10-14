@@ -1,0 +1,3 @@
+# Second implementation used by check_schemas.py (CI only; the protocol core has no dependencies).
+jsonschema>=4.18,<5
+cryptography>=42

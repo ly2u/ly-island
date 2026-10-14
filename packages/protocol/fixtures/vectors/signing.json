@@ -1,0 +1,27 @@
+{
+  "description": "Signing vector for islands/0. Public test key (32 bytes of 0x11); never use it for a real island.",
+  "seed": "1111111111111111111111111111111111111111111111111111111111111111",
+  "keyId": "https://example.org#k1",
+  "publicKey": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc",
+  "unsigned": {
+    "id": "https://example.org/notes/pointcloud-01",
+    "type": "post",
+    "actor": "https://example.org",
+    "published": "2026-10-13T12:00:00Z",
+    "updated": "2026-10-13T12:00:00Z",
+    "to": "public",
+    "object": {
+      "url": "https://example.org/notes/pointcloud-01",
+      "kind": "article",
+      "title": "用小模型把点云变成构件",
+      "summary": "第一次实验的记录：数据、流程和失败的地方。",
+      "language": "zh-CN",
+      "tags": [
+        "点云",
+        "BIM"
+      ]
+    }
+  },
+  "canonical": "{\"actor\":\"https://example.org\",\"id\":\"https://example.org/notes/pointcloud-01\",\"object\":{\"kind\":\"article\",\"language\":\"zh-CN\",\"summary\":\"第一次实验的记录：数据、流程和失败的地方。\",\"tags\":[\"点云\",\"BIM\"],\"title\":\"用小模型把点云变成构件\",\"url\":\"https://example.org/notes/pointcloud-01\"},\"published\":\"2026-10-13T12:00:00Z\",\"to\":\"public\",\"type\":\"post\",\"updated\":\"2026-10-13T12:00:00Z\"}",
+  "signature": "8X4obRrI3VyknFHctWh2HvYjg7NmFd3qG_DpPkb37S44nYwyFYHoTqED2xR4jOGuBCM3yvSHZp5hDfL2ABTnDg"
+}

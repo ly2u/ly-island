@@ -1,0 +1,46 @@
+name: check
+
+on:
+  push:
+    branches: [framework]
+  pull_request:
+    branches: [framework]
+
+permissions:
+  contents: read
+
+jobs:
+  protocol:
+    name: protocol core (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: node --test
+
+  schemas:
+    name: schemas and second implementation (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r packages/protocol/scripts/requirements.txt
+      - run: python packages/protocol/scripts/check_schemas.py
+
+  docs:
+    name: documents
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/check_docs.py

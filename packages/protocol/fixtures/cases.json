@@ -1,0 +1,1279 @@
+{
+  "description": "Shared fixtures for islands/0. Every case is checked by the protocol core (JavaScript) and by the JSON Schemas (Python jsonschema). layer \"schema\": both must reject. layer \"rules\": the schemas accept it, the protocol core must reject it with the given code.",
+  "cases": [
+    {
+      "name": "post",
+      "kind": "activity",
+      "expect": "valid",
+      "data": {
+        "id": "https://example.org/notes/a",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "post",
+        "to": "public",
+        "object": {
+          "url": "https://example.org/notes/a",
+          "kind": "article",
+          "title": "标题",
+          "tags": [
+            "点云"
+          ]
+        }
+      }
+    },
+    {
+      "name": "message without updated",
+      "kind": "activity",
+      "expect": "valid",
+      "data": {
+        "id": "https://example.org/island/a/1",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "message",
+        "to": [
+          "https://neighbor.example"
+        ],
+        "object": {
+          "text": "你好",
+          "inReplyTo": "https://neighbor.example/notes/x",
+          "public": true
+        }
+      }
+    },
+    {
+      "name": "bottle",
+      "kind": "activity",
+      "expect": "valid",
+      "data": {
+        "id": "https://example.org/island/a/1",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "bottle",
+        "to": "public",
+        "object": {
+          "text": "有人也在做点云吗？",
+          "expires": "2026-11-12T12:00:00Z"
+        }
+      }
+    },
+    {
+      "name": "pickup sent to the thrower",
+      "kind": "activity",
+      "expect": "valid",
+      "data": {
+        "id": "https://example.org/island/a/1",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "pickup",
+        "to": [
+          "https://neighbor.example"
+        ],
+        "object": {
+          "of": "https://neighbor.example/island/a/9",
+          "text": "捡到了"
+        }
+      }
+    },
+    {
+      "name": "key rotation",
+      "kind": "activity",
+      "expect": "valid",
+      "data": {
+        "id": "https://example.org/island/a/1",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "key",
+        "to": "public",
+        "object": {
+          "add": {
+            "id": "https://example.org#k2",
+            "type": "Ed25519",
+            "publicKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+          },
+          "revoke": "https://example.org#k1",
+          "reason": "retired"
+        }
+      }
+    },
+    {
+      "name": "unknown type with a valid envelope",
+      "kind": "activity",
+      "expect": "valid",
+      "data": {
+        "id": "https://example.org/island/a/1",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "hug",
+        "to": [
+          "https://neighbor.example"
+        ],
+        "object": {
+          "strength": 3
+        }
+      }
+    },
+    {
+      "name": "unknown fields are ignored",
+      "kind": "activity",
+      "expect": "valid",
+      "data": {
+        "id": "https://example.org/notes/a",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "post",
+        "to": "public",
+        "object": {
+          "url": "https://example.org/notes/a",
+          "kind": "article",
+          "title": "标题",
+          "tags": [
+            "点云"
+          ]
+        },
+        "future": {
+          "anything": true
+        }
+      }
+    },
+    {
+      "name": "manifest",
+      "kind": "manifest",
+      "expect": "valid",
+      "data": {
+        "protocol": "islands/0",
+        "id": "https://example.org",
+        "name": "小林的岛",
+        "keys": [
+          {
+            "id": "https://example.org#k1",
+            "type": "Ed25519",
+            "publicKey": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc"
+          }
+        ],
+        "links": {
+          "outbox": "https://example.org/island/outbox.json",
+          "inbox": "https://example.org/island/inbox",
+          "keys": "https://example.org/island/keys.json"
+        },
+        "accepts": {
+          "message": "friends"
+        },
+        "updated": "2026-10-13T12:00:00Z"
+      },
+      "context": {
+        "fetchedOrigin": "https://example.org"
+      }
+    },
+    {
+      "name": "outbox page",
+      "kind": "outbox",
+      "expect": "valid",
+      "data": {
+        "protocol": "islands/0",
+        "id": "https://example.org/island/outbox.json",
+        "owner": "https://example.org",
+        "updated": "2026-10-13T12:00:00Z",
+        "items": [
+          {
+            "id": "https://example.org/notes/a",
+            "actor": "https://example.org",
+            "published": "2026-10-13T12:00:00Z",
+            "proof": {
+              "key": "https://example.org#k1",
+              "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            },
+            "type": "post",
+            "to": "public",
+            "object": {
+              "url": "https://example.org/notes/a",
+              "kind": "article",
+              "title": "标题",
+              "tags": [
+                "点云"
+              ]
+            }
+          },
+          {
+            "id": "https://example.org/island/a/1",
+            "actor": "https://example.org",
+            "published": "2026-10-13T12:00:00Z",
+            "proof": {
+              "key": "https://example.org#k1",
+              "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            },
+            "type": "bottle",
+            "to": "public",
+            "object": {
+              "text": "有人也在做点云吗？",
+              "expires": "2026-11-12T12:00:00Z"
+            }
+          }
+        ],
+        "next": "https://example.org/island/outbox-2026.json"
+      }
+    },
+    {
+      "name": "friends with a plain blog",
+      "kind": "friends",
+      "expect": "valid",
+      "data": {
+        "protocol": "islands/0",
+        "id": "https://example.org/island/friends.json",
+        "owner": "https://example.org",
+        "updated": "2026-10-13T12:00:00Z",
+        "items": [
+          {
+            "id": "https://neighbor.example",
+            "name": "邻居的岛",
+            "since": "2026-09-01"
+          },
+          {
+            "id": "https://blog.example",
+            "feed": "https://feeds.example/blog.xml"
+          }
+        ]
+      }
+    },
+    {
+      "name": "key log oldest first",
+      "kind": "keylog",
+      "expect": "valid",
+      "data": {
+        "protocol": "islands/0",
+        "id": "https://example.org/island/keys.json",
+        "owner": "https://example.org",
+        "updated": "2026-10-13T12:00:00Z",
+        "items": [
+          {
+            "id": "https://example.org/island/keys/r1",
+            "actor": "https://example.org",
+            "published": "2026-10-01T00:00:00Z",
+            "proof": {
+              "key": "https://example.org#k1",
+              "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            },
+            "type": "key",
+            "to": "public",
+            "object": {
+              "add": {
+                "id": "https://example.org#k2",
+                "type": "Ed25519",
+                "publicKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+              }
+            }
+          },
+          {
+            "id": "https://example.org/island/keys/r2",
+            "actor": "https://example.org",
+            "published": "2026-10-02T00:00:00Z",
+            "proof": {
+              "key": "https://example.org#k2",
+              "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            },
+            "type": "key",
+            "to": "public",
+            "object": {
+              "revoke": "https://example.org#k1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing proof",
+      "kind": "activity",
+      "expect": "invalid",
+      "layer": "schema",
+      "code": "invalid-proof",
+      "data": {
+        "id": "https://example.org/notes/a",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "type": "post",
+        "to": "public",
+        "object": {
+          "url": "https://example.org/notes/a",
+          "kind": "article",
+          "title": "标题",
+          "tags": [
+            "点云"
+          ]
+        }
+      }
+    },
+    {
+      "name": "time without zone",
+      "kind": "activity",
+      "expect": "invalid",
+      "layer": "schema",
+      "code": "invalid-time",
+      "data": {
+        "id": "https://example.org/notes/a",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "post",
+        "to": "public",
+        "object": {
+          "url": "https://example.org/notes/a",
+          "kind": "article",
+          "title": "标题",
+          "tags": [
+            "点云"
+          ]
+        }
+      }
+    },
+    {
+      "name": "message addressed to public",
+      "kind": "activity",
+      "expect": "invalid",
+      "layer": "schema",
+      "code": "directed-needs-recipients",
+      "data": {
+        "id": "https://example.org/island/a/1",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "message",
+        "to": "public",
+        "object": {
+          "text": "你好",
+          "inReplyTo": "https://neighbor.example/notes/x",
+          "public": true
+        }
+      }
+    },
+    {
+      "name": "post addressed to an island",
+      "kind": "activity",
+      "expect": "invalid",
+      "layer": "schema",
+      "code": "public-type-needs-public",
+      "data": {
+        "id": "https://example.org/notes/a",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "post",
+        "to": [
+          "https://neighbor.example"
+        ],
+        "object": {
+          "url": "https://example.org/notes/a",
+          "kind": "article",
+          "title": "标题",
+          "tags": [
+            "点云"
+          ]
+        }
+      }
+    },
+    {
+      "name": "unknown post kind",
+      "kind": "activity",
+      "expect": "invalid",
+      "layer": "schema",
+      "code": "invalid-kind",
+      "data": {
+        "id": "https://example.org/notes/a",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "post",
+        "to": "public",
+        "object": {
+          "url": "https://example.org/notes/a",
+          "kind": "video",
+          "title": "标题",
+          "tags": [
+            "点云"
+          ]
+        }
+      }
+    },
+    {
+      "name": "short signature",
+      "kind": "activity",
+      "expect": "invalid",
+      "layer": "schema",
+      "code": "invalid-signature-encoding",
+      "data": {
+        "id": "https://example.org/notes/a",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "post",
+        "to": "public",
+        "object": {
+          "url": "https://example.org/notes/a",
+          "kind": "article",
+          "title": "标题",
+          "tags": [
+            "点云"
+          ]
+        }
+      }
+    },
+    {
+      "name": "bottle text over 500 characters",
+      "kind": "activity",
+      "expect": "invalid",
+      "layer": "schema",
+      "code": "invalid-text",
+      "data": {
+        "id": "https://example.org/island/a/1",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "bottle",
+        "to": "public",
+        "object": {
+          "text": "瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶瓶",
+          "expires": "2026-11-12T12:00:00Z"
+        }
+      }
+    },
+    {
+      "name": "unknown revoke reason",
+      "kind": "activity",
+      "expect": "invalid",
+      "layer": "schema",
+      "code": "invalid-reason",
+      "data": {
+        "id": "https://example.org/island/a/1",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "key",
+        "to": "public",
+        "object": {
+          "add": {
+            "id": "https://example.org#k2",
+            "type": "Ed25519",
+            "publicKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+          },
+          "revoke": "https://example.org#k1",
+          "reason": "lost"
+        }
+      }
+    },
+    {
+      "name": "reason without revoke",
+      "kind": "activity",
+      "expect": "invalid",
+      "layer": "schema",
+      "code": "reason-without-revoke",
+      "data": {
+        "id": "https://example.org/island/a/1",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "key",
+        "to": "public",
+        "object": {
+          "add": {
+            "id": "https://example.org#k2",
+            "type": "Ed25519",
+            "publicKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+          },
+          "reason": "retired"
+        }
+      }
+    },
+    {
+      "name": "uppercase actor host",
+      "kind": "activity",
+      "expect": "invalid",
+      "layer": "schema",
+      "code": "invalid-actor",
+      "data": {
+        "id": "https://example.org/notes/a",
+        "actor": "https://Example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "post",
+        "to": "public",
+        "object": {
+          "url": "https://example.org/notes/a",
+          "kind": "article",
+          "title": "标题",
+          "tags": [
+            "点云"
+          ]
+        }
+      }
+    },
+    {
+      "name": "url with explicit port",
+      "kind": "activity",
+      "expect": "invalid",
+      "layer": "schema",
+      "code": "invalid-url",
+      "data": {
+        "id": "https://example.org/notes/a",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "post",
+        "to": "public",
+        "object": {
+          "url": "https://example.org:443/notes/a",
+          "kind": "article",
+          "title": "标题",
+          "tags": [
+            "点云"
+          ]
+        }
+      }
+    },
+    {
+      "name": "pickup to two islands",
+      "kind": "activity",
+      "expect": "invalid",
+      "layer": "schema",
+      "code": "pickup-needs-one-recipient",
+      "data": {
+        "id": "https://example.org/island/a/1",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "pickup",
+        "to": [
+          "https://neighbor.example",
+          "https://third.example"
+        ],
+        "object": {
+          "of": "https://neighbor.example/island/a/9",
+          "text": "捡到了"
+        }
+      }
+    },
+    {
+      "name": "manifest without keys",
+      "kind": "manifest",
+      "expect": "invalid",
+      "layer": "schema",
+      "code": "invalid-keys",
+      "data": {
+        "protocol": "islands/0",
+        "id": "https://example.org",
+        "name": "小林的岛",
+        "keys": [],
+        "links": {
+          "outbox": "https://example.org/island/outbox.json",
+          "inbox": "https://example.org/island/inbox",
+          "keys": "https://example.org/island/keys.json"
+        },
+        "accepts": {
+          "message": "friends"
+        },
+        "updated": "2026-10-13T12:00:00Z"
+      }
+    },
+    {
+      "name": "manifest with an http inbox",
+      "kind": "manifest",
+      "expect": "invalid",
+      "layer": "schema",
+      "code": "invalid-link",
+      "data": {
+        "protocol": "islands/0",
+        "id": "https://example.org",
+        "name": "小林的岛",
+        "keys": [
+          {
+            "id": "https://example.org#k1",
+            "type": "Ed25519",
+            "publicKey": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc"
+          }
+        ],
+        "links": {
+          "outbox": "https://example.org/island/outbox.json",
+          "inbox": "http://example.org/island/inbox",
+          "keys": "https://example.org/island/keys.json"
+        },
+        "accepts": {
+          "message": "friends"
+        },
+        "updated": "2026-10-13T12:00:00Z"
+      }
+    },
+    {
+      "name": "manifest accepting an unknown policy",
+      "kind": "manifest",
+      "expect": "invalid",
+      "layer": "schema",
+      "code": "invalid-accepts",
+      "data": {
+        "protocol": "islands/0",
+        "id": "https://example.org",
+        "name": "小林的岛",
+        "keys": [
+          {
+            "id": "https://example.org#k1",
+            "type": "Ed25519",
+            "publicKey": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc"
+          }
+        ],
+        "links": {
+          "outbox": "https://example.org/island/outbox.json",
+          "inbox": "https://example.org/island/inbox",
+          "keys": "https://example.org/island/keys.json"
+        },
+        "accepts": {
+          "message": "everyone"
+        },
+        "updated": "2026-10-13T12:00:00Z"
+      }
+    },
+    {
+      "name": "manifest without outbox",
+      "kind": "manifest",
+      "expect": "invalid",
+      "layer": "schema",
+      "code": "missing-outbox",
+      "data": {
+        "protocol": "islands/0",
+        "id": "https://example.org",
+        "name": "小林的岛",
+        "keys": [
+          {
+            "id": "https://example.org#k1",
+            "type": "Ed25519",
+            "publicKey": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc"
+          }
+        ],
+        "links": {
+          "inbox": "https://example.org/island/inbox",
+          "keys": "https://example.org/island/keys.json"
+        },
+        "accepts": {
+          "message": "friends"
+        },
+        "updated": "2026-10-13T12:00:00Z"
+      }
+    },
+    {
+      "name": "id on another origin",
+      "kind": "activity",
+      "expect": "invalid",
+      "layer": "rules",
+      "code": "id-not-on-actor-origin",
+      "data": {
+        "id": "https://neighbor.example/notes/a",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "post",
+        "to": "public",
+        "object": {
+          "url": "https://example.org/notes/a",
+          "kind": "article",
+          "title": "标题",
+          "tags": [
+            "点云"
+          ]
+        }
+      }
+    },
+    {
+      "name": "signed with a key of another origin",
+      "kind": "activity",
+      "expect": "invalid",
+      "layer": "rules",
+      "code": "invalid-key-id",
+      "data": {
+        "id": "https://example.org/notes/a",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://neighbor.example#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "post",
+        "to": "public",
+        "object": {
+          "url": "https://example.org/notes/a",
+          "kind": "article",
+          "title": "标题",
+          "tags": [
+            "点云"
+          ]
+        }
+      }
+    },
+    {
+      "name": "post url on another origin",
+      "kind": "activity",
+      "expect": "invalid",
+      "layer": "rules",
+      "code": "url-not-on-actor-origin",
+      "data": {
+        "id": "https://example.org/notes/a",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "post",
+        "to": "public",
+        "object": {
+          "url": "https://neighbor.example/notes/a",
+          "kind": "article",
+          "title": "标题",
+          "tags": [
+            "点云"
+          ]
+        }
+      }
+    },
+    {
+      "name": "pickup not sent to the thrower",
+      "kind": "activity",
+      "expect": "invalid",
+      "layer": "rules",
+      "code": "pickup-not-to-author",
+      "data": {
+        "id": "https://example.org/island/a/1",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "pickup",
+        "to": [
+          "https://neighbor.example"
+        ],
+        "object": {
+          "of": "https://third.example/island/a/9",
+          "text": "捡到了"
+        }
+      }
+    },
+    {
+      "name": "updated before published",
+      "kind": "activity",
+      "expect": "invalid",
+      "layer": "rules",
+      "code": "updated-before-published",
+      "data": {
+        "id": "https://example.org/notes/a",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "post",
+        "to": "public",
+        "object": {
+          "url": "https://example.org/notes/a",
+          "kind": "article",
+          "title": "标题",
+          "tags": [
+            "点云"
+          ]
+        },
+        "updated": "2026-10-13T11:00:00Z"
+      }
+    },
+    {
+      "name": "day that does not exist",
+      "kind": "activity",
+      "expect": "invalid",
+      "layer": "rules",
+      "code": "invalid-time",
+      "data": {
+        "id": "https://example.org/notes/a",
+        "actor": "https://example.org",
+        "published": "2026-02-30T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "post",
+        "to": "public",
+        "object": {
+          "url": "https://example.org/notes/a",
+          "kind": "article",
+          "title": "标题",
+          "tags": [
+            "点云"
+          ]
+        }
+      }
+    },
+    {
+      "name": "bottle expiring before it was thrown",
+      "kind": "activity",
+      "expect": "invalid",
+      "layer": "rules",
+      "code": "expires-before-published",
+      "data": {
+        "id": "https://example.org/island/a/1",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "bottle",
+        "to": "public",
+        "object": {
+          "text": "有人也在做点云吗？",
+          "expires": "2026-10-01T00:00:00Z"
+        }
+      }
+    },
+    {
+      "name": "move to itself",
+      "kind": "activity",
+      "expect": "invalid",
+      "layer": "rules",
+      "code": "move-to-self",
+      "data": {
+        "id": "https://example.org/island/a/1",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k1",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "move",
+        "to": "public",
+        "object": {
+          "to": "https://example.org"
+        }
+      }
+    },
+    {
+      "name": "new key signing its own introduction",
+      "kind": "activity",
+      "expect": "invalid",
+      "layer": "rules",
+      "code": "self-signed-key",
+      "data": {
+        "id": "https://example.org/island/a/1",
+        "actor": "https://example.org",
+        "published": "2026-10-13T12:00:00Z",
+        "proof": {
+          "key": "https://example.org#k2",
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "type": "key",
+        "to": "public",
+        "object": {
+          "add": {
+            "id": "https://example.org#k2",
+            "type": "Ed25519",
+            "publicKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+          },
+          "revoke": "https://example.org#k1",
+          "reason": "retired"
+        }
+      }
+    },
+    {
+      "name": "manifest inbox on another origin",
+      "kind": "manifest",
+      "expect": "invalid",
+      "layer": "rules",
+      "code": "cross-origin-link",
+      "data": {
+        "protocol": "islands/0",
+        "id": "https://example.org",
+        "name": "小林的岛",
+        "keys": [
+          {
+            "id": "https://example.org#k1",
+            "type": "Ed25519",
+            "publicKey": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc"
+          }
+        ],
+        "links": {
+          "outbox": "https://example.org/island/outbox.json",
+          "inbox": "https://evil.example/inbox",
+          "keys": "https://example.org/island/keys.json"
+        },
+        "accepts": {
+          "message": "friends"
+        },
+        "updated": "2026-10-13T12:00:00Z"
+      }
+    },
+    {
+      "name": "manifest key id on another origin",
+      "kind": "manifest",
+      "expect": "invalid",
+      "layer": "rules",
+      "code": "invalid-key",
+      "data": {
+        "protocol": "islands/0",
+        "id": "https://example.org",
+        "name": "小林的岛",
+        "keys": [
+          {
+            "id": "https://evil.example#k1",
+            "type": "Ed25519",
+            "publicKey": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc"
+          }
+        ],
+        "links": {
+          "outbox": "https://example.org/island/outbox.json",
+          "inbox": "https://example.org/island/inbox",
+          "keys": "https://example.org/island/keys.json"
+        },
+        "accepts": {
+          "message": "friends"
+        },
+        "updated": "2026-10-13T12:00:00Z"
+      }
+    },
+    {
+      "name": "manifest read from another origin",
+      "kind": "manifest",
+      "expect": "invalid",
+      "layer": "rules",
+      "code": "id-mismatch",
+      "data": {
+        "protocol": "islands/0",
+        "id": "https://example.org",
+        "name": "小林的岛",
+        "keys": [
+          {
+            "id": "https://example.org#k1",
+            "type": "Ed25519",
+            "publicKey": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc"
+          }
+        ],
+        "links": {
+          "outbox": "https://example.org/island/outbox.json",
+          "inbox": "https://example.org/island/inbox",
+          "keys": "https://example.org/island/keys.json"
+        },
+        "accepts": {
+          "message": "friends"
+        },
+        "updated": "2026-10-13T12:00:00Z"
+      },
+      "context": {
+        "fetchedOrigin": "https://evil.example"
+      }
+    },
+    {
+      "name": "outbox next page on another origin",
+      "kind": "outbox",
+      "expect": "invalid",
+      "layer": "rules",
+      "code": "cross-origin-link",
+      "data": {
+        "protocol": "islands/0",
+        "id": "https://example.org/island/outbox.json",
+        "owner": "https://example.org",
+        "updated": "2026-10-13T12:00:00Z",
+        "items": [
+          {
+            "id": "https://example.org/notes/a",
+            "actor": "https://example.org",
+            "published": "2026-10-13T12:00:00Z",
+            "proof": {
+              "key": "https://example.org#k1",
+              "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            },
+            "type": "post",
+            "to": "public",
+            "object": {
+              "url": "https://example.org/notes/a",
+              "kind": "article",
+              "title": "标题",
+              "tags": [
+                "点云"
+              ]
+            }
+          },
+          {
+            "id": "https://example.org/island/a/1",
+            "actor": "https://example.org",
+            "published": "2026-10-13T12:00:00Z",
+            "proof": {
+              "key": "https://example.org#k1",
+              "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            },
+            "type": "bottle",
+            "to": "public",
+            "object": {
+              "text": "有人也在做点云吗？",
+              "expires": "2026-11-12T12:00:00Z"
+            }
+          }
+        ],
+        "next": "https://evil.example/page2.json"
+      }
+    },
+    {
+      "name": "outbox item by someone else",
+      "kind": "outbox",
+      "expect": "invalid",
+      "layer": "rules",
+      "code": "foreign-item",
+      "data": {
+        "protocol": "islands/0",
+        "id": "https://example.org/island/outbox.json",
+        "owner": "https://example.org",
+        "updated": "2026-10-13T12:00:00Z",
+        "items": [
+          {
+            "id": "https://example.org/notes/a",
+            "actor": "https://example.org",
+            "published": "2026-10-13T12:00:00Z",
+            "proof": {
+              "key": "https://example.org#k1",
+              "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            },
+            "type": "post",
+            "to": "public",
+            "object": {
+              "url": "https://example.org/notes/a",
+              "kind": "article",
+              "title": "标题",
+              "tags": [
+                "点云"
+              ]
+            }
+          },
+          {
+            "id": "https://neighbor.example/island/a/1",
+            "actor": "https://neighbor.example",
+            "published": "2026-10-13T12:00:00Z",
+            "proof": {
+              "key": "https://neighbor.example#k1",
+              "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            },
+            "type": "bottle",
+            "to": "public",
+            "object": {
+              "text": "x"
+            }
+          }
+        ],
+        "next": "https://example.org/island/outbox-2026.json"
+      }
+    },
+    {
+      "name": "directed activity in an outbox",
+      "kind": "outbox",
+      "expect": "invalid",
+      "layer": "rules",
+      "code": "directed-in-outbox",
+      "data": {
+        "protocol": "islands/0",
+        "id": "https://example.org/island/outbox.json",
+        "owner": "https://example.org",
+        "updated": "2026-10-13T12:00:00Z",
+        "items": [
+          {
+            "id": "https://example.org/notes/a",
+            "actor": "https://example.org",
+            "published": "2026-10-13T12:00:00Z",
+            "proof": {
+              "key": "https://example.org#k1",
+              "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            },
+            "type": "post",
+            "to": "public",
+            "object": {
+              "url": "https://example.org/notes/a",
+              "kind": "article",
+              "title": "标题",
+              "tags": [
+                "点云"
+              ]
+            }
+          },
+          {
+            "id": "https://example.org/island/a/1",
+            "actor": "https://example.org",
+            "published": "2026-10-13T12:00:00Z",
+            "proof": {
+              "key": "https://example.org#k1",
+              "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            },
+            "type": "message",
+            "to": [
+              "https://neighbor.example"
+            ],
+            "object": {
+              "text": "你好",
+              "inReplyTo": "https://neighbor.example/notes/x",
+              "public": true
+            }
+          }
+        ],
+        "next": "https://example.org/island/outbox-2026.json"
+      }
+    },
+    {
+      "name": "friends list naming the owner",
+      "kind": "friends",
+      "expect": "invalid",
+      "layer": "rules",
+      "code": "invalid-friend",
+      "data": {
+        "protocol": "islands/0",
+        "id": "https://example.org/island/friends.json",
+        "owner": "https://example.org",
+        "updated": "2026-10-13T12:00:00Z",
+        "items": [
+          {
+            "id": "https://example.org",
+            "name": "邻居的岛",
+            "since": "2026-09-01"
+          },
+          {
+            "id": "https://blog.example",
+            "feed": "https://feeds.example/blog.xml"
+          }
+        ]
+      }
+    },
+    {
+      "name": "friends list with duplicates",
+      "kind": "friends",
+      "expect": "invalid",
+      "layer": "rules",
+      "code": "duplicate-friend",
+      "data": {
+        "protocol": "islands/0",
+        "id": "https://example.org/island/friends.json",
+        "owner": "https://example.org",
+        "updated": "2026-10-13T12:00:00Z",
+        "items": [
+          {
+            "id": "https://neighbor.example",
+            "name": "邻居的岛",
+            "since": "2026-09-01"
+          },
+          {
+            "id": "https://neighbor.example",
+            "name": "邻居的岛",
+            "since": "2026-09-01"
+          }
+        ]
+      }
+    },
+    {
+      "name": "key log out of order",
+      "kind": "keylog",
+      "expect": "invalid",
+      "layer": "rules",
+      "code": "not-chronological",
+      "data": {
+        "protocol": "islands/0",
+        "id": "https://example.org/island/keys.json",
+        "owner": "https://example.org",
+        "updated": "2026-10-13T12:00:00Z",
+        "items": [
+          {
+            "id": "https://example.org/island/keys/r2",
+            "actor": "https://example.org",
+            "published": "2026-10-02T00:00:00Z",
+            "proof": {
+              "key": "https://example.org#k2",
+              "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            },
+            "type": "key",
+            "to": "public",
+            "object": {
+              "revoke": "https://example.org#k1"
+            }
+          },
+          {
+            "id": "https://example.org/island/keys/r1",
+            "actor": "https://example.org",
+            "published": "2026-10-01T00:00:00Z",
+            "proof": {
+              "key": "https://example.org#k1",
+              "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            },
+            "type": "key",
+            "to": "public",
+            "object": {
+              "add": {
+                "id": "https://example.org#k2",
+                "type": "Ed25519",
+                "publicKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
