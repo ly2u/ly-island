@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   compare:
@@ -22,6 +23,11 @@ jobs:
         with:
           node-version: 22
       - run: node spikes/ssg-compare/measure.mjs
+      - name: post the report on the pull request
+        if: always() && github.event_name == 'pull_request' && hashFiles('spikes/ssg-compare/report.md') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr comment ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --body-file spikes/ssg-compare/report.md
       - if: always()
         uses: actions/upload-artifact@v4
         with:

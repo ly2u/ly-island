@@ -6,7 +6,7 @@
 // Writes spikes/ssg-compare/results.json and prints a Markdown table (also
 // appended to $GITHUB_STEP_SUMMARY when set). Exits with 1 if any output check fails.
 
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { appendFileSync, existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,11 +36,31 @@ function files(dir) {
   });
 }
 
+class StepError extends Error {}
+
 /** @param {string} command @param {string[]} args @param {string} cwd */
 function timed(command, args, cwd) {
   const start = performance.now();
-  execFileSync(command, args, { cwd, stdio: 'inherit', env: { ...process.env, ASTRO_TELEMETRY_DISABLED: '1' } });
+  const run = spawnSync(command, args, {
+    cwd,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+    env: { ...process.env, ASTRO_TELEMETRY_DISABLED: '1', NO_COLOR: '1' },
+  });
+  const output = `${run.stdout ?? ''}${run.stderr ?? ''}`;
+  process.stdout.write(output);
+  if (run.status !== 0) {
+    const tail = output.trim().split('\n').slice(-40).join('\n');
+    throw new StepError(`${command} ${args.join(' ')} exited with ${run.status}\n${tail}`);
+  }
   return Math.round(performance.now() - start);
+}
+
+/** A GitHub annotation, readable through the API even when logs are not. */
+function annotate(title, message) {
+  if (!process.env.GITHUB_ACTIONS) return;
+  const escape = (text) => String(text).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  console.log(`::error title=${escape(title).replace(/[:,]/g, ' ')}::${escape(message).slice(0, 4000)}`);
 }
 
 /** @param {string} dir */
@@ -138,9 +158,20 @@ for (const tool of TOOLS) {
   rmSync(join(dir, 'dist'), { recursive: true, force: true });
   rmSync(join(dir, 'package-lock.json'), { force: true });
 
-  const installMs = timed('npm', ['install', '--no-audit', '--no-fund', '--loglevel=error'], dir);
-  const buildMs = timed('npm', ['run', 'build', '--silent'], dir);
-  const rebuildMs = timed('npm', ['run', 'build', '--silent'], dir);
+  let installMs;
+  let buildMs;
+  let rebuildMs;
+  try {
+    installMs = timed('npm', ['install', '--no-audit', '--no-fund', '--loglevel=error'], dir);
+    buildMs = timed('npm', ['run', 'build', '--silent'], dir);
+    rebuildMs = timed('npm', ['run', 'build', '--silent'], dir);
+  } catch (error) {
+    if (!(error instanceof StepError)) throw error;
+    failed = true;
+    annotate(`${tool} failed`, error.message);
+    results[tool] = { failure: error.message };
+    continue;
+  }
 
   const dist = join(dir, 'dist');
   const all = files(dist);
@@ -156,6 +187,7 @@ for (const tool of TOOLS) {
 
   const problems = await checkOutputs(dist);
   if (problems.length > 0) failed = true;
+  for (const problem of problems) annotate(`${tool} output`, problem);
 
   results[tool] = {
     packages: packageCount(dir),
@@ -196,13 +228,19 @@ const rows = [
   ['Article page gzip', 'articleGzipBytes', (v) => (v === null ? 'missing' : `${(v / 1024).toFixed(2)} KB`)],
   ['Protocol and output checks', 'problems', (v) => (v.length === 0 ? 'pass' : `FAIL: ${v.join('; ')}`)],
 ];
+const cell = (/** @type {string} */ tool, /** @type {any} */ row) =>
+  results[tool].failure ? 'build failed' : row[2](results[tool][row[1]], results[tool]);
 const table = [
   `| Measure | ${TOOLS.join(' | ')} |`,
   `| --- | ${TOOLS.map(() => '---').join(' | ')} |`,
-  ...rows.map(([label, key, format]) => `| ${label} | ${TOOLS.map((tool) => format(results[tool][key], results[tool])).join(' | ')} |`),
+  ...rows.map((row) => `| ${row[0]} | ${TOOLS.map((tool) => cell(tool, row)).join(' | ')} |`),
 ].join('\n');
+const failures = TOOLS.filter((tool) => results[tool].failure)
+  .map((tool) => `\n### ${tool} failed\n\n\`\`\`\n${results[tool].failure}\n\`\`\`\n`)
+  .join('');
 
-const report = `## Static generator comparison\n\nNode ${process.version}, ${new Date().toISOString()}\n\n${table}\n`;
+const report = `## Static generator comparison\n\nNode ${process.version}, ${new Date().toISOString()}\n\n${table}\n${failures}`;
 console.log(report);
+writeFileSync(join(ROOT, 'report.md'), report);
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, report);
 process.exit(failed ? 1 : 0);
