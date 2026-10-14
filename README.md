@@ -29,11 +29,14 @@
 
 ## 代码
 
-第 1 阶段进行中。
+第 1 阶段：一座静态岛。
 
 | 目录 | 内容 |
 |---|---|
 | [`packages/protocol`](packages/protocol/README.md) | 协议核心：格式校验、签名、密钥历史、撤回归属、出站校验、收件箱预检查。没有依赖 |
+| `packages/core` | 构建核心：记录、统计、成长规则 `default@0`、签名的协议文件、订阅源、小岛的图形。只依赖协议核心 |
+| [`site`](site/README.md) | 岛屿模板：Astro 站点、示例记录、两个主题、部署到 Cloudflare 的配置 |
+| `tools` | 检查工具：严格的 XML 解析器、构建产物检查、浏览器检查 |
 | `spikes/ssg-compare` | Astro 与 Eleventy 的对比实验，结果见[静态生成器对比](docs/ssg-comparison.md) |
 
 在仓库根目录运行检查：
@@ -42,6 +45,15 @@
 node --test
 python3 packages/protocol/scripts/check_schemas.py   # 需要 jsonschema 和 cryptography
 python3 scripts/check_docs.py
+```
+
+构建并检查示例岛：
+
+```bash
+cd site
+npm ci
+ISLAND_ALLOW_TEST_KEY=1 npm run build
+node ../tools/site-check/cli.mjs dist --theme isometric
 ```
 
 ## 文档
