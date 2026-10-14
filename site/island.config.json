@@ -1,0 +1,14 @@
+{
+  "$comment": "Settings for this island. See README.md. The signing key is not kept here: it is the ISLAND_SIGNING_KEY build secret.",
+  "origin": "https://example.org",
+  "name": "示例岛",
+  "summary": "一座演示用的小岛：桥、点云和一些日常。这里的内容都是虚构的。",
+  "language": ["zh-CN"],
+  "timeZone": "Asia/Shanghai",
+  "theme": "isometric",
+  "appearance": { "seed": "example-island", "colors": ["#cc4125", "#3d85c6"] },
+  "growth": { "rules": "default@0", "config": {} },
+  "discoverable": false,
+  "ai": { "read": true, "train": false },
+  "keyName": "k1"
+}

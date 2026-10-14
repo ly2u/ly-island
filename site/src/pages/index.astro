@@ -1,0 +1,33 @@
+---
+import World from '@theme/World.astro';
+import RecordList from '../components/RecordList.astro';
+import Base from '../layouts/Base.astro';
+import { island } from '../lib/island.js';
+import { strings } from '../lib/i18n.js';
+
+const RECENT = 20;
+const data = await island();
+const { config, shown, friends } = data;
+const t = strings(config.language[0]);
+---
+<Base>
+  <World island={data} />
+  {config.summary && <p class="island-summary">{config.summary}</p>}
+
+  <section aria-labelledby="recent">
+    <h2 id="recent">{t.recent}</h2>
+    <RecordList records={shown.slice(0, RECENT)} language={config.language[0]} />
+    {shown.length > RECENT && <p><a href="/records/">{t.allRecords} ({shown.length})</a></p>}
+  </section>
+
+  {friends.items.length > 0 && (
+    <section aria-labelledby="neighbors">
+      <h2 id="neighbors">{t.neighbors}</h2>
+      <ul class="neighbors">
+        {friends.items.map((friend) => (
+          <li><a href={friend.id} rel="noopener">{friend.name ?? friend.id}</a></li>
+        ))}
+      </ul>
+    </section>
+  )}
+</Base>

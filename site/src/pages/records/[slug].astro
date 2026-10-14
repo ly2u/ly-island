@@ -1,0 +1,38 @@
+---
+import { render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import { island } from '../../lib/island.js';
+import { strings } from '../../lib/i18n.js';
+
+export async function getStaticPaths() {
+  const { shown } = await island();
+  return shown.map((record) => ({ params: { slug: record.slug } }));
+}
+
+const { slug } = Astro.params;
+const { config, shown, entries } = await island();
+const record = shown.find((item) => item.slug === slug)!;
+const entry = entries.get(slug)!;
+const { Content } = await render(entry);
+const t = strings(config.language[0]);
+---
+<Base title={record.displayTitle} description={record.summary}>
+  <article class={`record-page kind-${record.kind}`} lang={record.language}>
+    <header>
+      {record.title && <h1>{record.title}</h1>}
+      <p class="meta">
+        <span class="kind">{t.kinds[record.kind as 'article']}</span>
+        <time datetime={record.published}>{record.date}</time>
+        {record.updated && <span>{t.updated} <time datetime={record.updated}>{record.updated.slice(0, 10)}</time></span>}
+        {record.done && <span class="done">{t.done} <time datetime={record.done}>{record.done}</time></span>}
+      </p>
+      {record.tags.length > 0 && (
+        <ul class="tags">{record.tags.map((tag) => <li>{tag}</li>)}</ul>
+      )}
+    </header>
+    <div class="prose">
+      <Content />
+    </div>
+  </article>
+  <p><a href="/">{t.back}</a></p>
+</Base>

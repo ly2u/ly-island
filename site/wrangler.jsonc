@@ -1,0 +1,18 @@
+// The island as a static-assets-only Worker: no Worker code runs and static
+// requests do not count against the free plan's request limit.
+// Bind the island's own domain in the Cloudflare dashboard (Worker, Settings,
+// Domains & Routes). See README.md.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "island",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  },
+  // Only the island's own domain serves it. Preview and workers.dev addresses
+  // stay off (docs/deployment.md, "关掉或保护所有备用入口").
+  "workers_dev": false,
+  "preview_urls": false
+}

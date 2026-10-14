@@ -1,0 +1,20 @@
+# Response headers for Cloudflare Workers static assets.
+# Public protocol data must be readable from other islands' pages.
+/.well-known/island.json
+  Access-Control-Allow-Origin: *
+
+/island/*
+  Access-Control-Allow-Origin: *
+
+/feed.xml
+  Access-Control-Allow-Origin: *
+  Content-Type: application/rss+xml; charset=utf-8
+
+# Built files have content hashes in their names.
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin

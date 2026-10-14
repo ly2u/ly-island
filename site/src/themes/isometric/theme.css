@@ -1,0 +1,68 @@
+.world {
+  margin: 0 0 1.5rem;
+}
+
+.island {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+}
+
+.island .island-sky {
+  fill: var(--sky);
+}
+
+.island .island-cloud {
+  fill: var(--cloud);
+}
+
+.island .island-fog {
+  fill: var(--sky);
+  transition: opacity 0.6s ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .island .island-cloud {
+    animation: drift 18s ease-in-out infinite alternate;
+  }
+
+  .island .island-cloud:nth-of-type(even) {
+    animation-duration: 24s;
+    animation-direction: alternate-reverse;
+  }
+}
+
+@keyframes drift {
+  from {
+    transform: translateX(-6px);
+  }
+  to {
+    transform: translateX(6px);
+  }
+}
+
+.growth {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+}
+
+.growth div {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.growth dt {
+  color: var(--muted);
+}
+
+.growth dd {
+  margin: 0;
+}
+
+.growth small {
+  color: var(--muted);
+}

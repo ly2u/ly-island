@@ -1,0 +1,4 @@
+[
+  { "id": "https://neighbor.example", "name": "邻居的岛（示例）", "since": "2026-09-01" },
+  { "id": "https://blog.example", "name": "一个普通博客（示例）", "feed": "https://blog.example/atom.xml" }
+]

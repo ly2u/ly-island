@@ -7,3 +7,4 @@ dist/
 spikes/ssg-compare/results.json
 spikes/ssg-compare/*/package-lock.json
 spikes/ssg-compare/report.md
+.wrangler/

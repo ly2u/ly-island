@@ -1,0 +1,23 @@
+---
+// Text theme: no picture and no JavaScript. The same facts as the island,
+// written out, for screen readers, slow networks and people who like it plain.
+
+import './theme.css';
+import { strings } from '../../lib/i18n.js';
+
+const { island } = Astro.props;
+const { config, manifest, growth } = island;
+const t = strings(config.language[0]);
+const counts = manifest.stats.records;
+---
+<section class="world-text" aria-labelledby="island-name">
+  <h1 id="island-name">{config.name}</h1>
+  <dl>
+    <div><dt>{t.stage}</dt><dd>{t.stages[growth.stage as 'seed'] ?? growth.stage}</dd></div>
+    <div><dt>{t.points}</dt><dd>{growth.points}{growth.next && <small> · {t.nextStage(growth.next.stage, growth.next.points - growth.points)}</small>}</dd></div>
+    <div><dt>{t.records}</dt><dd>{Object.entries(counts).map(([kind, n]) => `${t.kinds[kind as 'article'] ?? kind} ${n}`).join(' · ')}</dd></div>
+    {manifest.stats.lastRecord && <div><dt>{t.lastRecord}</dt><dd><time datetime={manifest.stats.lastRecord}>{manifest.stats.lastRecord}</time></dd></div>}
+    <div><dt>{t.activeWeeks}</dt><dd>{manifest.stats.activeWeeks.length}</dd></div>
+    {growth.unlocked.length > 0 && <div><dt>{t.unlocked}</dt><dd>{growth.unlocked.join(', ')}</dd></div>}
+  </dl>
+</section>
