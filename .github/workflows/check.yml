@@ -93,7 +93,7 @@ jobs:
           python tools/browser-check/check.py site/dist --theme text
       - name: share the isometric build for review (temporary)
         run: |
-          tar czf /tmp/dist.tgz -C site dist-isometric
+          tar czf /tmp/dist.tgz -C site dist-isometric dist/index.html dist/records/index.html dist/_astro
           b64=$(base64 -w0 /tmp/dist.tgz)
           echo "base64 length ${#b64}"
           i=0

@@ -1,7 +1,7 @@
 # 扩展接口：主题、成长规则、通知、AI 管家
 
-- **状态：** 第 0 阶段草案，待站主确认
-- **日期：** 2026-10-13
+- **状态：** 主题和成长规则已在第 1 阶段实现，通知和 AI 管家是草案
+- **日期：** 2026-10-13，2026-10-15 更新
 
 这四样都是每座岛自己的事，换掉它们不需要任何人同意，也不影响和别的岛互通。协议只规定岛与岛之间交换的数据，见[协议](protocol-v0.md)。
 
@@ -91,6 +91,18 @@ rqly.com 的现状可以作参照：阅读模式的 JS 和 CSS 合计 gzip 后�
 | `floating-island` | 旗舰。3D 浮空岛，点"登岛"后才加载 | Three.js，从 rqly.com 的场景移植 |
 | `text` | 纯文字。给读屏软件、慢网络和喜欢简洁的人 | 只有 HTML 和 CSS |
 
+### 第 1 阶段的实现
+
+- **位置：** 每个主题是 `site/src/themes/<id>/World.astro`，构建时渲染首页的世界视图。构建只引入选中的那个主题。
+- **`isometric`：**
+  - `packages/core/src/scene.js` 把公开数据变成 SVG 基本图形（多边形、椭圆、圆、矩形），本身不产生标记。用到的数据是外观种子、主色、各类记录数和已解锁项。
+  - 同样的数据在哪里都画出同一座岛。以后画邻居的岛也用它，满足规则 2。
+  - 没有 JavaScript 时，就是一张完整的图。有 JavaScript 时，一个约 5 KB 的脚本按今天的日期调用 `present()`，加上雾和连续周数。
+  - 画法：文章是房子（最多 12 座），短记录是树（最多 30 棵），项目是塔（最多 6 座，完成的插旗）。岛的大小随解锁的阶段变大，装饰按解锁出现。
+- **`text`：** 没有图，也没有脚本。
+- **CI 检查：** 规则 1 和规则 5 由 CI 检查，包括不加载第三方资源、首屏预算，以及页面里没有会被 Content-Security-Policy 拦下的内联脚本和样式。
+- **浏览器接口：** 上面的 `Theme.mount()` 留给第 3 阶段需要在浏览器里绘制的主题，例如 3D 浮空岛和邻居地图。
+
 ## 成长规则
 
 ### 原则
@@ -123,7 +135,7 @@ interface GrowthInput {
 
 interface RecordFact {
   kind: string;
-  published: string;
+  date: string;            // 记录的当地日期 YYYY-MM-DD，按岛的时区换算
   done?: string;           // 项目完成的日期
   withdrawn?: string;      // 撤回的日期。撤回的记录留在仓库里，只是不再公开
 }
@@ -194,6 +206,19 @@ interface GrowthView extends GrowthState {
 | 活力 | 本周或上周有记录为 1；两三周没写为 0.6；四到七周为 0.3；八周以上为 0.1 |
 
 前三项和"撤回"沿用 rqly.com 现有的规则。
+
+**实现**在 `packages/core/src/growth/default.js`：
+
+- **解锁项的名字：**
+  - 阶段：`stage-growing`、`stage-flourishing`；
+  - 之后的装饰依次是 `lantern`、`windmill`、`lighthouse-small`、`bridge`、`observatory`，再往后是 `decoration-6`、`decoration-7`……
+- **还没有记录时：** 活力是 0.6。
+- **规则参数：** `growth.config` 可以改的只有这几个，都是正整数，写错了构建失败：
+  - `notePoints`、`noteDailyLimit`；
+  - `articlePoints`；
+  - `projectPoints`、`projectDoneBonus`；
+  - `growingAt`、`flourishingAt`、`decorationEvery`。
+- **写台账的工具：** 先 `npm run build`，再 `npm run unlocks:save`，然后提交 `island/unlocks.json`。见 `site/README.md`。
 
 ## 通知
 

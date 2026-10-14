@@ -19,7 +19,7 @@ const t = strings(config.language[0]);
 <Base title={record.displayTitle} description={record.summary}>
   <article class={`record-page kind-${record.kind}`} lang={record.language}>
     <header>
-      {record.title && <h1>{record.title}</h1>}
+      {record.title ? <h1>{record.title}</h1> : <h1 class="sr-only">{record.displayTitle}</h1>}
       <p class="meta">
         <span class="kind">{t.kinds[record.kind as 'article']}</span>
         <time datetime={record.published}>{record.date}</time>

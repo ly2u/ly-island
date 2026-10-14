@@ -6,10 +6,10 @@
 // Shapes are { tag, attributes } with tag one of polygon, ellipse, circle,
 // rect; a theme renders them as SVG elements. No markup is produced here.
 
-export const VIEW = Object.freeze({ width: 400, height: 300 });
+export const VIEW = Object.freeze({ width: 400, height: 270 });
 export const CAPS = Object.freeze({ trees: 30, houses: 12, towers: 6 });
-const CENTER = { x: 200, y: 128 };
-const SIZES = { seed: 96, growing: 120, flourishing: 144 };
+const CENTER = { x: 200, y: 120 };
+const SIZES = { seed: 104, growing: 124, flourishing: 144 };
 const GREENS = ['#7fb069', '#6a9f58', '#8cbf6d', '#5f8f4e'];
 const EARTH = '#9a7650';
 const ROCK = '#6f6a7a';
@@ -162,7 +162,7 @@ export function islandScene({ seed, colors, counts, done = 0, unlocked = [] }) {
   for (let i = 0; i < 7; i += 1) {
     background.push({
       tag: 'ellipse',
-      attributes: { class: 'island-cloud', cx: r1(20 + i * 60 + rng() * 20), cy: r1(255 + rng() * 30), rx: r1(45 + rng() * 25), ry: r1(14 + rng() * 8), fill: '#ffffff', opacity: r1(0.7 + rng() * 0.2) },
+      attributes: { class: 'island-cloud', cx: r1(20 + i * 60 + rng() * 20), cy: r1(232 + rng() * 26), rx: r1(45 + rng() * 25), ry: r1(14 + rng() * 8), fill: '#ffffff', opacity: r1(0.7 + rng() * 0.2) },
     });
   }
 
