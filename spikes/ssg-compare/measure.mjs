@@ -35,6 +35,11 @@ import { checkOutputs, PROTOCOL_FILES } from './checks.mjs';
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
 const TOOLS = ['astro', 'eleventy'];
 const BAD_CONTENT = join(ROOT, 'fixtures', 'bad-front-matter');
+/** How each tool reports the bad note: its own schema error, naming the field. */
+const SCHEMA_ERRORS = {
+  astro: [/does not match collection schema/, /kind/],
+  eleventy: [/eleventyDataSchema/, /kind must be one of/],
+};
 
 /** A GitHub annotation, readable through the API even when logs are not. */
 function annotate(/** @type {string} */ title, /** @type {string} */ message) {
@@ -197,15 +202,16 @@ async function measure() {
       problems,
     };
 
-    // A note with an unknown kind must stop the build, for the right reason.
+    // A note with an unknown kind must stop the build, through the tool's schema check.
     const bad = run('npm', ['run', 'build', '--silent'], dir, { SPIKE_CONTENT: BAD_CONTENT });
-    const rejected = bad.status !== 0 && bad.output.includes('kind');
+    const rejected = bad.status !== 0 && SCHEMA_ERRORS[/** @type {'astro'} */ (tool)].every((pattern) => pattern.test(bad.output));
     results[tool].rejectsBadFrontMatter = rejected;
     if (!rejected) {
+      const tail = bad.output.trim().split('\n').slice(-15).join('\n');
       problems.push(
         bad.status === 0
           ? 'built a note whose kind is not article, note or project'
-          : `the bad note failed the build without naming "kind" (exit ${bad.status})`,
+          : `the bad note failed the build, but not through the schema check (exit ${bad.status}):\n${tail}`,
       );
     }
     // Leave the normal output in dist for the artifact.
