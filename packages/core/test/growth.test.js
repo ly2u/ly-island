@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import { defaultRules, mergeLedger, presentStats } from '../src/index.js';
+import { defaultRules, mergeLedger, presentStats, rulesFor } from '../src/index.js';
 
 const { accumulate, checkConfig, pointsOn, present, unlocksFor } = defaultRules;
 const EMPTY = { unlocked: [] };
@@ -45,10 +45,25 @@ describe('accumulate (build time)', () => {
     assert.deepEqual(state.unlocked, ['stage-growing']);
   });
 
-  test('acceptance: a record withdrawn on the day it was written never counted', () => {
-    const facts = Array.from({ length: 9 }, (_, i) => at(`2026-10-0${i + 1}`));
-    facts.push(at('2026-10-10', 'article', { withdrawn: '2026-10-10' }));
-    assert.deepEqual(accumulate({ records: facts, ledger: EMPTY }).unlocked, []);
+  test('same-day withdrawal keeps the previous build\'s unlock without saving a ledger', () => {
+    const facts = Array.from({ length: 10 }, () => at('2026-10-14'));
+    const before = accumulate({ records: facts, ledger: EMPTY });
+    const after = accumulate({ records: facts.map((r, i) => i ? r : { ...r, withdrawn: r.date }), ledger: EMPTY });
+    assert.equal(before.points, 30);
+    assert.equal(after.points, 27);
+    assert.deepEqual(after.unlocked, before.unlocked);
+    assert.deepEqual(after.unlocked, ['stage-growing']);
+  });
+
+  test('same-day project completion and withdrawal retains its unlock, not its points', () => {
+    const project = at('2026-10-14', 'project', { done: '2026-10-14' });
+    const config = { growingAt: 15 };
+    const before = accumulate({ records: [project], ledger: EMPTY }, config);
+    const after = accumulate({ records: [{ ...project, withdrawn: project.date }], ledger: EMPTY }, config);
+    assert.equal(before.points, 15);
+    assert.equal(after.points, 0);
+    assert.deepEqual(after.unlocked, before.unlocked);
+    assert.deepEqual(after.unlocked, ['stage-growing']);
   });
 
   test('acceptance: rebuilding from scratch gives the same result (no hidden state)', () => {
@@ -117,6 +132,9 @@ describe('present (browser)', () => {
   });
 
   test('unknown rules fall back to default@0', () => {
-    assert.equal(presentStats({ growth: { rules: 'someone-else@3', points: 5, stage: 'seed' } }, '2026-10-14').points, 5);
+    for (const rules of ['someone-else@3', '__proto__', 'constructor', 'toString', null, {}, []]) {
+      assert.equal(presentStats({ growth: { rules, points: 5, stage: 'seed' } }, '2026-10-14').points, 5);
+    }
+    for (const id of ['__proto__', 'constructor', 'toString']) assert.throws(() => rulesFor(id), /unknown growth rules/);
   });
 });

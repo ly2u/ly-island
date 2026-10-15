@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { addDays, dateTime, isCalendarDate, isoWeek, localDate, weekNumber } from '../src/dates.js';
+import { addDays, dateTime, isCalendarDate, isRecordDate, isoWeek, localDate, weekNumber } from '../src/dates.js';
 
 test('ISO weeks, including years with 53 weeks', () => {
   for (const [day, week] of [
@@ -36,13 +36,30 @@ test('week numbers are consecutive across years and reject weeks that do not exi
 test('local dates: dates stay, times move to the island time zone', () => {
   assert.equal(localDate('2026-10-01'), '2026-10-01');
   assert.equal(localDate('2026-10-01T23:30:00+08:00', 'UTC'), '2026-10-01');
-  // YAML turns `date: 2026-10-01` into midnight UTC: that is a date without a time.
-  assert.equal(localDate(new Date('2026-10-01T00:00:00Z'), 'America/New_York'), '2026-10-01');
+  assert.equal(localDate('2026-10-01', 'America/New_York'), '2026-10-01');
+  assert.equal(localDate(new Date('2026-10-01T00:00:00Z'), 'America/New_York'), '2026-09-30');
+  assert.equal(localDate('2026-10-05T00:00:00Z', 'America/Los_Angeles'), '2026-10-04');
+  assert.equal(isoWeek(localDate('2026-10-05T00:00:00Z', 'America/Los_Angeles')), '2026-W40');
+  assert.equal(localDate('2027-01-04T00:00:00Z', 'America/Los_Angeles'), '2027-01-03');
+  assert.equal(localDate('2026-10-01T00:30:00+08:00', 'UTC'), '2026-09-30');
   assert.equal(localDate(new Date('2026-09-30T17:00:00Z'), 'Asia/Shanghai'), '2026-10-01');
   assert.equal(localDate(new Date('2026-10-01T03:00:00Z'), 'America/New_York'), '2026-09-30');
   assert.throws(() => localDate('2026-02-30'), RangeError);
   assert.throws(() => localDate(new Date(Number.NaN)), RangeError);
   assert.ok(!isCalendarDate('2026-13-01'));
+});
+
+test('raw dates reject coercion, overflow and ambiguous timestamps', () => {
+  for (const value of [null, false, 0, [], {}, '2026-02-30', '2025-02-29', '2026-02-30T00:00:00Z',
+    '2026-10-01T24:00:00Z', '2026-10-01T00:60:00Z', '2026-10-01T00:00:60Z',
+    '2026-10-01T00:00:00+24:00', '2026-10-01T00:00:00', '2026-10-01\n', '10/01/2026']) {
+    assert.equal(isRecordDate(value), false, JSON.stringify(value));
+    assert.throws(() => dateTime(value), RangeError, JSON.stringify(value));
+    assert.throws(() => localDate(value), RangeError, JSON.stringify(value));
+  }
+  for (const value of ['2024-02-29', '2024-02-29T23:59:59.123Z', '2026-10-01T08:00:00+08:00']) {
+    assert.equal(isRecordDate(value), true, value);
+  }
 });
 
 test('date-times are RFC 3339 in UTC without fractions', () => {

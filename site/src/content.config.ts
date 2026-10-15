@@ -5,19 +5,23 @@
 import { defineCollection } from 'astro:content';
 import { glob } from 'astro/loaders';
 import { z } from 'astro/zod';
+import { isRecordDate } from '../../packages/core/src/dates.js';
+import { recordLoader } from './lib/record-loader.js';
+
+const date = z.string().refine(isRecordDate, 'expected a real YYYY-MM-DD date or RFC 3339 timestamp with an offset');
 
 const records = defineCollection({
-  loader: glob({ base: './content/records', pattern: '*.md' }),
+  loader: recordLoader(glob),
   schema: z
     .object({
       title: z.string().optional(),
-      date: z.coerce.date(),
+      date,
       kind: z.enum(['article', 'note', 'project']),
       summary: z.string().optional(),
       tags: z.array(z.string()).default([]),
-      done: z.coerce.date().optional(),
-      withdrawn: z.coerce.date().optional(),
-      updated: z.coerce.date().optional(),
+      done: date.optional(),
+      withdrawn: date.optional(),
+      updated: date.optional(),
       language: z.string().optional(),
       draft: z.boolean().default(false),
     })

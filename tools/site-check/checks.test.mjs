@@ -88,7 +88,7 @@ describe('a correct build', () => {
     assert.deepEqual(problems, []);
     assert.equal(summary.activities, 3);
     assert.equal(summary.feedItems, 2);
-    assert.ok(Number(summary.firstScreenGzipBytes) > 0);
+    assert.ok(Number(summary.firstScreenDirectGzipBytes) > 0);
   });
 
   test('the command line exits 0, and 1 when something fails', () => {
@@ -105,6 +105,8 @@ describe('each broken promise is caught', () => {
     await fails({ 'island/friends.json': null }, /manifest link friends .* is not in the build/);
     await fails({ 'island/outbox-7.json': JSON.stringify(island.outbox[0].document) }, /outbox-7\.json: an outbox page that no other page links to/);
     await fails({ '.well-known/island.json': 'null' }, /must be a JSON object/);
+    const wrongSnapshot = { ...island.outbox[0].document, snapshot: '0'.repeat(64) };
+    await fails({ 'island/outbox.json': JSON.stringify(wrongSnapshot) }, /snapshot does not match/);
   });
 
   test('records: a withdrawn page still published, a record page missing or unreachable', async () => {

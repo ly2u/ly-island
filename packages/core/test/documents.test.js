@@ -44,7 +44,7 @@ describe('buildIsland', () => {
     assert.equal(JSON.stringify(await build(list)), JSON.stringify(await build(list)));
   });
 
-  test('full outbox pages never change when new records arrive', async () => {
+  test('append-only additions leave old page bodies alone; the head snapshot changes', async () => {
     const make = (/** @type {number} */ n) =>
       records(Array.from({ length: n }, (_, i) => ({ date: new Date(Date.UTC(2026, 0, 1) + i * 86_400_000) })));
     const before = await build(make(2 * OUTBOX_PAGE_SIZE + 3));
@@ -52,6 +52,7 @@ describe('buildIsland', () => {
     assert.deepEqual(before.outbox.map((page) => page.name), ['outbox-1', 'outbox-2', 'outbox']);
     assert.equal(JSON.stringify(after.outbox[0]), JSON.stringify(before.outbox[0]));
     assert.equal(JSON.stringify(after.outbox[1]), JSON.stringify(before.outbox[1]));
+    assert.notEqual(after.outbox.at(-1).document.snapshot, before.outbox.at(-1).document.snapshot);
     const first = after.outbox[2].document;
     assert.equal(first.items.length, 4);
     assert.equal(first.next, `${ORIGIN}/island/outbox-2.json`);
@@ -62,6 +63,32 @@ describe('buildIsland', () => {
     const all = [...after.outbox].reverse().flatMap((page) => page.document.items.map((item) => item.published));
     assert.equal(all.length, 2 * OUTBOX_PAGE_SIZE + 4);
     assert.deepEqual(all, [...all].sort().reverse());
+  });
+
+  test('updates of old posts move to the head; backdated additions and withdrawal change the snapshot', async () => {
+    const input = Array.from({ length: 120 }, (_, i) => ({ date: new Date(Date.UTC(2026, 0, 1) + i * 86_400_000) }));
+    const before = await build(records(input));
+    assert.equal(before.outbox.at(-1).document.updated, '2026-10-01T00:00:00Z');
+    const edited = await build(records(input.map((r, i) => i ? r : { ...r, title: '修改旧文章', updated: '2026-10-14' })));
+    const head = edited.outbox.at(-1).document;
+    assert.equal(head.items[0].object.title, '修改旧文章');
+    assert.equal(head.items[0].updated, '2026-10-14T00:00:00Z');
+    assert.notEqual(head.snapshot, before.outbox.at(-1).document.snapshot);
+    const historicalEdit = await build(records(input.map((r, i) => i ? r : {
+      ...r, title: '仍早于首页的修改', updated: '2026-01-01T01:00:00Z',
+    })));
+    assert.deepEqual(historicalEdit.outbox.at(-1).document.items, before.outbox.at(-1).document.items);
+    assert.notEqual(historicalEdit.outbox.at(-1).document.snapshot, before.outbox.at(-1).document.snapshot);
+    const backdated = await build(records([...input, { date: '2025-01-01' }]));
+    assert.notEqual(backdated.outbox.at(-1).document.snapshot, before.outbox.at(-1).document.snapshot);
+    assert.ok(backdated.outbox.flatMap((p) => p.document.items).some((i) => i.object.url?.endsWith('/r121/')));
+    const withdrawn = await build(records(input.map((r, i) => i ? r : { ...r, withdrawn: '2026-10-14' })));
+    assert.equal(withdrawn.outbox.at(-1).document.items[0].type, 'delete');
+    assert.notEqual(withdrawn.outbox.at(-1).document.snapshot, before.outbox.at(-1).document.snapshot);
+    for (const island of [before, edited, backdated, withdrawn]) {
+      assert.match(island.outbox.at(-1).document.snapshot, /^[0-9a-f]{64}$/);
+      for (const page of island.outbox) assert.ok(validateOutbox(page.document).valid);
+    }
   });
 
   test('an island without records still has a valid empty outbox', async () => {

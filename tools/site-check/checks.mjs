@@ -5,11 +5,13 @@
 // signing key, and (optionally) reproducible builds.
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join, relative, sep } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
 import {
   trustOnFirstUse,
+  canonicalBytes,
   validateFriends,
   validateManifest,
   validateOutbox,
@@ -134,6 +136,7 @@ export async function checkSite(dist, options = {}) {
   const pagesSeen = new Set();
   let outboxValid = manifestValid;
   let nextUrl = manifestValid ? manifest?.links?.outbox : undefined;
+  let snapshot;
   while (typeof nextUrl === 'string') {
     const file = fileFor(nextUrl, origin);
     if (file === null || pagesSeen.has(file) || pagesSeen.size >= MAX_PAGES) {
@@ -153,6 +156,7 @@ export async function checkSite(dist, options = {}) {
       problems.push(`${file}: ${JSON.stringify([check.issues, check.items.filter((item) => !item.ok)])}`);
       break;
     }
+    if (pagesSeen.size === 1) snapshot = page.snapshot;
     activities.push(...page.items);
     nextUrl = page.next;
   }
@@ -161,6 +165,13 @@ export async function checkSite(dist, options = {}) {
   }
   summary.outboxPages = pagesSeen.size;
   summary.activities = activities.length;
+
+  if (outboxValid) {
+    const expected = createHash('sha256').update(canonicalBytes(
+      [...activities].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    )).digest('hex');
+    if (snapshot !== expected) problems.push('outbox head snapshot does not match the complete activity set');
+  }
 
   if (manifest && manifestValid && outboxValid) {
     const history = await trustOnFirstUse(manifest, { now: new Date().toISOString() });
@@ -286,19 +297,20 @@ export async function checkSite(dist, options = {}) {
   summary.htmlPages = html.length;
   summary.scriptBytes = scriptBytes;
 
-  // First-screen budget: the home page and the CSS and JS it loads, gzipped.
+  // A lower bound: HTML and its directly linked CSS/JS. The required browser
+  // check enforces the FULL budget, including imports and runtime data fetches.
   const home = read('index.html');
-  const assets = [
+  const assets = [...new Set([
     ...attributeValues(home, 'script', 'src'),
     ...attributeValues(home, 'link', 'href').filter(({ element }) => /rel="(stylesheet|modulepreload)"/i.test(element)),
   ]
     .map(({ value }) => fileFor(value, origin))
-    .filter((file) => file !== null && fileSet.has(file));
+    .filter((file) => file !== null && fileSet.has(file)))];
   const firstScreen = [home, ...assets.map((file) => readFileSync(join(dist, /** @type {string} */ (file))))].reduce(
     (sum, content) => sum + gzipSync(content, { level: 9 }).length,
     0,
   );
-  summary.firstScreenGzipBytes = firstScreen;
+  summary.firstScreenDirectGzipBytes = firstScreen;
   if (firstScreen > FIRST_SCREEN_BUDGET) problems.push(`first screen is ${firstScreen} bytes gzipped, over the ${FIRST_SCREEN_BUDGET} budget`);
 
   // Theme expectations.

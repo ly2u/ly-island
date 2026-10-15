@@ -4,15 +4,27 @@
 
 const DAY_MS = 86_400_000;
 const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const TIMESTAMP = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-](\d{2}):(\d{2}))$/;
 const WEEK = /^(\d{4})-W(\d{2})$/;
 
 /** @param {string} value */
 export function isCalendarDate(value) {
   const match = DATE.exec(value);
-  if (!match) return false;
+  if (!match || match[0] !== value) return false;
   const [y, m, d] = [Number(match[1]), Number(match[2]), Number(match[3])];
-  const date = new Date(Date.UTC(y, m - 1, d));
+  const date = new Date(0);
+  date.setUTCFullYear(y, m - 1, d);
   return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+}
+
+/** A real calendar date or an RFC 3339 instant with an explicit offset. No coercion. */
+export function isRecordDate(value) {
+  if (typeof value !== 'string') return false;
+  if (isCalendarDate(value)) return true;
+  const match = TIMESTAMP.exec(value);
+  return !!match && match[0] === value && isCalendarDate(match[1]) && Number(match[2]) < 24 && Number(match[3]) < 60
+    && Number(match[4]) < 60 && Number(match[6] ?? 0) < 24 && Number(match[7] ?? 0) < 60
+    && Number.isFinite(Date.parse(value));
 }
 
 /** @param {string} timeZone */
@@ -28,23 +40,19 @@ export function isTimeZone(timeZone) {
 /**
  * The local calendar date of a record date.
  * - "2026-10-01" (string) is that day;
- * - a string with a time keeps the date as written (the author's own clock);
- * - a Date at exactly 00:00:00.000 UTC is a date without a time (that is how
- *   YAML parses `date: 2026-10-01`), so it is that UTC day;
- * - any other Date is converted to `timeZone`.
+ * - a timestamp string or Date is an instant, converted to `timeZone`.
+ * The loader preserves date-only YAML scalars as strings, so midnight never
+ * has to stand in for two different meanings.
  * @param {Date | string} value @param {string} [timeZone]
  * @returns {string} YYYY-MM-DD
  */
 export function localDate(value, timeZone = 'UTC') {
   if (typeof value === 'string') {
-    const day = value.slice(0, 10);
-    if (!isCalendarDate(day) || (value.length > 10 && !Number.isFinite(Date.parse(value)))) {
-      throw new RangeError(`not a date: ${JSON.stringify(value)}`);
-    }
-    return day;
+    if (isCalendarDate(value)) return value;
+    if (!isRecordDate(value)) throw new RangeError(`not a date: ${JSON.stringify(value)}`);
+    value = new Date(value);
   }
   if (!(value instanceof Date) || Number.isNaN(value.getTime())) throw new RangeError(`not a date: ${String(value)}`);
-  if (value.getTime() % DAY_MS === 0) return value.toISOString().slice(0, 10);
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' })
     .formatToParts(value)
     .reduce((acc, part) => ({ ...acc, [part.type]: part.value }), /** @type {Record<string, string>} */ ({}));
@@ -57,6 +65,7 @@ export function localDate(value, timeZone = 'UTC') {
  * @param {Date | string} value
  */
 export function dateTime(value) {
+  if (!(value instanceof Date) && !isRecordDate(value)) throw new RangeError(`not a date: ${String(value)}`);
   const time = typeof value === 'string' && isCalendarDate(value) ? Date.parse(`${value}T00:00:00Z`) : new Date(value).getTime();
   if (!Number.isFinite(time)) throw new RangeError(`not a date: ${String(value)}`);
   return new Date(Math.floor(time / 1000) * 1000).toISOString().replace('.000Z', 'Z');

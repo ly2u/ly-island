@@ -77,3 +77,20 @@ test('statistics keep the latest 60 active weeks', () => {
 test('plain text from HTML', () => {
   assert.equal(plainText('<p>A &amp; B</p><script>x()</script><p>&#x4E2D;&lt;b&gt;</p>'), 'A & B 中<b>');
 });
+
+test('instants are converted consistently for records, weeks, completion and withdrawal', () => {
+  const list = normalizeRecords([
+    { slug: 'date-only', kind: 'project', title: '日历日期', date: '2026-10-05' },
+    { slug: 'instant', kind: 'project', title: 'UTC 零点', date: '2026-10-05T00:00:00Z', done: '2026-10-05T01:00:00Z' },
+    { slug: 'gone', kind: 'article', title: '已撤回', date: '2026-10-03', withdrawn: '2026-10-05T00:00:00Z' },
+  ], { ...options, timeZone: 'America/Los_Angeles' });
+  const instant = list.find((r) => r.slug === 'instant');
+  assert.equal(instant.date, '2026-10-04');
+  assert.equal(instant.done, '2026-10-04');
+  assert.equal(instant.doneAt, '2026-10-05T01:00:00Z');
+  assert.equal(list.find((r) => r.slug === 'date-only').date, '2026-10-05');
+  assert.equal(list.find((r) => r.slug === 'gone').withdrawn, '2026-10-04');
+  assert.equal(list.find((r) => r.slug === 'gone').withdrawnAt, '2026-10-05T00:00:00Z');
+  assert.deepEqual(recordStats(list).activeWeeks, ['2026-W40', '2026-W41']);
+  assert.throws(() => records([{ slug: 'trailing-newline\n' }]), /file name/);
+});

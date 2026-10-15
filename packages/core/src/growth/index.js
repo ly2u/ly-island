@@ -10,7 +10,7 @@ export const DEFAULT_RULES = defaultRules.id;
 
 /** @param {string} id */
 export function rulesFor(id) {
-  const rules = RULES[id];
+  const rules = Object.hasOwn(RULES, id) ? RULES[id] : undefined;
   if (!rules) throw new TypeError(`unknown growth rules ${id}; known: ${Object.keys(RULES).join(', ')}`);
   return rules;
 }
@@ -20,7 +20,8 @@ export function rulesFor(id) {
  * @param {any} stats @param {string} today
  */
 export function presentStats(stats, today) {
-  const rules = RULES[stats?.growth?.rules] ?? defaultRules;
+  const id = stats?.growth?.rules;
+  const rules = typeof id === 'string' && Object.hasOwn(RULES, id) ? RULES[id] : defaultRules;
   return rules.present(stats, today);
 }
 

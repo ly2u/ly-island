@@ -9,6 +9,7 @@ const island = loadConfig();
 export default defineConfig({
   site: island.origin,
   outDir: './dist',
+  prerenderConflictBehavior: 'error',
   build: {
     format: 'directory',
     // External files only, so the Content-Security-Policy in public/_headers

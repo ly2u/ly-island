@@ -82,12 +82,12 @@ export function unlocksFor(points, config = DEFAULT_CONFIG) {
  * from its date until the day before it was withdrawn.
  * @param {RecordFact[]} facts @param {string} day @param {typeof DEFAULT_CONFIG} config
  */
-export function pointsOn(facts, day, config = DEFAULT_CONFIG) {
+export function pointsOn(facts, day, config = DEFAULT_CONFIG, beforeWithdrawals = false) {
   let points = 0;
   /** @type {Map<string, number>} */
   const notesPerDay = new Map();
   for (const fact of facts) {
-    if (fact.date > day || (fact.withdrawn !== undefined && fact.withdrawn <= day)) continue;
+    if (fact.date > day || (fact.withdrawn !== undefined && (beforeWithdrawals ? fact.withdrawn < day : fact.withdrawn <= day))) continue;
     if (fact.kind === 'note') {
       notesPerDay.set(fact.date, (notesPerDay.get(fact.date) ?? 0) + 1);
     } else if (fact.kind === 'article') {
@@ -138,7 +138,10 @@ export function accumulate({ records, ledger }, rawConfig = {}) {
     if (fact.withdrawn !== undefined) days.add(fact.withdrawn);
   }
   let best = points;
-  for (const day of days) best = Math.max(best, pointsOn(records, day, config));
+  // The growth contract contains calendar days, not a complete event log.
+  // At a same-day tie, credit publication/completion before withdrawal. This
+  // deliberately favors retaining an unlock; current points still exclude it.
+  for (const day of days) best = Math.max(best, pointsOn(records, day, config, true));
 
   const unlocked = [...unlocksFor(best, config)];
   for (const entry of ledger.unlocked) {

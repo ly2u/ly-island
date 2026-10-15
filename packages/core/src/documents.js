@@ -3,6 +3,7 @@
 
 import {
   effectiveUpdated,
+  canonicalBytes,
   PROTOCOL,
   signActivity,
   validateFriends,
@@ -40,22 +41,25 @@ export function newestRecordTime(records) {
   let newest = '1970-01-01T00:00:00Z';
   for (const record of records) {
     newest = later(newest, record.updated ?? record.published);
-    if (record.done) newest = later(newest, dateTime(record.done));
-    if (record.withdrawn) newest = later(newest, dateTime(record.withdrawn));
+    if (record.done) newest = later(newest, record.doneAt ?? dateTime(record.done));
+    if (record.withdrawn) newest = later(newest, record.withdrawnAt ?? dateTime(record.withdrawn));
   }
   return newest;
 }
 
 /**
- * Splits activities into pages. Pages are filled from the oldest activity, so
- * a full page never changes again when new records arrive; the newest page,
- * which may hold fewer items, is outbox.json.
+ * Pages describe a mutable snapshot, ordered by effectiveUpdated, not an
+ * append-only event log. Updates move to the head. The head's snapshot digest
+ * changes for ANY activity change, including backdated additions off the head.
+ * Receivers must revalidate every page on a changed snapshot (see protocol-v0).
  * @param {Record<string, any>[]} activities
  * @param {string} origin @param {string} fallbackUpdated
+ * @param {string} [snapshot] digest of the complete, signed activity set
  */
-export function outboxPages(activities, origin, fallbackUpdated) {
+export function outboxPages(activities, origin, fallbackUpdated, snapshot) {
   const ordered = [...activities].sort((a, b) =>
-    a.published === b.published ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : a.published < b.published ? -1 : 1,
+    effectiveUpdated(a) === effectiveUpdated(b) ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+      : effectiveUpdated(a) < effectiveUpdated(b) ? -1 : 1,
   );
   const chunks = [];
   for (let i = 0; i < ordered.length; i += OUTBOX_PAGE_SIZE) chunks.push(ordered.slice(i, i + OUTBOX_PAGE_SIZE));
@@ -72,8 +76,9 @@ export function outboxPages(activities, origin, fallbackUpdated) {
         protocol: PROTOCOL,
         id: `${origin}/island/${name}.json`,
         owner: origin,
-        updated: updated || fallbackUpdated,
+        updated: index === chunks.length - 1 ? later(updated || fallbackUpdated, fallbackUpdated) : updated || fallbackUpdated,
         items,
+        ...(index === chunks.length - 1 && snapshot ? { snapshot } : {}),
         ...(index > 0 ? { next: `${origin}/island/${nameOf(index - 1)}.json` } : {}),
       },
     };
@@ -114,7 +119,7 @@ export async function buildIsland({ config, records, friends, ledger, signer, so
             id: `${record.url}#withdrawn`,
             type: 'delete',
             actor: origin,
-            published: later(dateTime(record.withdrawn), record.updated ?? record.published),
+            published: later(record.withdrawnAt ?? dateTime(record.withdrawn), record.updated ?? record.published),
             to: 'public',
             object: { of: record.url },
           },
@@ -138,7 +143,10 @@ export async function buildIsland({ config, records, friends, ledger, signer, so
       );
     }
   }
-  const pages = outboxPages(activities, origin, updated);
+  const snapshot = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', canonicalBytes(
+    [...activities].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+  ))), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  const pages = outboxPages(activities, origin, updated, snapshot);
 
   const manifest = {
     protocol: PROTOCOL,

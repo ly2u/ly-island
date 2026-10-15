@@ -10,7 +10,10 @@ Checks, on a 360 px wide screen:
   page shows its title and text;
 - nothing scrolls sideways;
 - with JavaScript on: no console errors, no blocked resources or
-  Content-Security-Policy violations, and the isometric theme's script ran.
+  Content-Security-Policy violations, and the isometric theme's script ran;
+- a fresh home-page load stays within 200 KiB, summing gzip(level=9) of all
+  unique fetched resource URLs through networkidle, including imported JS,
+  nested CSS and runtime data. This is the authoritative first-screen gate.
 
 Requires: playwright (pip) and its Chromium.
 """
@@ -19,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
+import gzip
 import json
 import sys
 import threading
@@ -31,6 +35,27 @@ from playwright.sync_api import sync_playwright
 
 TYPES = {".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".json": "application/json",
          ".xml": "application/xml", ".svg": "image/svg+xml", ".txt": "text/plain; charset=utf-8"}
+FIRST_SCREEN_BUDGET = 200 * 1024
+
+
+def first_screen_size(responses, base: str) -> tuple[int, int]:
+    """Measure a fresh context's requests, rather than guessing HTML imports.
+
+    Query strings distinguish resources; fragments don't. Repeated references
+    to the same URL count once, like module imports/browser resource reuse.
+    Reading a failed response body raises, so missing measurements fail closed.
+    """
+    resources = {}
+    for response in responses:
+        url = response.url.split("#", 1)[0]
+        if urlsplit(url).scheme not in {"http", "https"}:
+            continue  # data/blob payloads are already included in their parent
+        if urlsplit(url).netloc != urlsplit(base).netloc:
+            raise ValueError(f"home page fetches a third-party resource: {url}")
+        if not 200 <= response.status < 300:
+            raise ValueError(f"home resource returned {response.status}: {url}")
+        resources[url] = response.body()
+    return sum(len(gzip.compress(body, compresslevel=9, mtime=0)) for body in resources.values()), len(resources)
 
 
 def header_rules(dist: Path) -> list[tuple[str, list[tuple[str, str]]]]:
@@ -142,6 +167,23 @@ def main() -> int:
         page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.on("requestfailed", lambda request: errors.append(f"request failed: {request.url}"))
+        # First navigation in a new context: no warmed browser cache. Keep
+        # Response objects until bodies finish, then read after networkidle.
+        responses = []
+        def remember_response(response):
+            responses.append(response)
+        page.on("response", remember_response)
+        page.goto(base + "/")
+        page.wait_for_load_state("networkidle")
+        page.remove_listener("response", remember_response)
+        try:
+            first_screen_bytes, resource_count = first_screen_size(responses, base)
+            print(f"first screen: {first_screen_bytes} bytes gzip in {resource_count} resources (budget {FIRST_SCREEN_BUDGET})")
+            if first_screen_bytes > FIRST_SCREEN_BUDGET:
+                problems.append(f"first screen is {first_screen_bytes} bytes gzipped, over the {FIRST_SCREEN_BUDGET} budget")
+        except Exception as error:
+            problems.append(f"cannot measure first screen: {error}")
+        problems += [f"/: {error}" for error in errors]
         for path in ["/", "/records/", *paths]:
             errors.clear()
             page.goto(base + path)

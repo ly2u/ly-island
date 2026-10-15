@@ -52,7 +52,7 @@ tags: [点云, BIM]
 | `summary` | 否 | 最多 1,000 字 |
 | `tags` | 否 | 最多 32 个，每个最多 64 字 |
 | `done` | 否 | 项目完成的日期，只有项目能写 |
-| `updated` | 否 | 修改过的日期 |
+| `updated` | 否 | 修改文章时必须填写，并晚于前一版本；否则接收方不能用相同编号替换旧动态 |
 | `language` | 否 | 这条记录的语言，缺省用设置里的第一种语言 |
 | `withdrawn` | 否 | 撤回的日期，见下文 |
 | `draft` | 否 | `true` 表示草稿：不构建，也不计入成长 |
@@ -64,6 +64,8 @@ tags: [点云, BIM]
 - 积分随之减少，但已经解锁的外观保留。
 
 写错的地方会让构建失败，并一次列出所有问题。
+
+日期只接受真实的 `YYYY-MM-DD` 或带明确时区的 RFC 3339 时间（如 `2026-10-05T08:00:00+08:00`）；不接受 `null`、数字、布尔值、溢出日期和没有时区的时间。日期本身不换日；时间一律按岛的时区换算，包括 UTC 零点。`done`、`withdrawn`、`updated` 也用这条规则。
 
 ## 设置
 
@@ -164,7 +166,7 @@ npm run unlocks:save
 - 协议文件：通过校验；每一条动态都能验签，并由 Python 实现再验一次；
 - 订阅源：严格解析的 XML；
 - 关掉 JavaScript：从首页出发能读到每一条记录；
-- 首屏：压缩后不超过 200 KB；
+- 首屏：真实浏览器首次加载到 `networkidle`，所有实际请求的唯一 URL 内容按 gzip level 9 合计，不超过 200 KiB。包含间接 JS/CSS 导入和运行时数据；HTML 静态检查给出的只是直接资源下界；
 - 安全：
   - 不加载第三方资源；
   - 页面里没有会被 Content-Security-Policy 拦下的内联脚本和样式；
@@ -176,4 +178,9 @@ npm run unlocks:save
 ```bash
 npm run build
 node ../tools/site-check/cli.mjs dist
+python3 -m pip install -r ../tools/browser-check/requirements.txt
+python3 -m playwright install chromium
+python3 ../tools/browser-check/check.py dist
 ```
+
+完整验收需要两种检查都通过。CI 还用大模块、嵌套 CSS 导入和运行时 JSON 请求三个负例证明浏览器能拦住超预算资源。原始文件名和日期的负例由 `node scripts/check-record-loader.mjs` 在临时副本中运行实际 Astro 构建。

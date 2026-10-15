@@ -6,7 +6,9 @@ import { dateTime, localDate } from './dates.js';
 
 export const RECORD_KINDS = Object.freeze(['article', 'note', 'project']);
 /** File names become URLs, so they are kept to lowercase ASCII words joined by "-". */
-export const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+// The explicit end assertion also rejects a final newline (unlike JS "$"
+// alone, which can match just before that newline).
+export const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*(?![\s\S])/;
 const EXCERPT_LENGTH = 80;
 
 /**
@@ -38,7 +40,9 @@ const EXCERPT_LENGTH = 80;
  * @property {string[]} tags
  * @property {string} language
  * @property {string} [done] YYYY-MM-DD
+ * @property {string} [doneAt] RFC 3339, retaining the completion instant
  * @property {string} [withdrawn] YYYY-MM-DD
+ * @property {string} [withdrawnAt] RFC 3339, retaining the withdrawal instant
  * @property {string} html
  * @property {string} text plain text of the body
  */
@@ -134,6 +138,10 @@ export function normalizeRecords(inputs, { origin, timeZone, language }) {
     }
     if (!date || input.date === undefined) continue;
     const published = dateTime(input.date);
+    const doneAt = done ? dateTime(input.done) : undefined;
+    const withdrawnAt = withdrawn ? dateTime(input.withdrawn) : undefined;
+    if (doneAt && doneAt < published) issue('done cannot be before date');
+    if (withdrawnAt && withdrawnAt < published) issue('withdrawn cannot be before date');
     if (updated && updated < published) issue('updated cannot be before date');
 
     const html = input.html ?? '';
@@ -152,8 +160,8 @@ export function normalizeRecords(inputs, { origin, timeZone, language }) {
       ...(input.summary !== undefined ? { summary: input.summary } : {}),
       tags: Array.isArray(tags) ? [...tags] : [],
       language: input.language ?? language,
-      ...(done ? { done } : {}),
-      ...(withdrawn ? { withdrawn } : {}),
+      ...(done ? { done, doneAt } : {}),
+      ...(withdrawn ? { withdrawn, withdrawnAt } : {}),
       html,
       text,
     });
