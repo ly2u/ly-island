@@ -136,6 +136,50 @@ test('a manifest refresh that finds an unexplained key holds the very letter tha
   assert.equal((await a.rows("SELECT * FROM events WHERE type = 'key.changed'")).length, 1);
 });
 
+test('a letter held longer than the inbox window expires instead of going out, and can be sent again', async () => {
+  const { net, time, team, a, b, asA } = await setup();
+  const posts = () => net.count((entry) => entry.method === 'POST' && entry.url === `${b.origin}/island/inbox`);
+  assert.equal((await (await asA('/island/api/send', message(b.origin))).json()).status, 'delivered');
+  time.advance(25 * 3_600_000);
+  await b.rekey('e5'.repeat(32));
+  let owner = ownerCall(a, await team.token(team.claims(time.now())));
+  assert.equal((await (await owner('/island/api/send', message(b.origin))).json()).status, 'held');
+  const before = posts();
+
+  // Three days later the owner confirms the new key.
+  time.advance(3 * 24 * 3_600_000);
+  owner = ownerCall(a, await team.token(team.claims(time.now())));
+  const confirmed = await (await owner('/island/api/islands', { origin: b.origin, action: 'retrust' })).json();
+  assert.deepEqual([confirmed.released, confirmed.expired], [0, 1]);
+  await a.cron();
+  assert.equal(posts(), before, 'an expired letter is not posted');
+  const [expired] = await a.rows("SELECT id, status, last_error FROM sent WHERE status != 'delivered'");
+  assert.deepEqual([expired.status, expired.last_error], ['expired', 'too-old-to-send']);
+
+  // Sent again: a new activity with a new time and signature.
+  const again = await (await owner('/island/api/resend', { id: expired.id })).json();
+  assert.equal(again.status, 'delivered');
+  assert.notEqual(again.id, expired.id);
+  assert.equal(posts(), before + 1);
+  assert.deepEqual((await a.rows('SELECT status FROM sent WHERE id = ?', [expired.id]))[0].status, 'resent');
+  assert.equal((await owner('/island/api/resend', { id: expired.id })).status, 400, 'only once');
+});
+
+test('a pending retry that waited past the window expires instead of being refused', async () => {
+  const { net, time, a, b, asA } = await setup();
+  const original = net.hosts.get('b.example');
+  net.route('b.example', (request) => (new URL(request.url).pathname === '/island/inbox' ? new Response(null, { status: 429, headers: { 'retry-after': '86400' } }) : original(request)));
+  assert.equal((await (await asA('/island/api/send', message(b.origin))).json()).status, 'pending');
+  for (let i = 0; i < 2; i += 1) {
+    time.advance(24 * 3_600_000 + 60_000);
+    await a.cron();
+  }
+  const posts = net.count((entry) => entry.method === 'POST' && entry.url === `${b.origin}/island/inbox`);
+  assert.equal(posts, 2, 'the first send and one retry; the second retry would have been too old');
+  assert.equal((await a.rows('SELECT status FROM sent'))[0].status, 'expired');
+  assert.equal((await a.rows("SELECT * FROM events WHERE type = 'delivery.failed'")).length, 1);
+});
+
 test('without its signing key the service still receives, but refuses to send', async () => {
   const { a, b, asA } = await setup();
   a.env.ISLAND_SIGNING_KEY = '';

@@ -11,14 +11,22 @@
 // shows a key we cannot explain): the activity is "held" and the owner is
 // told. When the owner confirms the new key (retrust), held activities go
 // back to the queue.
+//
+// An inbox refuses activities published more than 48 hours ago, and the
+// signed time is never changed. So an activity older than SEND_WINDOW_MS is
+// not posted any more: it is "expired", and the owner can send it again as
+// a new activity (POST /island/api/resend).
 
-import { signActivity, validateActivity } from '../../protocol/src/index.js';
+import { DELIVERY_WINDOW, signActivity, validateActivity } from '../../protocol/src/index.js';
+import { timeOf } from '../../protocol/src/util.js';
 import { BudgetExceeded } from './budget.js';
 import { OutboundError } from './net.js';
 import { eventStatement } from './notify.js';
 import { islandColumns, learnIsland, pausedEvent, upsertIsland } from './remote.js';
 
 export const SENDABLE = Object.freeze(['follow', 'visit', 'message', 'water']);
+/** How old an activity may be when posted: the inbox window less an hour for clocks and delays. */
+export const SEND_WINDOW_MS = DELIVERY_WINDOW.pastMs - 60 * 60 * 1000;
 /** Wait before retry n (1-based), within 24 hours in total. */
 const RETRY_DELAYS_MS = [60 * 60 * 1000, 4 * 60 * 60 * 1000, 12 * 60 * 60 * 1000];
 const MAX_ATTEMPTS = RETRY_DELAYS_MS.length + 1;
@@ -80,7 +88,8 @@ export async function attempt(ctx, row) {
   const release = ctx.budget.hold(1);
   let outcome;
   try {
-    outcome = await post(ctx, row, writes);
+    const published = timeOf(JSON.parse(row.activity).published);
+    outcome = now - published > SEND_WINDOW_MS ? { kind: 'expired', reason: 'too-old-to-send' } : await post(ctx, row, writes);
   } finally {
     release();
   }
@@ -91,6 +100,8 @@ export async function attempt(ctx, row) {
     status = 'delivered';
   } else if (outcome.kind === 'held') {
     status = 'held';
+  } else if (outcome.kind === 'expired') {
+    status = 'expired';
   } else if (outcome.kind === 'final') {
     status = 'failed';
   } else if (outcome.kind === 'wait') {
@@ -104,8 +115,18 @@ export async function attempt(ctx, row) {
   }
   writes.push([
     'UPDATE sent SET status = ?, attempts = ?, next_at = ?, last_error = ? WHERE id = ?',
-    [status, outcome.kind === 'wait' || outcome.kind === 'held' ? attempts - 1 : attempts, nextAt, outcome.kind === 'delivered' ? null : outcome.reason, row.id],
+    [status, ['wait', 'held', 'expired'].includes(outcome.kind) ? attempts - 1 : attempts, nextAt, outcome.kind === 'delivered' ? null : outcome.reason, row.id],
   ]);
+  if (status === 'expired') {
+    const event = eventStatement(ctx.policy, {
+      type: 'delivery.failed',
+      at: now,
+      actor: { id: row.recipient },
+      summary: ctx.strings.deliveryExpired(row.recipient),
+      url: `${ctx.self}/island/admin/#sent`,
+    });
+    if (event) writes.push(event);
+  }
   if (status === 'failed') {
     const event = eventStatement(ctx.policy, {
       type: 'delivery.failed',
@@ -125,7 +146,7 @@ export async function attempt(ctx, row) {
  * @param {SendContext} ctx
  * @param {{ recipient: string, activity: string }} row
  * @param {[string, unknown[]][]} writes
- * @returns {Promise<{ kind: 'delivered' } | { kind: 'final' | 'retry' | 'held', reason: string } | { kind: 'wait', seconds: number, reason: string }>}
+ * @returns {Promise<{ kind: 'delivered' } | { kind: 'final' | 'retry' | 'held' | 'expired', reason: string } | { kind: 'wait', seconds: number, reason: string }>}
  */
 async function post(ctx, row, writes) {
   const island = await ctx.store.first('SELECT * FROM islands WHERE origin = ?', [row.recipient]);

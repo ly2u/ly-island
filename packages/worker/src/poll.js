@@ -32,6 +32,7 @@ import {
 } from '../../protocol/src/index.js';
 import { BudgetExceeded } from './budget.js';
 import { OutboundError, parseJson } from './net.js';
+import { timeOf } from '../../protocol/src/util.js';
 import { eventStatement } from './notify.js';
 import { islandColumns, learnIsland, pausedEvent, upsertIsland } from './remote.js';
 import { hash32 } from './util.js';
@@ -191,19 +192,25 @@ async function pollOne(ctx, { origin, row, state }, verify, writes, keep) {
   const name = String(manifest.name ?? origin);
   const head = String(manifest.links.outbox);
 
+  // Rejections are remembered per key history: when it changes, items are checked again.
+  const historyTag = (await sha256Hex(new TextEncoder().encode(canonicalize(history.keys ?? [])))).slice(0, 32);
+
   /**
-   * Feed versions and tombstones of this island, and the cached page at `url`.
+   * Feed versions, tombstones and remembered rejections of this island, and
+   * the cached page at `url`.
    * @param {string | null} url
    */
   const readKnown = async (url) => {
-    const [feedRows, tombRows, pageRows] = await ctx.store.batch([
+    const [feedRows, tombRows, rejectedRows, pageRows] = await ctx.store.batch([
       ['SELECT id, version, activity FROM feed WHERE actor = ?', [origin]],
       ['SELECT target, deleted, version FROM tombstones WHERE actor = ?', [origin]],
+      ['SELECT item FROM rejected WHERE actor = ? AND history = ?', [origin, historyTag]],
       ['SELECT url, etag, next, items FROM pages WHERE actor = ? AND url = ?', [origin, url ?? '']],
     ]);
     return {
-      feed: new Map(feedRows.map((r) => [String(r.id), { version: String(r.version), updated: String(r.version).split(' ')[0], activity: String(r.activity) }])),
-      tombs: new Map(tombRows.map((r) => [String(r.target), { deleted: String(r.deleted), version: String(r.version) }])),
+      feed: new Map(feedRows.map((r) => [String(r.id), { version: String(r.version), at: timeOf(String(r.version).split(' ')[0]), activity: String(r.activity) }])),
+      tombs: new Map(tombRows.map((r) => [String(r.target), { deleted: Number(r.deleted), version: String(r.version) }])),
+      rejected: new Set(rejectedRows.map((r) => String(r.item))),
       page: pageRows[0] ?? null,
     };
   };
@@ -227,7 +234,7 @@ async function pollOne(ctx, { origin, row, state }, verify, writes, keep) {
   };
 
   let scan = state.scan;
-  /** @type {{ url: string, items: any[], itemOk: boolean[], next: string | null, etag: string | null, fresh: boolean }} */
+  /** @type {{ url: string, items: any[], itemOk: boolean[], next: string | null, etag: string | null, fresh: boolean, entries?: [string, string][] }} */
   let current;
   let known;
 
@@ -269,7 +276,7 @@ async function pollOne(ctx, { origin, row, state }, verify, writes, keep) {
       const entries = /** @type {[string, string][]} */ (JSON.parse(String(cached.items)));
       const items = entries.map(([, text]) => JSON.parse(text));
       const check = validateOutbox({ protocol: 'islands/0', id: address, owner: origin, updated: '1970-01-01T00:00:00Z', items });
-      current = { url: address, items, itemOk: check.items.map((i) => i.ok), next: cached.next ?? null, etag: cached.etag ?? null, fresh: false };
+      current = { url: address, items, itemOk: check.items.map((i) => i.ok), next: cached.next ?? null, etag: cached.etag ?? null, fresh: false, entries };
     } else if (response.status === 200) {
       const read = pageFrom(response.body);
       if (!read) return failed('invalid-outbox', { scan: null, etag: null });
@@ -283,7 +290,7 @@ async function pollOne(ctx, { origin, row, state }, verify, writes, keep) {
   /** @type {[string, string][]} */
   let entries;
   try {
-    entries = current.items.map((item) => [String(item?.id ?? ''), canonicalize(item)]);
+    entries = current.entries ?? current.items.map((item) => [String(item?.id ?? ''), canonicalize(item)]);
   } catch {
     return failed('invalid-outbox', { scan: null, etag: null });
   }
@@ -294,8 +301,8 @@ async function pollOne(ctx, { origin, row, state }, verify, writes, keep) {
     ]);
   }
 
-  const processed = await processItems(ctx, { origin, name, history, baseline: state.baseline, now }, current, known, verify, writes);
-  const lastActivity = processed.lastActivity && (!state.lastActivity || processed.lastActivity > state.lastActivity) ? processed.lastActivity : state.lastActivity;
+  const processed = await processItems(ctx, { origin, name, history, historyTag, baseline: state.baseline, now }, { ...current, entries }, known, verify, writes);
+  const lastActivity = processed.lastActivity && (!state.lastActivity || timeOf(processed.lastActivity) > timeOf(state.lastActivity)) ? processed.lastActivity : state.lastActivity;
   if (!processed.complete) {
     // Out of verifications: the same page again next run (from the cache if unchanged).
     save({ ...state, scan: { ...scan, pending: current.url }, lastActivity, nextAt: now });
@@ -348,52 +355,70 @@ async function pollOne(ctx, { origin, row, state }, verify, writes, keep) {
 }
 
 /**
- * Verifies and stores what is new on one page.
+ * Verifies and stores what is new on one page. Times are compared as
+ * instants (timeOf), never as RFC 3339 text: "+02:00" and "Z" sort wrongly as
+ * strings. The activities themselves are stored exactly as signed.
  * @param {PollContext} ctx
- * @param {{ origin: string, name: string, history: any, baseline: boolean, now: number }} island
- * @param {{ items: any[], itemOk: boolean[] }} page
- * @param {{ feed: Map<string, { version: string, updated: string, activity: string }>, tombs: Map<string, { deleted: string, version: string }> }} known
+ * @param {{ origin: string, name: string, history: any, historyTag: string, baseline: boolean, now: number }} island
+ * @param {{ items: any[], itemOk: boolean[], entries: [string, string][] }} page
+ * @param {{ feed: Map<string, { version: string, at: number, activity: string }>, tombs: Map<string, { deleted: number, version: string }>, rejected: Set<string> }} known
  * @param {{ left: number }} verify
  * @param {[string, unknown[]][]} writes
  */
-async function processItems(ctx, { origin, name, history, baseline, now }, page, known, verify, writes) {
+async function processItems(ctx, { origin, name, history, historyTag, baseline, now }, page, known, verify, writes) {
   let events = 0;
   /** @type {string | null} */
   let lastActivity = null;
-  const check = async (/** @type {any} */ activity) => {
+  let pruned = false;
+  /**
+   * Verifies one item, remembering a failure so later runs skip it.
+   * @returns {Promise<'ok' | 'invalid' | 'later'>}
+   */
+  const check = async (/** @type {any} */ activity, /** @type {number} */ index) => {
+    const itemHash = await sha256Hex(new TextEncoder().encode(page.entries[index][1]));
+    if (known.rejected.has(itemHash)) return 'invalid';
     if (verify.left <= 0) return 'later';
     verify.left -= 1;
     const verdict = await verifyActivity(history, activity, { source: 'origin', delivery: false });
-    if (!verdict.ok) return 'invalid';
+    if (!verdict.ok) {
+      known.rejected.add(itemHash);
+      writes.push(['INSERT INTO rejected (actor, item, history, at) VALUES (?, ?, ?, ?) ON CONFLICT (actor, item, history) DO NOTHING', [origin, itemHash, historyTag, now]]);
+      if (!pruned) {
+        writes.push(['DELETE FROM rejected WHERE actor = ? AND at < ?', [origin, now - 30 * DAY]]);
+        pruned = true;
+      }
+      return 'invalid';
+    }
     const time = effectiveUpdated(activity);
-    if (!lastActivity || time > lastActivity) lastActivity = time;
+    if (!lastActivity || timeOf(time) > timeOf(lastActivity)) lastActivity = time;
     return 'ok';
   };
 
   for (const [index, activity] of page.items.entries()) {
     if (!page.itemOk[index] || activity.actor !== origin) continue;
     const time = effectiveUpdated(activity);
+    const at = timeOf(time);
     const version = `${time} ${activity.proof.value}`;
 
     if (activity.type === 'post') {
       const previous = known.feed.get(activity.id);
       if (previous?.version === version) continue;
-      if (previous && !(time > previous.updated)) continue;
+      if (previous && !(at > previous.at)) continue;
       const tomb = known.tombs.get(activity.id);
       // Withdrawn: only a version later than the withdrawal brings it back.
-      if (tomb && !(time > tomb.deleted)) continue;
-      const verdict = await check(activity);
+      if (tomb && !(at > tomb.deleted)) continue;
+      const verdict = await check(activity, index);
       if (verdict === 'later') return { complete: false, events, lastActivity };
       if (verdict !== 'ok') continue;
       writes.push([
         'INSERT INTO feed (actor, id, version, published, activity) VALUES (?, ?, ?, ?, ?) ON CONFLICT (actor, id) DO UPDATE SET version = excluded.version, published = excluded.published, activity = excluded.activity',
-        [origin, activity.id, version, activity.published, JSON.stringify(activity)],
+        [origin, activity.id, version, new Date(timeOf(activity.published)).toISOString(), JSON.stringify(activity)],
       ]);
       if (tomb) {
         writes.push(['DELETE FROM tombstones WHERE actor = ? AND target = ?', [origin, activity.id]]);
         known.tombs.delete(activity.id);
       }
-      known.feed.set(activity.id, { version, updated: time, activity: JSON.stringify(activity) });
+      known.feed.set(activity.id, { version, at, activity: JSON.stringify(activity) });
       if (!previous && !tomb && baseline) {
         const title = activity.object.title ?? activity.object.summary ?? activity.object.url;
         const event = eventStatement(ctx.policy, {
@@ -412,21 +437,21 @@ async function processItems(ctx, { origin, name, history, baseline, now }, page,
       const of = String(activity.object?.of ?? '');
       const tomb = known.tombs.get(of);
       if (tomb?.version === version) continue;
-      if (tomb && !(time > tomb.deleted)) continue;
+      if (tomb && !(at > tomb.deleted)) continue;
       const stored = known.feed.get(of);
       // A post republished after this withdrawal stays.
-      if (stored && stored.updated > time) continue;
+      if (stored && stored.at > at) continue;
       // Authorship first (cheap), then the signature: an invalid or foreign
       // withdrawal leaves no tombstone at all.
       if (!checkDelete(activity, stored ? { target: JSON.parse(stored.activity) } : {}).ok) continue;
-      const verdict = await check(activity);
+      const verdict = await check(activity, index);
       if (verdict === 'later') return { complete: false, events, lastActivity };
       if (verdict !== 'ok') continue;
       writes.push(
-        ['INSERT INTO tombstones (actor, target, deleted, version) VALUES (?, ?, ?, ?) ON CONFLICT (actor, target) DO UPDATE SET deleted = excluded.deleted, version = excluded.version', [origin, of, time, version]],
+        ['INSERT INTO tombstones (actor, target, deleted, version) VALUES (?, ?, ?, ?) ON CONFLICT (actor, target) DO UPDATE SET deleted = excluded.deleted, version = excluded.version', [origin, of, at, version]],
         ['DELETE FROM feed WHERE actor = ? AND id = ?', [origin, of]],
       );
-      known.tombs.set(of, { deleted: time, version });
+      known.tombs.set(of, { deleted: at, version });
       known.feed.delete(of);
     } else if (activity.type === 'key') {
       // A hint that the key log changed: read the manifest and log next time.

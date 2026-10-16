@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { islandSigner } from '../../core/src/index.js';
 import { canonicalize, signActivity } from '../../protocol/src/index.js';
 import { POLL, snapshotOf } from '../src/poll.js';
 import { access, channels, clock, island, network, ownerCall, SEEDS } from './harness.js';
@@ -339,4 +340,147 @@ test('budget: running out inside an island keeps everything finished before it',
   assert.ok(second.used <= 45, `${second.used} subrequests`);
   assert.equal(second.polled[0], 'https://m8.example');
   assert.equal((await a.rows('SELECT * FROM feed')).length, 9);
+});
+
+/** Signs an activity as `target` (its k1, or another key). */
+async function signedBy(target, fields, signer = null) {
+  const key = signer ?? (await target.signer());
+  return signActivity({ actor: target.origin, to: 'public', ...fields }, { keyId: key.keyId, privateKey: key.privateKey });
+}
+
+/** Serves `items` as b's whole outbox: one head page with the right snapshot. */
+async function serveOutbox(target, items) {
+  const page = { protocol: 'islands/0', id: `${target.origin}/island/outbox.json`, owner: target.origin, updated: '2026-10-15T00:00:00Z', items, snapshot: await digestOf(items) };
+  target.serve('/island/outbox.json', page);
+  return page;
+}
+
+test('withdrawal times are compared as instants, not as RFC 3339 text', async () => {
+  const { time, a, b, feed } = await followed(1);
+  const template = allItems(b).find((item) => item.type === 'post');
+  const id = `${b.origin}/records/tz/`;
+  // 01:00 at +02:00 is 23:00 the day before in UTC; the withdrawal comes an hour later.
+  const post = await signedBy(b, { id, type: 'post', published: '2026-10-14T01:00:00+02:00', object: { ...template.object, url: id } });
+  const withdrawal = await signedBy(b, { id: `${id}#withdrawn`, type: 'delete', published: '2026-10-14T00:00:00Z', object: { of: id } });
+  const until = async (/** @type {any} */ page) => runUntil(a, time, async () => (await pollState(a, b.origin)).snapshot === page.snapshot, 6);
+
+  // The post exists; the later withdrawal removes it.
+  await until(await serveOutbox(b, [post]));
+  assert.deepEqual(await feed(), [id]);
+  time.advance(DAY + 3_600_000);
+  await until(await serveOutbox(b, [withdrawal]));
+  assert.deepEqual(await feed(), [], 'a later withdrawal applies even though "…Z" sorts before "…+02:00"');
+  assert.equal((await a.rows('SELECT deleted FROM tombstones'))[0].deleted, Date.parse('2026-10-14T00:00:00Z'));
+
+  // The old post's signed copy next to the withdrawal stays out.
+  time.advance(DAY + 3_600_000);
+  await until(await serveOutbox(b, [withdrawal, post]));
+  assert.deepEqual(await feed(), []);
+
+  // So does a copy at the same instant written another way (offset, fractions).
+  const same = await signedBy(b, { id, type: 'post', published: '2026-10-14T01:00:00+02:00', updated: '2026-10-14T02:00:00.000+02:00', object: { ...template.object, url: id } });
+  time.advance(DAY + 3_600_000);
+  await until(await serveOutbox(b, [withdrawal, same]));
+  assert.deepEqual(await feed(), [], 'the same instant as the withdrawal is not later');
+
+  // A version that is really later brings it back.
+  const later = await signedBy(b, { id, type: 'post', published: '2026-10-14T01:00:00+02:00', updated: '2026-10-14T00:00:00.5-00:30', object: { ...template.object, url: id } });
+  time.advance(DAY + 3_600_000);
+  await until(await serveOutbox(b, [withdrawal, later]));
+  assert.deepEqual(await feed(), [id]);
+  assert.equal((await a.rows('SELECT * FROM tombstones')).length, 0);
+});
+
+test('a withdrawal read first, and a post signed with an offset, still stay withdrawn', async () => {
+  const { time, a, b, feed } = await followed(1);
+  const template = allItems(b).find((item) => item.type === 'post');
+  const id = `${b.origin}/records/tz/`;
+  const post = await signedBy(b, { id, type: 'post', published: '2026-10-14T01:00:00+02:00', object: { ...template.object, url: id } });
+  const withdrawal = await signedBy(b, { id: `${id}#withdrawn`, type: 'delete', published: '2026-10-14T00:00:00Z', object: { of: id } });
+  let page = await serveOutbox(b, [withdrawal]);
+  await runUntil(a, time, async () => (await pollState(a, b.origin)).snapshot === page.snapshot, 6);
+  assert.equal((await a.rows('SELECT * FROM tombstones')).length, 1);
+  time.advance(DAY + 3_600_000);
+  page = await serveOutbox(b, [withdrawal, post]);
+  await runUntil(a, time, async () => (await pollState(a, b.origin)).snapshot === page.snapshot, 6);
+  assert.deepEqual(await feed(), []);
+  assert.equal((await a.rows('SELECT * FROM tombstones')).length, 1);
+});
+
+test('items with bad signatures are checked once, so the good ones behind them get read', async () => {
+  const { time, a, b, feed } = await followed(1);
+  const template = allItems(b).find((item) => item.type === 'post');
+  const posts = [];
+  for (let i = 0; i < 50; i += 1) {
+    const id = `${b.origin}/records/p${i}/`;
+    posts.push(await signedBy(b, { id, type: 'post', published: `2026-10-${String(10 + Math.floor(i / 10)).padStart(2, '0')}T0${i % 10}:00:00Z`, object: { ...template.object, url: id } }));
+  }
+  // The first 40 on the page carry a broken signature (still well-formed).
+  const broken = posts.map((post, i) => (i < 40 ? { ...post, proof: { ...post.proof, value: `${post.proof.value.slice(0, -6)}AAAAAA` } } : post));
+  const page = await serveOutbox(b, broken);
+  const reports = await runUntil(a, time, async () => (await feed()).length === 10, 4);
+  assert.ok(reports.every((report) => report.verified <= POLL.verifyLimit));
+  assert.equal(reports.length, 2, 'one run for the 40 bad items, the next reads the 10 good ones');
+  assert.equal(reports[1].verified, 10, 'the bad ones are not checked again');
+  await runUntil(a, time, async () => (await pollState(a, b.origin)).snapshot === page.snapshot, 4);
+  assert.equal((await pollState(a, b.origin)).synced, true);
+
+  // Fixed by the publisher: the corrected items are new versions and are read.
+  time.advance(DAY + 3_600_000);
+  const fixed = await serveOutbox(b, posts);
+  await runUntil(a, time, async () => (await pollState(a, b.origin)).snapshot === fixed.snapshot, 6);
+  assert.equal((await feed()).length, 50);
+});
+
+test('bad items do not block the next page either', async () => {
+  const { time, a, b, feed } = await followed(1);
+  const template = allItems(b).find((item) => item.type === 'post');
+  const make = async (/** @type {number} */ i) => {
+    const id = `${b.origin}/records/q${i}/`;
+    return signedBy(b, { id, type: 'post', published: `2026-09-${String(1 + Math.floor(i / 10)).padStart(2, '0')}T0${i % 10}:00:00Z`, object: { ...template.object, url: id } });
+  };
+  const older = [];
+  for (let i = 0; i < 5; i += 1) older.push(await make(i));
+  const newer = [];
+  for (let i = 10; i < 55; i += 1) {
+    const post = await make(i);
+    newer.push({ ...post, proof: { ...post.proof, value: `${post.proof.value.slice(0, -6)}AAAAAA` } });
+  }
+  const second = { protocol: 'islands/0', id: `${b.origin}/island/outbox-1.json`, owner: b.origin, updated: '2026-10-15T00:00:00Z', items: older };
+  const head = { protocol: 'islands/0', id: `${b.origin}/island/outbox.json`, owner: b.origin, updated: '2026-10-15T00:00:00Z', items: newer, next: second.id, snapshot: await digestOf([...newer, ...older]) };
+  b.serve('/island/outbox-1.json', second);
+  b.serve('/island/outbox.json', head);
+  await runUntil(a, time, async () => (await pollState(a, b.origin)).snapshot === head.snapshot, 8);
+  assert.equal((await feed()).length, 5, 'all good items on the next page were read');
+});
+
+test('a rejection is checked again when the key history changes', async () => {
+  const net = network();
+  const time = clock();
+  const a = await island({ net, time, origin: 'https://a.example', seed: SEEDS.a });
+  const b = await island({ net, time, origin: 'https://b.example', seed: SEEDS.b, keyLog: [] });
+  await a.store.run('INSERT INTO islands (origin, first_seen, following) VALUES (?, ?, 1)', [b.origin, time.now()]);
+  const template = allItems(b).find((item) => item.type === 'post');
+  // Signed with a second key a does not know yet.
+  const k2 = await islandSigner({ ISLAND_SIGNING_KEY: 'f6'.repeat(32) }, { origin: b.origin, keyName: 'k2' });
+  const id = `${b.origin}/records/k2/`;
+  const post = await signedBy(b, { id, type: 'post', published: '2026-10-14T00:00:00Z', object: { ...template.object, url: id } }, k2);
+  const page = await serveOutbox(b, [post]);
+  await runUntil(a, time, async () => (await pollState(a, b.origin)).snapshot === page.snapshot, 6);
+  assert.equal((await a.rows('SELECT * FROM feed')).length, 0);
+  assert.equal((await a.rows('SELECT * FROM rejected')).length, 1);
+
+  // b's key log now adds k2, signed with k1; a reads it with the next manifest.
+  const k1 = await b.signer();
+  const entry = await signActivity(
+    { id: `${b.origin}/island/keys/1`, type: 'key', actor: b.origin, published: '2026-10-14T00:00:00Z', to: 'public', object: { add: { id: k2.keyId, type: 'Ed25519', publicKey: k2.publicKey } } },
+    { keyId: k1.keyId, privateKey: k1.privateKey },
+  );
+  b.serve('/island/keys.json', { protocol: 'islands/0', id: `${b.origin}/island/keys.json`, owner: b.origin, updated: '2026-10-15T00:00:00Z', items: [entry] });
+  // A new item makes the head change, so the page is read again.
+  const id2 = `${b.origin}/records/k1/`;
+  const next = await serveOutbox(b, [post, await signedBy(b, { id: id2, type: 'post', published: '2026-10-15T00:00:00Z', object: { ...template.object, url: id2 } })]);
+  time.advance(DAY + 3_600_000);
+  await runUntil(a, time, async () => (await pollState(a, b.origin)).snapshot === next.snapshot, 6);
+  assert.deepEqual((await a.rows('SELECT id FROM feed ORDER BY id')).map((r) => r.id), [id2, id]);
 });

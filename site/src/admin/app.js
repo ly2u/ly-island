@@ -41,12 +41,15 @@ function say(message, error = false) {
   status.classList.toggle('error', error);
 }
 
-/** Runs an action and reports how it went. @param {() => Promise<unknown>} action @param {string} [done] */
+/**
+ * Runs an action and reports how it went.
+ * @param {() => Promise<any>} action @param {string | ((result: any) => string)} [done]
+ */
 async function act(action, done = t.done) {
   try {
     say(t.working);
-    await action();
-    say(done);
+    const result = await action();
+    say(typeof done === 'function' ? done(result) : done);
     await render();
   } catch (error) {
     say(`${t.failed}: ${/** @type {Error} */ (error).message}`, true);
@@ -119,7 +122,8 @@ const views = {
             item.following && !item.publicFriend ? h('button', { type: 'button', onclick: () => act(() => api('/unfollow', { origin: item.origin })) }, t.unfollow) : null,
             !item.following ? h('button', { type: 'button', onclick: () => act(() => api('/follow', { origin: item.origin })) }, t.follow) : null, ' ',
             h('button', { type: 'button', onclick: () => act(() => api('/islands', { origin: item.origin, action: item.blocked ? 'unblock' : 'block' })) }, item.blocked ? t.unblock : t.block), ' ',
-            item.paused ? h('button', { type: 'button', onclick: () => act(() => api('/islands', { origin: item.origin, action: 'retrust' })) }, t.retrust) : null,
+            item.paused ? h('button', { type: 'button', onclick: () => act(() => api('/islands', { origin: item.origin, action: 'retrust' }),
+              (result) => t.retrusted.replace('{released}', String(result.released ?? 0)).replace('{expired}', String(result.expired ?? 0))) }, t.retrust) : null,
           ),
         ))),
       ),
@@ -184,7 +188,9 @@ const views = {
       h('thead', {}, h('tr', {}, h('th', {}, t.to), h('th', {}, t.kind), h('th', {}, t.status), h('th', {}, ''))),
       h('tbody', {}, ...items.map((/** @type {any} */ item) => h('tr', {},
         h('td', {}, link(item.recipient, item.recipient)), h('td', {}, t.types[item.type] ?? item.type),
-        h('td', {}, t.statuses[item.status] ?? item.status, item.last_error ? ` (${item.last_error})` : ''), h('td', {}, when(item.created))))))];
+        h('td', {}, t.statuses[item.status] ?? item.status, item.last_error && item.status !== 'resent' ? ` (${item.last_error})` : ''),
+        h('td', { class: 'actions' }, when(item.created), ' ',
+          ['expired', 'failed'].includes(item.status) ? h('button', { type: 'button', onclick: () => act(() => api('/resend', { id: item.id }), t.resent) }, t.resend) : null)))))];
   },
 
   async drafts() {

@@ -56,6 +56,7 @@ export const MIGRATIONS = Object.freeze([
       ) STRICT`,
       'CREATE INDEX IF NOT EXISTS sent_due ON sent (status, next_at)',
       // Public activities read from followed islands, one row per activity id.
+      // `published` is kept as UTC (toISOString), so text order is time order.
       `CREATE TABLE IF NOT EXISTS feed (
         actor TEXT NOT NULL,
         id TEXT NOT NULL,
@@ -66,14 +67,27 @@ export const MIGRATIONS = Object.freeze([
       ) STRICT`,
       'CREATE INDEX IF NOT EXISTS feed_by_time ON feed (published DESC)',
       // Valid withdrawals (protocol "撤回与修改的归属"), keyed by withdrawer and
-      // target id. A post is only taken again in a version later than the
-      // withdrawal, so old signed copies cannot bring it back.
+      // target id. `deleted` is the withdrawal's time in milliseconds (times
+      // are compared as instants, never as RFC 3339 text). A post is only
+      // taken again in a version later than that, so old signed copies cannot
+      // bring it back.
       `CREATE TABLE IF NOT EXISTS tombstones (
         actor TEXT NOT NULL,
         target TEXT NOT NULL,
-        deleted TEXT NOT NULL,
+        deleted INTEGER NOT NULL,
         version TEXT NOT NULL,
         PRIMARY KEY (actor, target)
+      ) STRICT`,
+      // Outbox items that failed verification, by the SHA-256 of the whole
+      // item and the key history they were checked against, so a scan does
+      // not spend every run on the same bad items. Any change to the item
+      // or to the history checks it again; rows expire after 30 days.
+      `CREATE TABLE IF NOT EXISTS rejected (
+        actor TEXT NOT NULL,
+        item TEXT NOT NULL,
+        history TEXT NOT NULL,
+        at INTEGER NOT NULL,
+        PRIMARY KEY (actor, item, history)
       ) STRICT`,
       // The outbox pages of followed islands as last read: ETag, next page
       // and the items, each as canonical JSON, so a scan can continue across

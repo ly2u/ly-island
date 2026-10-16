@@ -5,7 +5,7 @@
 import { LIMITS, retrust } from '../../protocol/src/index.js';
 import { isHttpsOrigin } from '../../protocol/src/util.js';
 import { newToken, sameOriginJsonPost, tokenHash } from './auth.js';
-import { send } from './deliver.js';
+import { send, SEND_WINDOW_MS } from './deliver.js';
 import { flushDigest, flushNow, sendToChannels } from './notify.js';
 import { islandColumns, learnIsland, upsertIsland } from './remote.js';
 import { pollNeighbors } from './poll.js';
@@ -126,13 +126,23 @@ export async function ownerApi(ctx, request, url) {
         const learned = await learnIsland(ctx, target, null, { force: true });
         if (!learned.ok) return json({ error: learned.reason }, 502);
         const history = await retrust(learned.manifest, { now: new Date(now).toISOString() });
-        const [, , released] = await ctx.store.batch([
+        const [, , changed] = await ctx.store.batch([
           upsertIsland(target, now, { ...islandColumns(learned, now), history: JSON.stringify(history) }),
           ['UPDATE islands SET history = ? WHERE origin = ?', [JSON.stringify(history), target]],
-          // What waited for this confirmation goes out with the next run.
-          ["UPDATE sent SET status = 'pending', next_at = ? WHERE recipient = ? AND status = 'held' RETURNING id", [now, target]],
+          // What waited for this confirmation goes out with the next run,
+          // unless it waited too long: the recipient would refuse it as too
+          // old, and its signed time is not changed. Those are "expired" and
+          // can be sent again as new letters (/resend).
+          [
+            `UPDATE sent SET
+               status = CASE WHEN created >= ? THEN 'pending' ELSE 'expired' END,
+               next_at = CASE WHEN created >= ? THEN ? ELSE NULL END,
+               last_error = CASE WHEN created >= ? THEN last_error ELSE 'too-old-to-send' END
+             WHERE recipient = ? AND status = 'held' RETURNING status`,
+            [now - SEND_WINDOW_MS, now - SEND_WINDOW_MS, now, now - SEND_WINDOW_MS, target],
+          ],
         ]);
-        return json({ ok: true, released: released.length });
+        return json({ ok: true, released: changed.filter((row) => row.status === 'pending').length, expired: changed.filter((row) => row.status === 'expired').length });
       }
       const change = columns[/** @type {keyof typeof columns} */ (body.action)];
       if (!change) return json({ error: 'invalid-action' }, 400);
@@ -158,6 +168,14 @@ export async function ownerApi(ctx, request, url) {
       if (!object) return json({ error: 'invalid-content' }, 400);
       const result = await send(ctx, { type: body.type, to: target, object });
       if (result.id) await ctx.store.run('DELETE FROM drafts WHERE id = ?', [Number(body.draft ?? 0)]);
+      return json(result, result.status === 'not-sent' ? 400 : 200);
+    }
+    case '/resend': {
+      // An expired or failed letter, sent again as a new activity (new id, new time, new signature).
+      const old = await ctx.store.first("SELECT id, recipient, type, activity FROM sent WHERE id = ? AND status IN ('expired', 'failed')", [String(body.id)]);
+      if (!old) return json({ error: 'not-resendable' }, 400);
+      const result = await send(ctx, { type: String(old.type), to: String(old.recipient), object: JSON.parse(String(old.activity)).object ?? {} });
+      if (result.id) await ctx.store.run("UPDATE sent SET status = 'resent', last_error = ? WHERE id = ?", [result.id, old.id]);
       return json(result, result.status === 'not-sent' ? 400 : 200);
     }
     case '/drafts/delete':
