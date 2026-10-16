@@ -12,6 +12,12 @@
   "name": "island",
   "main": "worker/index.js",
   "compatibility_date": "2026-09-01",
+  // fetch() leaves through Cloudflare's front door, as if from the public
+  // internet. Without it, a fetch to a host in the Worker's own zone goes to
+  // the zone's origin and skips the Worker mapped there, so two islands on
+  // one domain (dev.rqly.com and dev2.rqly.com) could not reach each other.
+  // No compatibility date turns it on by itself.
+  "compatibility_flags": ["global_fetch_strictly_public"],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",

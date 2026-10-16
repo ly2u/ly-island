@@ -35,8 +35,11 @@ export const MIGRATIONS = Object.freeze([
         PRIMARY KEY (actor, id)
       ) STRICT`,
       'CREATE INDEX IF NOT EXISTS received_by_folder ON received (folder, received DESC)',
-      // Accepted (actor, id) pairs, kept 7 days against replays.
-      'CREATE TABLE IF NOT EXISTS seen (actor TEXT NOT NULL, id TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (actor, id)) STRICT',
+      // Accepted (actor, id) pairs, kept 7 days against replays. `claim` is the
+      // request that accepted it: the inbox claims a pair and its rate quota
+      // in one conditional write, and every other write of that delivery
+      // happens only if the claim is its own (src/inbox.js).
+      'CREATE TABLE IF NOT EXISTS seen (actor TEXT NOT NULL, id TEXT NOT NULL, at INTEGER NOT NULL, claim TEXT, PRIMARY KEY (actor, id)) STRICT',
       // Accepted deliveries per sender and per registrable domain, by hour.
       'CREATE TABLE IF NOT EXISTS rate (key TEXT NOT NULL, hour INTEGER NOT NULL, count INTEGER NOT NULL, PRIMARY KEY (key, hour)) STRICT',
       // Directed activities this island sent, one recipient each, with delivery state.
@@ -62,6 +65,28 @@ export const MIGRATIONS = Object.freeze([
         PRIMARY KEY (actor, id)
       ) STRICT`,
       'CREATE INDEX IF NOT EXISTS feed_by_time ON feed (published DESC)',
+      // Valid withdrawals (protocol "撤回与修改的归属"), keyed by withdrawer and
+      // target id. A post is only taken again in a version later than the
+      // withdrawal, so old signed copies cannot bring it back.
+      `CREATE TABLE IF NOT EXISTS tombstones (
+        actor TEXT NOT NULL,
+        target TEXT NOT NULL,
+        deleted TEXT NOT NULL,
+        version TEXT NOT NULL,
+        PRIMARY KEY (actor, target)
+      ) STRICT`,
+      // The outbox pages of followed islands as last read: ETag, next page
+      // and the items, each as canonical JSON, so a scan can continue across
+      // runs, reuse 304 pages and check the publisher's snapshot digest.
+      `CREATE TABLE IF NOT EXISTS pages (
+        actor TEXT NOT NULL,
+        url TEXT NOT NULL,
+        etag TEXT,
+        next TEXT,
+        items TEXT NOT NULL,
+        fetched INTEGER NOT NULL,
+        PRIMARY KEY (actor, url)
+      ) STRICT`,
       // Local notification events (never sent to other islands).
       `CREATE TABLE IF NOT EXISTS events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -108,9 +108,10 @@ export async function access(net) {
  * @param {Record<string, any>} [options.notify]
  * @param {Record<string, any>} [options.env]
  * @param {((host: string) => Promise<string[]>) | null} [options.resolver]
+ * @param {any[] | null} [options.keyLog] key log items; when given, the manifest links a key log
+ * @param {import('../src/store-d1.js').Store} [options.store] another store, such as a local D1 (site/scripts/d1-check.mjs)
  */
-export async function island({ net, time, origin, seed, name = new URL(origin).hostname, records = 2, friends = [], accepts = {}, notify = {}, env = {}, resolver = null }) {
-  const store = sqliteStore();
+export async function island({ net, time, origin, seed, name = new URL(origin).hostname, records = 2, friends = [], accepts = {}, notify = {}, env = {}, resolver = null, keyLog = null, store = sqliteStore() }) {
   await migrate(store);
   /** @type {Map<string, { body: string, type: string }>} */
   const files = new Map();
@@ -128,6 +129,10 @@ export async function island({ net, time, origin, seed, name = new URL(origin).h
     const signer = await islandSigner({ ISLAND_SIGNING_KEY: seed }, { origin, keyName: 'k1' });
     const built = await buildIsland({ config, records: list, friends, ledger: { unlocked: [] }, signer, sourceDate: '2026-10-01T00:00:00Z' });
     files.clear();
+    if (keyLog !== null) {
+      built.manifest.links.keys = `${origin}/island/keys.json`;
+      files.set('/island/keys.json', { body: JSON.stringify({ protocol: 'islands/0', id: `${origin}/island/keys.json`, owner: origin, updated: '2026-10-01T00:00:00Z', items: keyLog }), type: 'application/json' });
+    }
     files.set('/.well-known/island.json', { body: JSON.stringify(built.manifest), type: 'application/json' });
     files.set('/island/friends.json', { body: JSON.stringify(built.friends), type: 'application/json' });
     for (const page of built.outbox) files.set(page.path, { body: JSON.stringify(page.document), type: 'application/json' });
@@ -189,6 +194,14 @@ export async function island({ net, time, origin, seed, name = new URL(origin).h
       seed = newSeed;
       fullEnv.ISLAND_SIGNING_KEY = newSeed;
       built = await publish();
+    },
+    /** The signing key, for activities a test builds by hand. */
+    signer: () => islandSigner({ ISLAND_SIGNING_KEY: seed }, { origin, keyName: 'k1' }),
+    /** A served JSON file. @param {string} path */
+    json: (path) => JSON.parse(/** @type {string} */ (files.get(path)?.body)),
+    /** Serves `value` at `path` (until the next republish). @param {string} path @param {unknown} value */
+    serve(path, value) {
+      files.set(path, { body: typeof value === 'string' ? value : JSON.stringify(value), type: 'application/json' });
     },
     /** Rebuilds the static files from changed records. @param {(list: any[]) => any[]} change */
     async republish(change) {

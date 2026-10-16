@@ -83,6 +83,9 @@ jobs:
       - name: island service in workerd (wrangler dev, local D1)
         working-directory: site
         run: node ../tools/run-annotated.mjs smoke-worker -- npm run smoke:worker
+      - name: island service on a real local D1 (limits, transactions, concurrency)
+        working-directory: site
+        run: node ../tools/run-annotated.mjs d1-check -- npm run d1:check
       - name: build and check the text theme
         working-directory: site
         env:

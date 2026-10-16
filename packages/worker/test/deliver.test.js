@@ -84,6 +84,58 @@ test('5xx retries at most 3 times within a day; 429 waits for Retry-After', asyn
   assert.equal((await a.rows("SELECT * FROM events WHERE type = 'delivery.failed'")).length, 1);
 });
 
+test('nothing is posted to an island whose key history is paused, until the owner confirms', async () => {
+  const { net, time, team, a, b, asA } = await setup();
+  const posts = () => net.count((entry) => entry.method === 'POST' && entry.url === `${b.origin}/island/inbox`);
+  assert.equal((await (await asA('/island/api/send', message(b.origin))).json()).status, 'delivered');
+
+  // A second message meets a 503 and waits for its retry.
+  const original = net.hosts.get('b.example');
+  let down = true;
+  net.route('b.example', (request) => (new URL(request.url).pathname === '/island/inbox' && down ? new Response(null, { status: 503 }) : original(request)));
+  assert.equal((await (await asA('/island/api/send', message(b.origin))).json()).status, 'pending');
+  down = false;
+
+  // A day later b's manifest shows another key and no key log explains it.
+  time.advance(25 * 3_600_000);
+  await b.rekey('e5'.repeat(32));
+  const before = posts();
+  // The retry refreshes b's manifest, finds the unknown key, and holds the letter.
+  await a.cron();
+  assert.equal(posts(), before, 'no POST to the paused island on retry');
+  const [island] = await a.rows("SELECT history FROM islands WHERE origin = 'https://b.example'");
+  assert.equal(JSON.parse(island.history).status, 'paused');
+  assert.deepEqual((await a.rows("SELECT status FROM sent ORDER BY created")).map((r) => r.status), ['delivered', 'held']);
+  // A new message to the already paused island is held too, without a request.
+  const asA2 = ownerCall(a, await team.token(team.claims(time.now())));
+  const third = await (await asA2('/island/api/send', message(b.origin))).json();
+  assert.deepEqual([third.status, third.reason], ['held', 'recipient-key-mismatch']);
+  assert.equal(posts(), before, 'no POST for a new message either');
+  await a.cron();
+  assert.equal(posts(), before, 'held letters are not retried');
+  assert.equal((await a.rows("SELECT * FROM events WHERE type = 'key.changed'")).length, 1, 'the owner is told once');
+
+  // The owner confirms the new key: the held letters go out with the next run.
+  const confirmed = await (await asA2('/island/api/islands', { origin: b.origin, action: 'retrust' })).json();
+  assert.equal(confirmed.released, 2);
+  await a.cron();
+  assert.equal(posts(), before + 2);
+  assert.deepEqual((await a.rows("SELECT status FROM sent ORDER BY created")).map((r) => r.status), ['delivered', 'delivered', 'delivered']);
+});
+
+test('a manifest refresh that finds an unexplained key holds the very letter that found it', async () => {
+  const { net, time, team, a, b, asA } = await setup();
+  assert.equal((await (await asA('/island/api/send', message(b.origin))).json()).status, 'delivered');
+  time.advance(25 * 3_600_000);
+  await b.rekey('e5'.repeat(32));
+  const before = net.count((entry) => entry.method === 'POST' && entry.url === `${b.origin}/island/inbox`);
+  const send = ownerCall(a, await team.token(team.claims(time.now())));
+  const result = await (await send('/island/api/send', message(b.origin))).json();
+  assert.deepEqual([result.ok, result.status], [false, 'held']);
+  assert.equal(net.count((entry) => entry.method === 'POST' && entry.url === `${b.origin}/island/inbox`), before);
+  assert.equal((await a.rows("SELECT * FROM events WHERE type = 'key.changed'")).length, 1);
+});
+
 test('without its signing key the service still receives, but refuses to send', async () => {
   const { a, b, asA } = await setup();
   a.env.ISLAND_SIGNING_KEY = '';

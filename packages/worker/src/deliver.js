@@ -6,11 +6,17 @@
 // recipient's inbox. Retries follow the protocol's response table: 429 waits
 // for Retry-After; 5xx and network errors retry at most 3 times within 24
 // hours; other 4xx answers are final.
+//
+// Nothing is posted to an island whose key history is paused (its manifest
+// shows a key we cannot explain): the activity is "held" and the owner is
+// told. When the owner confirms the new key (retrust), held activities go
+// back to the queue.
 
 import { signActivity, validateActivity } from '../../protocol/src/index.js';
+import { BudgetExceeded } from './budget.js';
 import { OutboundError } from './net.js';
 import { eventStatement } from './notify.js';
-import { islandColumns, learnIsland, upsertIsland } from './remote.js';
+import { islandColumns, learnIsland, pausedEvent, upsertIsland } from './remote.js';
 
 export const SENDABLE = Object.freeze(['follow', 'visit', 'message', 'water']);
 /** Wait before retry n (1-based), within 24 hours in total. */
@@ -24,6 +30,7 @@ const MAX_ATTEMPTS = RETRY_DELAYS_MS.length + 1;
  * @property {import('./store-d1.js').Store} store
  * @property {ReturnType<typeof import('./net.js').outbound>} net
  * @property {() => number} now
+ * @property {ReturnType<typeof import('./budget.js').budget>} budget
  * @property {import('./notify.js').Policy} policy
  * @property {ReturnType<typeof import('./strings.js').stringsFor>} strings
  */
@@ -68,12 +75,22 @@ export async function attempt(ctx, row) {
   const attempts = Number(row.attempts) + 1;
   /** @type {[string, unknown[]][]} */
   const writes = [];
-  const outcome = await post(ctx, row, writes);
+  // The write that records the outcome is held first: a delivery that went
+  // out is always recorded, so it is not sent again.
+  const release = ctx.budget.hold(1);
+  let outcome;
+  try {
+    outcome = await post(ctx, row, writes);
+  } finally {
+    release();
+  }
 
   let status;
   let nextAt = null;
   if (outcome.kind === 'delivered') {
     status = 'delivered';
+  } else if (outcome.kind === 'held') {
+    status = 'held';
   } else if (outcome.kind === 'final') {
     status = 'failed';
   } else if (outcome.kind === 'wait') {
@@ -87,7 +104,7 @@ export async function attempt(ctx, row) {
   }
   writes.push([
     'UPDATE sent SET status = ?, attempts = ?, next_at = ?, last_error = ? WHERE id = ?',
-    [status, outcome.kind === 'wait' ? attempts - 1 : attempts, nextAt, outcome.kind === 'delivered' ? null : outcome.reason, row.id],
+    [status, outcome.kind === 'wait' || outcome.kind === 'held' ? attempts - 1 : attempts, nextAt, outcome.kind === 'delivered' ? null : outcome.reason, row.id],
   ]);
   if (status === 'failed') {
     const event = eventStatement(ctx.policy, {
@@ -108,13 +125,19 @@ export async function attempt(ctx, row) {
  * @param {SendContext} ctx
  * @param {{ recipient: string, activity: string }} row
  * @param {[string, unknown[]][]} writes
- * @returns {Promise<{ kind: 'delivered' } | { kind: 'final' | 'retry', reason: string } | { kind: 'wait', seconds: number, reason: string }>}
+ * @returns {Promise<{ kind: 'delivered' } | { kind: 'final' | 'retry' | 'held', reason: string } | { kind: 'wait', seconds: number, reason: string }>}
  */
 async function post(ctx, row, writes) {
   const island = await ctx.store.first('SELECT * FROM islands WHERE origin = ?', [row.recipient]);
   const learned = await learnIsland(ctx, row.recipient, island);
   if (!learned.ok) return { kind: learned.retry ? 'retry' : 'final', reason: learned.reason };
-  if (learned.fetched) writes.push(upsertIsland(row.recipient, ctx.now(), islandColumns(learned, ctx.now())));
+  if (learned.fetched) {
+    writes.push(upsertIsland(row.recipient, ctx.now(), islandColumns(learned, ctx.now())));
+    const keyEvent = pausedEvent(ctx, row.recipient, island, learned, ctx.now());
+    if (keyEvent) writes.push(keyEvent);
+  }
+  // A paused identity is not confirmed: the body must not leave this island.
+  if (learned.paused) return { kind: 'held', reason: `recipient-${learned.history.pauseReason ?? 'paused'}` };
   const inbox = learned.manifest.links?.inbox;
   if (typeof inbox !== 'string') return { kind: 'final', reason: 'no-inbox' };
 
@@ -146,7 +169,13 @@ export async function retryDue(ctx, limit = 5) {
   let done = 0;
   for (const row of due) {
     if (!ctx.budget.has(4)) break;
-    await attempt(ctx, /** @type {any} */ (row));
+    try {
+      await attempt(ctx, /** @type {any} */ (row));
+    } catch (error) {
+      // Out of budget before anything was posted: the row stays due.
+      if (error instanceof BudgetExceeded) break;
+      throw error;
+    }
     done += 1;
   }
   return done;

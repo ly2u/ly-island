@@ -5,9 +5,14 @@
 // - Address rules from @islands/protocol: https only, no credentials, no
 //   ports, no IP literals or local names, same origin where required.
 // - A resolver, when the platform has one (self-hosting), checks every
-//   address a name resolves to and the connection must use those addresses.
-//   On Cloudflare Workers there is no resolver: connections leave from
-//   Cloudflare's network, and Workers cannot choose the address used.
+//   address a name resolves to before connecting. That alone does not stop
+//   DNS rebinding: fetch() resolves the name again. The self-hosting
+//   adapter (phase 4) must connect to the address that was checked; until
+//   then this check is a first line only, and is not counted as protection
+//   against rebinding.
+// - On Cloudflare Workers there is no resolver: connections leave from
+//   Cloudflare's network (global_fetch_strictly_public routes every fetch as
+//   from the public internet), and Workers cannot choose the address used.
 // - GET follows at most 3 redirects on the same origin; POST follows none.
 // - Only headers built by buildOutboundHeaders(); 10 s timeout; bodies over
 //   the limit are cut off and refused.

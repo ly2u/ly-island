@@ -94,6 +94,19 @@ test('with no channels listed, the channels whose secrets are set are used', asy
   assert.equal(sent[0].body.chat_id, '42');
 });
 
+test('a digest of 200 events is confirmed within D1\'s 100 bound parameters, and sent once', async () => {
+  const { sent, ctx, record, at } = await setup({ timezone: 'UTC', digestAt: '21:00', channels: [{ type: 'telegram', chatId: '7' }] });
+  at('2026-10-14T12:00:00Z');
+  for (let i = 0; i < 200; i += 1) await record('visit.received', `visitor ${i}`);
+  at('2026-10-14T21:05:00Z');
+  assert.equal(await flushDigest(ctx), 200);
+  assert.equal(sent.length, 1);
+  assert.equal((await ctx.store.all('SELECT * FROM events WHERE sent IS NULL')).length, 0);
+  at('2026-10-14T21:20:00Z');
+  assert.equal(await flushDigest(ctx), 0, 'not again the same day');
+  assert.equal(sent.length, 1);
+});
+
 test('migrations are idempotent and versioned', async () => {
   const store = sqliteStore();
   assert.equal(await migrate(store), 0);

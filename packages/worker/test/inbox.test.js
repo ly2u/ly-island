@@ -81,6 +81,66 @@ describe('the inbox follows the protocol steps', () => {
     assert.ok(Number(limited.headers.get('retry-after')) > 0);
   });
 
+  test('concurrent copies of one delivery: one letter, one event, one share of each quota', async () => {
+    const { b, deliver, sign } = await setup();
+    assert.equal((await deliver(await sign())).status, 202); // b now knows a
+    for (const table of ['received', 'seen', 'rate', 'events']) await b.store.run(`DELETE FROM ${table}`);
+    const activity = await sign();
+    const responses = await Promise.all(Array.from({ length: 12 }, () => deliver(activity)));
+    const reasons = await Promise.all(responses.map(reason));
+    assert.deepEqual(responses.map((r) => r.status), Array(12).fill(202));
+    assert.equal(reasons.filter((r) => r === 'accepted').length, 1, reasons.join(', '));
+    assert.equal(reasons.filter((r) => r === 'duplicate').length, 11);
+    assert.equal((await b.rows('SELECT * FROM received')).length, 1);
+    assert.equal((await b.rows('SELECT * FROM events')).length, 1);
+    assert.deepEqual((await b.rows('SELECT count FROM rate ORDER BY key')).map((r) => r.count), [1, 1]);
+  });
+
+  test('concurrent different deliveries cannot pass the hourly quota', async () => {
+    const { b, deliver, sign } = await setup();
+    assert.equal((await deliver(await sign())).status, 202);
+    for (const table of ['received', 'seen', 'rate', 'events']) await b.store.run(`DELETE FROM ${table}`);
+    const activities = await Promise.all(Array.from({ length: 40 }, () => sign()));
+    const responses = await Promise.all(activities.map((activity) => deliver(activity)));
+    const statuses = responses.map((r) => r.status);
+    // a is a new island (first seen less than 7 days ago): 15 an hour.
+    assert.equal(statuses.filter((s) => s === 202).length, 15, statuses.join(' '));
+    assert.equal(statuses.filter((s) => s === 429).length, 25);
+    assert.equal((await b.rows('SELECT * FROM received')).length, 15);
+    assert.equal((await b.rows('SELECT * FROM events')).length, 15);
+    assert.equal((await b.rows("SELECT count FROM rate WHERE key = 'actor https://a.example'"))[0].count, 15);
+  });
+
+  test('concurrent islands under one registrable domain share its quota', async () => {
+    const net = network();
+    const time = clock();
+    const b = await island({ net, time, origin: 'https://b.example', seed: SEEDS.b });
+    const senders = [];
+    for (let i = 0; i < 34; i += 1) {
+      const seed = (0x40 + i).toString(16).repeat(32);
+      const origin = `https://s${i}.spam.example`;
+      await island({ net, time, origin, seed });
+      senders.push(await signed(origin, seed, b.origin, {}, time));
+    }
+    const responses = await Promise.all(senders.map((activity) =>
+      b.request('/island/inbox', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(activity) })));
+    const statuses = responses.map((r) => r.status);
+    assert.equal(statuses.filter((s) => s === 202).length, 30, statuses.join(' '));
+    assert.equal(statuses.filter((s) => s === 429).length, 4);
+    assert.equal((await b.rows("SELECT count FROM rate WHERE key = 'domain spam.example'"))[0].count, 30);
+  });
+
+  test('forged copies racing the real one cannot claim its id', async () => {
+    const { b, deliver, sign } = await setup();
+    assert.equal((await deliver(await sign())).status, 202);
+    const activity = await sign();
+    const forged = { ...activity, object: { text: '改过的' } };
+    const responses = await Promise.all([...Array.from({ length: 5 }, () => deliver(forged)), deliver(activity)]);
+    assert.deepEqual(responses.map((r) => r.status), [401, 401, 401, 401, 401, 202]);
+    const [letter] = await b.rows('SELECT activity FROM received WHERE id = ?', [activity.id]);
+    assert.equal(JSON.parse(letter.activity).object.text, '你好');
+  });
+
   test('rate limits add up all islands under one registrable domain', async () => {
     const net = network();
     const time = clock();

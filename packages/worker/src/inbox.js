@@ -6,11 +6,19 @@
 // An (actor, id) is recorded as seen only after it was verified and accepted
 // (or silently dropped for a blocked sender), so a forged copy cannot block
 // the real one.
+//
+// Acceptance is one atomic, conditional write. The reads before verifying
+// are only a cheap early answer: other requests can pass the same checks
+// while this one verifies. So the write batch first claims the (actor, id)
+// pair, but only if no one has accepted it and both hourly quotas still have
+// room, and every other write of the delivery (the letter, the quotas, the
+// event) happens only if that claim is this request's own. D1 runs a batch
+// as one transaction, one at a time per database.
 
 import { precheckDelivery, verifyActivity } from '../../protocol/src/index.js';
 import { eventStatement } from './notify.js';
 import { registrableDomain } from './psl.js';
-import { islandColumns, learnIsland, upsertIsland } from './remote.js';
+import { islandColumns, learnIsland, pausedEvent, upsertIsland } from './remote.js';
 import { clip } from './strings.js';
 
 export const INBOX_LIMITS = Object.freeze({
@@ -117,11 +125,8 @@ export async function receive(ctx, request) {
   const name = String(learned.manifest.name ?? actor);
   if (learned.fetched) {
     writes.push(upsertIsland(actor, now, islandColumns(learned, now)));
-    const wasPaused = JSON.parse(island?.history ?? 'null')?.status === 'paused';
-    if (learned.paused && !wasPaused) {
-      const keyEvent = eventStatement(ctx.policy, { type: 'key.changed', at: now, actor: { id: actor, name }, summary: ctx.strings.keyChanged(name) });
-      if (keyEvent) writes.push(keyEvent);
-    }
+    const keyEvent = pausedEvent(ctx, actor, island, learned, now);
+    if (keyEvent) writes.push(keyEvent);
   }
   if (!verdict.ok) {
     if (writes.length > 0) await ctx.store.batch(writes);
@@ -147,20 +152,57 @@ export async function receive(ctx, request) {
   const tier = island?.allowed === 1 || (following && follower) ? 'neighbor' : friendOfFriend.length > 0 ? 'friend-of-friend' : 'stranger';
   const folder = tier === 'stranger' ? 'strangers' : 'inbox';
 
+  const claim = crypto.randomUUID();
+  /** Only when this request's claim holds. */
+  const mine = ['EXISTS (SELECT 1 FROM seen WHERE actor = ? AND id = ? AND claim = ?)', [actor, id, claim]];
+  const keys = { actor: `actor ${actor}`, domain: `domain ${domain}` };
+  const count = 'COALESCE((SELECT count FROM rate WHERE key = ? AND hour = ?), 0)';
   writes.push(
-    ['INSERT INTO received (actor, id, type, folder, received, activity) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (actor, id) DO NOTHING', [actor, id, type, folder, now, JSON.stringify(activity)]],
-    ['INSERT INTO seen (actor, id, at) VALUES (?, ?, ?) ON CONFLICT (actor, id) DO UPDATE SET at = excluded.at', [actor, id, now]],
-    ['INSERT INTO rate (key, hour, count) VALUES (?, ?, 1) ON CONFLICT (key, hour) DO UPDATE SET count = count + 1', [`actor ${actor}`, hour]],
-    ['INSERT INTO rate (key, hour, count) VALUES (?, ?, 1) ON CONFLICT (key, hour) DO UPDATE SET count = count + 1', [`domain ${domain}`, hour]],
-    upsertIsland(actor, now, {}, { follower: type === 'follow' ? 1 : 0 }),
+    upsertIsland(actor, now, {}),
+    [
+      `INSERT INTO seen (actor, id, at, claim)
+       SELECT ?, ?, ?, ?
+       WHERE NOT EXISTS (SELECT 1 FROM seen WHERE actor = ? AND id = ? AND at > ?)
+         AND ${count} < ? AND ${count} < ?
+       ON CONFLICT (actor, id) DO UPDATE SET at = excluded.at, claim = excluded.claim`,
+      [actor, id, now, claim, actor, id, now - INBOX_LIMITS.seenMs, keys.actor, hour, actorLimit, keys.domain, hour, INBOX_LIMITS.perDomainHour],
+    ],
+    guarded(['INSERT INTO received (actor, id, type, folder, received, activity) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (actor, id) DO NOTHING', [actor, id, type, folder, now, JSON.stringify(activity)]], mine),
+    guarded(['INSERT INTO rate (key, hour, count) VALUES (?, ?, 1) ON CONFLICT (key, hour) DO UPDATE SET count = count + 1', [keys.actor, hour]], mine),
+    guarded(['INSERT INTO rate (key, hour, count) VALUES (?, ?, 1) ON CONFLICT (key, hour) DO UPDATE SET count = count + 1', [keys.domain, hour]], mine),
+  );
+  if (type === 'follow') writes.push([`UPDATE islands SET follower = 1 WHERE origin = ? AND ${mine[0]}`, [actor, ...mine[1]]]);
+  const event = eventFor(ctx, activity, name, tier, now);
+  if (event) writes.push(guarded(event, mine));
+  writes.push(
     ['DELETE FROM seen WHERE at < ?', [now - INBOX_LIMITS.seenMs]],
     ['DELETE FROM rate WHERE hour < ?', [hour - 48]],
+    // How it went: our claim, someone else's (a duplicate), or none (over a quota).
+    ['SELECT claim FROM seen WHERE actor = ? AND id = ?', [actor, id]],
   );
-  const event = eventFor(ctx, activity, name, tier, now);
-  if (event) writes.push(event);
-  await ctx.store.batch(writes);
-  ctx.later(ctx.flushNotifications());
-  return answer(202, 'accepted');
+  const results = await ctx.store.batch(writes);
+  const holder = results[results.length - 1][0]?.claim;
+  if (holder === claim) {
+    ctx.later(ctx.flushNotifications());
+    return answer(202, 'accepted');
+  }
+  if (holder) return answer(202, 'duplicate');
+  return answer(429, 'rate-limited', { 'retry-after': String(Math.ceil(((hour + 1) * HOUR_MS - now) / 1000)) });
+}
+
+/**
+ * Makes "INSERT INTO t (columns) VALUES (...) [rest]" happen only when
+ * `condition` holds, as "INSERT INTO t (columns) SELECT ... WHERE condition [rest]".
+ * @param {[string, unknown[]]} statement @param {[string, unknown[]]} condition
+ * @returns {[string, unknown[]]}
+ */
+export function guarded([sql, params], [condition, conditionParams]) {
+  const match = /^INSERT INTO (\w+) \(([^)]*)\) VALUES \(([^)]*)\)([\s\S]*)$/.exec(sql.trim());
+  if (!match) throw new Error(`cannot guard: ${sql}`);
+  const [, table, columns, values, rest] = match;
+  const restParams = (rest.match(/\?/g) ?? []).length;
+  const valueParams = params.slice(0, params.length - restParams);
+  return [`INSERT INTO ${table} (${columns}) SELECT ${values} WHERE ${condition}${rest}`, [...valueParams, ...conditionParams, ...params.slice(params.length - restParams)]];
 }
 
 /**

@@ -126,8 +126,13 @@ export async function ownerApi(ctx, request, url) {
         const learned = await learnIsland(ctx, target, null, { force: true });
         if (!learned.ok) return json({ error: learned.reason }, 502);
         const history = await retrust(learned.manifest, { now: new Date(now).toISOString() });
-        await ctx.store.batch([upsertIsland(target, now, { ...islandColumns(learned, now), history: JSON.stringify(history) }), ['UPDATE islands SET history = ? WHERE origin = ?', [JSON.stringify(history), target]]]);
-        return json({ ok: true });
+        const [, , released] = await ctx.store.batch([
+          upsertIsland(target, now, { ...islandColumns(learned, now), history: JSON.stringify(history) }),
+          ['UPDATE islands SET history = ? WHERE origin = ?', [JSON.stringify(history), target]],
+          // What waited for this confirmation goes out with the next run.
+          ["UPDATE sent SET status = 'pending', next_at = ? WHERE recipient = ? AND status = 'held' RETURNING id", [now, target]],
+        ]);
+        return json({ ok: true, released: released.length });
       }
       const change = columns[/** @type {keyof typeof columns} */ (body.action)];
       if (!change) return json({ error: 'invalid-action' }, 400);
@@ -204,7 +209,7 @@ function sendObject(body) {
 
 /** Everything in the store, for moving house (docs/deployment.md "互动数据导出"). @param {any} ctx */
 async function exportAll(ctx) {
-  const tables = ['islands', 'received', 'sent', 'feed', 'events', 'drafts', 'state'];
+  const tables = ['islands', 'received', 'sent', 'feed', 'tombstones', 'events', 'drafts', 'state'];
   const results = await ctx.store.batch(tables.map((table) => /** @type {[string]} */ ([`SELECT * FROM ${table}`])));
   const tokens = await ctx.store.all('SELECT scope, label, created, revoked FROM tokens');
   const body = { exported: new Date(ctx.now()).toISOString(), island: ctx.self, ...Object.fromEntries(tables.map((table, i) => [table, results[i]])), tokens };

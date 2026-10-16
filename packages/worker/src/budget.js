@@ -11,17 +11,33 @@ export class BudgetExceeded extends Error {
 
 /**
  * @param {number} limit
- * @returns {{ take(count?: number): void, has(count?: number): boolean, readonly used: number, readonly limit: number }}
+ * @returns {{ take(count?: number): void, has(count?: number): boolean, hold(count: number): () => void,
+ *   readonly used: number, readonly limit: number }}
  */
 export function budget(limit) {
   let used = 0;
+  let held = 0;
   return {
+    /** Spends from what is not held. */
     take(count = 1) {
-      if (used + count > limit) throw new BudgetExceeded();
+      if (used + held + count > limit) throw new BudgetExceeded();
       used += count;
     },
     has(count = 1) {
-      return used + count <= limit;
+      return used + held + count <= limit;
+    },
+    /**
+     * Keeps `count` aside, for example for the write that saves a run's
+     * progress, so nothing before it can spend them. Returns the release.
+     */
+    hold(count) {
+      if (used + held + count > limit) throw new BudgetExceeded();
+      held += count;
+      let released = false;
+      return () => {
+        if (!released) held -= count;
+        released = true;
+      };
     },
     get used() {
       return used;

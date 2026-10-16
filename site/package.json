@@ -14,7 +14,8 @@
     "keygen": "node scripts/keygen.mjs",
     "unlocks:save": "node scripts/unlocks.mjs",
     "dev:worker": "npm run build && node scripts/wrangler-config.mjs && wrangler dev --config wrangler.generated.json",
-    "smoke:worker": "node scripts/smoke-worker.mjs"
+    "smoke:worker": "node scripts/smoke-worker.mjs",
+    "d1:check": "node scripts/d1-check.mjs"
   },
   "dependencies": {
     "astro": "7.3.8",

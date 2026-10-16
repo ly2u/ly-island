@@ -68,6 +68,9 @@ function expect(what, actual, expected) {
 }
 
 try {
+  // The generated configuration keeps the public routing flag (two islands in one zone).
+  const generated = JSON.parse(readFileSync('wrangler.generated.json', 'utf8'));
+  expect('compatibility flag global_fetch_strictly_public', (generated.compatibility_flags ?? []).includes('global_fetch_strictly_public'), true);
   await ready();
   const manifest = JSON.parse(readFileSync('dist/.well-known/island.json', 'utf8'));
   const self = manifest.id;

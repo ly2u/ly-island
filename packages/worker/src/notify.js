@@ -181,12 +181,21 @@ export function channelRequest(channel, env, title, text, events) {
  */
 export async function flushNow(ctx) {
   if (ctx.policy.channels.length === 0 || inQuietHours(ctx.policy, ctx.now())) return 0;
+  if (!ctx.budget.has(3)) return 0;
   const rows = await ctx.store.all("SELECT id, data FROM events WHERE mode = 'now' AND sent IS NULL ORDER BY id LIMIT 10");
   if (rows.length === 0) return 0;
   const events = rows.map((row) => JSON.parse(row.data));
-  const failed = await sendToChannels(ctx, ctx.strings.notifyTitle, events.map((e) => e.summary).join('\n'), events);
+  // The write that marks them sent is held first, so what went out is recorded.
+  const release = ctx.budget.hold(1);
+  let failed;
+  try {
+    failed = await sendToChannels(ctx, ctx.strings.notifyTitle, events.map((e) => e.summary).join('\n'), events);
+  } finally {
+    release();
+  }
   if (failed.length < ctx.policy.channels.length) {
-    await ctx.store.run(`UPDATE events SET sent = ? WHERE id IN (${rows.map(() => '?').join(', ')})`, [ctx.now(), ...rows.map((row) => row.id)]);
+    // One JSON parameter instead of one per row: D1 allows 100 per statement.
+    await ctx.store.run('UPDATE events SET sent = ? WHERE id IN (SELECT value FROM json_each(?))', [ctx.now(), JSON.stringify(rows.map((row) => row.id))]);
   }
   return rows.length;
 }
@@ -197,7 +206,7 @@ export async function flushNow(ctx) {
  */
 export async function flushDigest(ctx) {
   const { date, time } = localClock(ctx.now(), ctx.policy.timeZone);
-  if (ctx.policy.channels.length === 0 || time < ctx.policy.digestAt) return 0;
+  if (ctx.policy.channels.length === 0 || time < ctx.policy.digestAt || !ctx.budget.has(3)) return 0;
   const [last, rows] = await ctx.store.batch([
     ["SELECT value FROM state WHERE key = 'digest'"],
     ["SELECT id, type, data FROM events WHERE mode = 'digest' AND sent IS NULL ORDER BY id LIMIT 200"],
@@ -209,10 +218,18 @@ export async function flushDigest(ctx) {
   if (strangers > 0) lines.push(ctx.strings.strangerCount(strangers));
   const rest = events.length - strangers - Math.min(20, events.length - strangers);
   if (rest > 0) lines.push(ctx.strings.more(rest));
-  const failed = await sendToChannels(ctx, ctx.strings.digestTitle, lines.join('\n'), events.filter((e) => e.type !== 'stranger.pending').slice(0, 20));
+  const release = ctx.budget.hold(1);
+  let failed;
+  try {
+    failed = await sendToChannels(ctx, ctx.strings.digestTitle, lines.join('\n'), events.filter((e) => e.type !== 'stranger.pending').slice(0, 20));
+  } finally {
+    release();
+  }
   if (failed.length === ctx.policy.channels.length) return 0;
+  // The checkpoint and the confirmation in one transaction. One JSON
+  // parameter for all ids: D1 allows at most 100 bound parameters.
   await ctx.store.batch([
-    [`UPDATE events SET sent = ? WHERE id IN (${rows.map(() => '?').join(', ')})`, [ctx.now(), ...rows.map((row) => row.id)]],
+    ['UPDATE events SET sent = ? WHERE id IN (SELECT value FROM json_each(?))', [ctx.now(), JSON.stringify(rows.map((row) => row.id))]],
     ["INSERT INTO state (key, value) VALUES ('digest', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value", [date]],
     ['DELETE FROM events WHERE sent IS NOT NULL AND sent < ?', [ctx.now() - 30 * 86_400_000]],
   ]);

@@ -16,7 +16,7 @@ import { encodeBase64url, importPrivateSeed, publicKeyOf } from '../../protocol/
 import { isHttpsOrigin } from '../../protocol/src/util.js';
 import { aiApi, json, ownerApi } from './api.js';
 import { aiToken, owner } from './auth.js';
-import { budget, countedStore } from './budget.js';
+import { budget, BudgetExceeded, countedStore } from './budget.js';
 import { retryDue } from './deliver.js';
 import { receive } from './inbox.js';
 import { outbound } from './net.js';
@@ -30,6 +30,8 @@ export { d1Store } from './store-d1.js';
 
 /** Subrequests one invocation may use, below the free plan's 50. */
 export const BUDGET = 45;
+/** What delivery retries leave for polling and notifications in a cron run. */
+const LEFT_AFTER_RETRIES = 30;
 
 /**
  * @param {object} options
@@ -160,14 +162,28 @@ export function createIsland({ storeFor, notify = {}, timeZone = 'UTC', fetch = 
     /** @param {unknown} _controller @param {Record<string, any>} env @param {{ waitUntil(p: Promise<unknown>): void }} executionContext */
     async scheduled(_controller, env, executionContext) {
       const ctx = await context(env, (promise) => executionContext.waitUntil(promise));
-      const report = { retried: 0, polled: /** @type {string[]} */ ([]), verified: 0, notified: 0, digest: 0, used: 0 };
+      const report = { retried: 0, polled: /** @type {string[]} */ ([]), verified: 0, notified: 0, digest: 0, stopped: false, used: 0 };
+      /** Runs one stage; running out of budget ends it quietly, the next run continues. @template T */
+      const stage = async (/** @type {() => Promise<T>} */ run, /** @type {T} */ otherwise) => {
+        try {
+          return await run();
+        } catch (error) {
+          if (!(error instanceof BudgetExceeded)) throw error;
+          report.stopped = true;
+          return otherwise;
+        }
+      };
       try {
-        report.retried = await retryDue(ctx, 3);
-        const polled = await pollNeighbors(ctx);
+        // Retries go first but cannot take what polling and notifications need.
+        const keep = ctx.budget.hold(Math.min(LEFT_AFTER_RETRIES, ctx.budget.limit - ctx.budget.used));
+        report.retried = await stage(() => retryDue(ctx, 3), 0);
+        keep();
+        const polled = await stage(() => pollNeighbors(ctx), { polled: [], verified: 0, events: 0, stopped: true });
         report.polled = polled.polled;
         report.verified = polled.verified;
-        report.notified = await flushNow(ctx);
-        report.digest = await flushDigest(ctx);
+        report.stopped ||= polled.stopped;
+        report.notified = await stage(() => flushNow(ctx), 0);
+        report.digest = await stage(() => flushDigest(ctx), 0);
       } finally {
         report.used = ctx.budget.used;
         console.log('island cron', JSON.stringify(report));
