@@ -1,0 +1,28 @@
+---
+// The owner's desk. Served only through the island service, which checks the
+// Cloudflare Access login first (docs/deployment.md). The page itself holds
+// no data: the script loads everything from /island/api.
+import Base from '../../../layouts/Base.astro';
+import { island } from '../../../lib/island.js';
+import { strings } from '../../../lib/i18n.js';
+import '../../../styles/admin.css';
+
+const { config } = await island();
+const a = strings(config.language[0]).admin;
+const tabs = ['inbox', 'feed', 'islands', 'compose', 'sent', 'drafts', 'settings'] as const;
+---
+<Base title={a.title} noindex>
+  <div class="admin" data-admin data-strings={JSON.stringify(a)}>
+    <h1>{a.title}</h1>
+    <noscript><p>{a.needsScript}</p></noscript>
+    <nav class="admin-tabs" aria-label={a.title}>
+      {tabs.map((tab) => <a href={`#${tab}`} data-tab={tab}>{a.tabs[tab]}</a>)}
+    </nav>
+    <p class="admin-status" data-status role="status" aria-live="polite"></p>
+    <div class="admin-view" data-view></div>
+  </div>
+</Base>
+
+<script>
+  import '../../../admin/app.js';
+</script>

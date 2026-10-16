@@ -1,6 +1,7 @@
 ---
 import { render } from 'astro:content';
 import Base from '../../layouts/Base.astro';
+import ReplyForm from '../../components/ReplyForm.astro';
 import { island } from '../../lib/island.js';
 import { strings } from '../../lib/i18n.js';
 
@@ -34,5 +35,6 @@ const t = strings(config.language[0]);
       <Content />
     </div>
   </article>
+  <ReplyForm url={record.url} />
   <p><a href="/">{t.back}</a></p>
 </Base>

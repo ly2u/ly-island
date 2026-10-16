@@ -1,18 +1,45 @@
-// The island as a static-assets-only Worker: no Worker code runs and static
-// requests do not count against the free plan's request limit.
-// Bind the island's own domain in the Cloudflare dashboard (Worker, Settings,
-// Domains & Routes). See README.md.
+// The island on Cloudflare: static pages from ./dist, plus the island
+// service (worker/index.js) for the inbox, the owner's pages and API, and
+// the cron. Static requests never run Worker code.
+//
+// Deploy with `npm run deploy`, which writes wrangler.generated.json from
+// this file with the values that differ per island (cron minutes from
+// hash(origin), Worker and database names) and deploys that.
+// Bind the island's own domain in the Cloudflare dashboard (Worker,
+// Settings, Domains & Routes). See README.md.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "island",
+  "main": "worker/index.js",
   "compatibility_date": "2026-09-01",
+  // fetch() leaves through Cloudflare's front door, as if from the public
+  // internet. Without it, a fetch to a host in the Worker's own zone goes to
+  // the zone's origin and skips the Worker mapped there, so two islands on
+  // one domain (dev.rqly.com and dev2.rqly.com) could not reach each other.
+  // No compatibility date turns it on by itself.
+  "compatibility_flags": ["global_fetch_strictly_public"],
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
-    "not_found_handling": "404-page"
+    "not_found_handling": "404-page",
+    "run_worker_first": [
+      "/island/inbox",
+      "/island/go",
+      "/island/compose",
+      "/island/admin",
+      "/island/admin/*",
+      "/island/api/*",
+      "/island/ai/*"
+    ]
   },
-  // Only the island's own domain serves it. Preview and workers.dev addresses
-  // stay off (docs/deployment.md, "关掉或保护所有备用入口").
+  // Created on the first deploy when it does not exist yet; the service
+  // creates its own tables.
+  "d1_databases": [{ "binding": "ISLAND_DB", "database_name": "island-data" }],
+  // Variables set in the dashboard (ACCESS_TEAM_DOMAIN, ACCESS_AUD) survive deploys.
+  "keep_vars": true,
+  // Only the island's own domain serves it. Preview and workers.dev
+  // addresses stay off (docs/deployment.md, "关掉或保护所有备用入口").
   "workers_dev": false,
   "preview_urls": false
 }

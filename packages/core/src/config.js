@@ -14,6 +14,8 @@ export const TEST_ORIGIN = 'https://example.org';
 export const TEST_SEED = '11'.repeat(32);
 export const DEFAULT_COLORS = Object.freeze(['#6fa8dc', '#f6b26b']);
 const KEY_NAME = /^[A-Za-z0-9._-]{1,64}$/;
+/** What the inbox takes from whom; bottles (pickup) come with phase 3. */
+export const DEFAULT_ACCEPTS = Object.freeze({ follow: 'signed', visit: 'signed', message: 'signed', water: 'signed', pickup: 'none' });
 const LANGUAGE = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/;
 
 export class ConfigError extends Error {
@@ -37,6 +39,7 @@ export class ConfigError extends Error {
  * @property {boolean} discoverable
  * @property {{ read: boolean, train: boolean }} ai
  * @property {string} keyName
+ * @property {{ enabled: boolean, accepts: Record<string, 'none' | 'friends' | 'signed'> }} interactions
  */
 
 /** @param {unknown} value */
@@ -57,7 +60,7 @@ export function islandConfig(raw, env = {}, { themes } = {}) {
   /** @type {string[]} */
   const problems = [];
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) throw new ConfigError(['the file must hold a JSON object']);
-  const known = ['$comment', 'origin', 'name', 'summary', 'language', 'timeZone', 'theme', 'appearance', 'growth', 'discoverable', 'ai', 'keyName'];
+  const known = ['$comment', 'origin', 'name', 'summary', 'language', 'timeZone', 'theme', 'appearance', 'growth', 'discoverable', 'ai', 'keyName', 'interactions'];
   for (const key of Object.keys(raw)) if (!known.includes(key)) problems.push(`unknown setting ${key}`);
 
   const origin = env.ISLAND_ORIGIN || raw.origin;
@@ -97,6 +100,17 @@ export function islandConfig(raw, env = {}, { themes } = {}) {
   const keyName = raw.keyName ?? 'k1';
   if (typeof keyName !== 'string' || !KEY_NAME.test(keyName)) problems.push('keyName must be 1 to 64 letters, digits, ".", "_" or "-"');
 
+  const interactions = raw.interactions ?? {};
+  const enabled = interactions.enabled ?? true;
+  if (typeof enabled !== 'boolean') problems.push('interactions.enabled must be true or false');
+  const accepts = { ...DEFAULT_ACCEPTS };
+  for (const [type, value] of Object.entries(interactions.accepts ?? {})) {
+    if (!Object.hasOwn(DEFAULT_ACCEPTS, type)) problems.push(`interactions.accepts: unknown activity type ${type}`);
+    else if (!['none', 'friends', 'signed'].includes(/** @type {string} */ (value))) problems.push(`interactions.accepts.${type} must be none, friends or signed`);
+    else if (type === 'pickup' && value !== 'none') problems.push('interactions.accepts.pickup stays none until drift bottles exist (phase 3)');
+    else accepts[/** @type {keyof typeof DEFAULT_ACCEPTS} */ (type)] = /** @type {'signed'} */ (value);
+  }
+
   if (problems.length > 0) throw new ConfigError(problems);
   return {
     origin,
@@ -110,6 +124,7 @@ export function islandConfig(raw, env = {}, { themes } = {}) {
     discoverable,
     ai: { read: ai.read, train: ai.train },
     keyName,
+    interactions: { enabled, accepts },
   };
 }
 

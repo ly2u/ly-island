@@ -1,0 +1,11 @@
+{
+  "quietHours": ["23:00", "08:00"],
+  "digestAt": "21:00",
+  "rules": {
+    "message.received": "now",
+    "key.changed": "now",
+    "neighbor.posted": "digest",
+    "reminder.record": "off"
+  },
+  "channels": []
+}

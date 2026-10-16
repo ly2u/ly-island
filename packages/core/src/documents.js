@@ -160,7 +160,9 @@ export async function buildIsland({ config, records, friends, ledger, signer, so
       outbox: `${origin}/island/outbox.json`,
       friends: `${origin}/island/friends.json`,
       feed: `${origin}/feed.xml`,
+      ...(config.interactions?.enabled ? { inbox: `${origin}/island/inbox`, compose: `${origin}/island/compose` } : {}),
     },
+    ...(config.interactions?.enabled ? { accepts: config.interactions.accepts } : {}),
     appearance: config.appearance,
     stats: {
       ...stats,

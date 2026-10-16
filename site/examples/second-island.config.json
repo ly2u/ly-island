@@ -1,0 +1,14 @@
+{
+  "$comment": "A second test island built from the same repository (docs/deployment.md, \"第二座测试岛\"). Build with ISLAND_CONFIG=examples/second-island.config.json and set ISLAND_ORIGIN to its address. It shares the example records; its own key, Worker and database keep it separate.",
+  "origin": "https://example.net",
+  "name": "Second test island",
+  "summary": "A test island for trying visits, messages and notifications between two islands. Everything here is made up.",
+  "language": ["en"],
+  "timeZone": "Europe/Berlin",
+  "theme": "text",
+  "appearance": { "seed": "second-test-island", "colors": ["#2e7d32", "#f9a825"] },
+  "growth": { "rules": "default@0", "config": {} },
+  "discoverable": false,
+  "ai": { "read": false, "train": false },
+  "keyName": "k1"
+}
