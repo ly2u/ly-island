@@ -79,6 +79,20 @@ test('a calendar day starts at local midnight, or at the first instant a clock c
   // Cuba moves its clocks at midnight: 2026-03-08 begins at 01:00 local.
   assert.equal(iso(startOfDay('2026-03-08', 'America/Havana')), '2026-03-08T05:00:00.000Z');
   assert.equal(iso(startOfDay('0099-01-01', 'UTC')), '0099-01-01T00:00:00.000Z');
+  assert.equal(localDate(new Date('0099-01-01T00:00:00Z'), 'UTC'), '0099-01-01');
+  // Amman went back from 01:00 to 00:00 on 2021-10-29: the day starts at the first midnight.
+  assert.equal(iso(startOfDay('2021-10-29', 'Asia/Amman')), '2021-10-28T21:00:00.000Z');
+  assert.equal(localDate(new Date(Date.parse('2021-10-28T21:00:00Z') - 1000), 'Asia/Amman'), '2021-10-28');
+  // Samoa skipped 2011-12-30 entirely: that day does not exist there.
+  assert.throws(() => startOfDay('2011-12-30', 'Pacific/Apia'), /2011-12-30 does not exist in Pacific\/Apia/);
+  assert.equal(iso(startOfDay('2011-12-31', 'Pacific/Apia')), '2011-12-30T10:00:00.000Z');
+  assert.equal(iso(startOfDay('2011-12-29', 'Pacific/Apia')), '2011-12-29T10:00:00.000Z');
+  // The result is always the first second of the requested day.
+  for (const [day, zone] of [['2021-10-29', 'Asia/Amman'], ['2026-03-08', 'America/Havana'], ['2026-11-01', 'America/Havana'], ['2026-10-05', 'Pacific/Chatham'], ['2026-10-05', 'Etc/GMT+12'], ['2026-10-05', 'Pacific/Kiritimati']]) {
+    const start = startOfDay(day, zone);
+    assert.equal(localDate(new Date(start), zone), day, `${day} ${zone}`);
+    assert.ok(localDate(new Date(start - 1000), zone) < day, `${day} ${zone}: an earlier second is already that day`);
+  }
   assert.equal(dateTime('2026-10-05', 'Asia/Shanghai'), '2026-10-04T16:00:00Z');
   assert.equal(dateTime('2026-10-05'), '2026-10-05T00:00:00Z');
 });

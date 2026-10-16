@@ -27,6 +27,29 @@ export function isRecordDate(value) {
     && Number.isFinite(Date.parse(value));
 }
 
+/** @type {Map<string, Intl.DateTimeFormat>} */
+const formatters = new Map();
+
+/** A cached formatter for wall-clock parts in a time zone (creating one is slow). @param {string} timeZone */
+function formatter(timeZone) {
+  let format = formatters.get(timeZone);
+  if (!format) {
+    format = new Intl.DateTimeFormat('en-CA', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    formatters.set(timeZone, format);
+  }
+  return format;
+}
+
+/** Wall-clock parts of an instant in a time zone, as numbers. @param {number} time @param {string} timeZone */
+function wallParts(time, timeZone) {
+  /** @type {Record<string, number>} */
+  const parts = {};
+  for (const part of formatter(timeZone).formatToParts(new Date(time))) {
+    if (part.type !== 'literal') parts[part.type] = Number(part.value);
+  }
+  return parts;
+}
+
 /** @param {string} timeZone */
 export function isTimeZone(timeZone) {
   try {
@@ -53,37 +76,58 @@ export function localDate(value, timeZone = 'UTC') {
     value = new Date(value);
   }
   if (!(value instanceof Date) || Number.isNaN(value.getTime())) throw new RangeError(`not a date: ${String(value)}`);
-  const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' })
-    .formatToParts(value)
-    .reduce((acc, part) => ({ ...acc, [part.type]: part.value }), /** @type {Record<string, string>} */ ({}));
-  return `${parts.year}-${parts.month}-${parts.day}`;
+  const { year, month, day } = wallParts(value.getTime(), timeZone);
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
 /** Wall-clock time in a time zone minus UTC, in milliseconds, at an instant. @param {number} time @param {string} timeZone */
 function zoneOffset(time, timeZone) {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('en-CA', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
-      .formatToParts(new Date(time))
-      .map((part) => [part.type, part.value]),
-  );
+  const parts = wallParts(time, timeZone);
   const wall = new Date(0);
-  wall.setUTCFullYear(Number(parts.year), Number(parts.month) - 1, Number(parts.day)); // Date.UTC would read years 0-99 as 19xx
-  wall.setUTCHours(Number(parts.hour), Number(parts.minute), Number(parts.second), 0);
+  wall.setUTCFullYear(parts.year, parts.month - 1, parts.day); // Date.UTC would read years 0-99 as 19xx
+  wall.setUTCHours(parts.hour, parts.minute, parts.second, 0);
   return wall.getTime() - Math.floor(time / 1000) * 1000;
 }
 
+const HOUR_MS = 3_600_000;
+// Every UTC offset in use lies between -12:00 and +14:00, so the start of a
+// local day is within this window around its "as if UTC" midnight.
+const EARLIEST_OFFSET = -12 * HOUR_MS;
+const LATEST_OFFSET = 14 * HOUR_MS;
+
 /**
- * The first instant of a calendar day in a time zone, in milliseconds.
- * Where a clock change skips midnight, the first instant that day has.
+ * The earliest instant whose local date in `timeZone` is `date`, in milliseconds.
+ * - Usually local midnight.
+ * - When clocks go back over midnight, 00:00 happens twice: the first one.
+ * - When clocks jump over midnight, the first instant the day has.
+ * - When the whole local day was skipped (Pacific/Apia, 2011-12-30), a
+ *   RangeError: the day does not exist there.
  * @param {string} date YYYY-MM-DD @param {string} [timeZone]
  */
 export function startOfDay(date, timeZone = 'UTC') {
   if (!isCalendarDate(date)) throw new RangeError(`not a date: ${JSON.stringify(date)}`);
-  const midnight = dayNumber(date) * DAY_MS;
-  let time = midnight - zoneOffset(midnight, timeZone);
-  time = midnight - zoneOffset(time, timeZone);
-  for (let step = 0; step < 96 && localDate(new Date(time), timeZone) < date; step += 1) time += 15 * 60 * 1000;
-  return time;
+  const midnight = dayNumber(date) * DAY_MS; // local 00:00 written as if it were UTC
+  const local = (/** @type {number} */ time) => localDate(new Date(time), timeZone);
+
+  // Every offset in force around that day; each one that maps 00:00 back to
+  // itself is a real local midnight. Two of them mean clocks went back over it.
+  const offsets = new Set();
+  for (let hours = -36; hours <= 36; hours += 6) offsets.add(zoneOffset(midnight + hours * HOUR_MS, timeZone));
+  const midnights = [...offsets].map((offset) => midnight - offset).filter((time) => time + zoneOffset(time, timeZone) === midnight);
+  if (midnights.length > 0) return Math.min(...midnights);
+
+  // No local midnight: search for the first second whose local date is not
+  // before the requested day, between an instant surely still the day before
+  // and one surely already that day or later.
+  let before = midnight - LATEST_OFFSET - HOUR_MS;
+  let after = midnight - EARLIEST_OFFSET + HOUR_MS;
+  while (after - before > 1000) {
+    const middle = before + Math.floor((after - before) / 2000) * 1000;
+    if (local(middle) < date) before = middle;
+    else after = middle;
+  }
+  if (local(after) !== date) throw new RangeError(`${date} does not exist in ${timeZone}: the clocks skipped that day`);
+  return after;
 }
 
 /**

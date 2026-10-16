@@ -117,12 +117,20 @@ export function normalizeRecords(inputs, { origin, timeZone, language }) {
     /** @param {Date | string | undefined} value @param {string} field */
     const day = (value, field) => {
       if (value === undefined) return undefined;
+      let local;
       try {
-        return localDate(value, timeZone);
+        local = localDate(value, timeZone);
       } catch {
         issue(`${field} is not a date`);
         return undefined;
       }
+      try {
+        dateTime(value, timeZone); // a date without a time must exist in the island's time zone
+      } catch (error) {
+        issue(`${field}: ${/** @type {Error} */ (error).message}`);
+        return undefined;
+      }
+      return local;
     };
     const date = day(input.date, 'date');
     if (input.date === undefined) issue('date is required');

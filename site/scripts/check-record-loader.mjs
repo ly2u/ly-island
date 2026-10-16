@@ -20,8 +20,9 @@ try {
   cpSync(join(repo, 'site/node_modules'), join(site, 'node_modules'), { recursive: true });
   const recordDir = join(site, 'content/records');
   const settings = JSON.parse(readFileSync(join(site, 'island.config.json'), 'utf8'));
-  settings.timeZone = 'America/Los_Angeles';
-  writeFileSync(join(site, 'island.config.json'), JSON.stringify(settings));
+  const zone = (/** @type {string} */ timeZone) =>
+    writeFileSync(join(site, 'island.config.json'), JSON.stringify({ ...settings, timeZone }));
+  zone('America/Los_Angeles');
   const reset = () => {
     rmSync(recordDir, { recursive: true, force: true });
     mkdirSync(recordDir, { recursive: true });
@@ -83,7 +84,41 @@ try {
   const deletion = outbox.items.find((item) => item.type === 'delete');
   assert.equal(deletion.published, '2026-10-05T00:00:00Z');
   assert.ok(readFileSync(join(site, 'dist/records/finished/index.html'), 'utf8').includes('datetime="2026-10-04">2026-10-04</time>'));
-  console.log(`record loader: ${cases} failing-build cases rejected; leap day, date-only, offsets, UTC midnight, lifecycle dates and year boundary passed`);
+
+  // Clock changes at midnight. Samoa skipped 2011-12-30: a date that does not
+  // exist there fails instead of being signed as the next day.
+  zone('Pacific/Apia');
+  reset();
+  record('skipped-day.md', 'date: 2011-12-30');
+  const skipped = build();
+  assert.notEqual(skipped.status, 0, 'a day Pacific/Apia skipped was accepted');
+  assert.match(skipped.output, /2011-12-30 does not exist in Pacific\/Apia/);
+  cases++;
+
+  // Amman repeated 00:00-01:00 on 2021-10-29: an update in the first hour is after the day began.
+  zone('Asia/Amman');
+  reset();
+  record('first-hour.md', 'date: 2021-10-29\nupdated: 2021-10-29T00:30:00+03:00');
+  const amman = build();
+  assert.equal(amman.status, 0, amman.output);
+  const ammanPost = JSON.parse(readFileSync(join(site, 'dist/island/outbox.json'), 'utf8')).items.find((item) => item.type === 'post');
+  assert.equal(ammanPost.published, '2021-10-28T21:00:00Z');
+  assert.equal(ammanPost.updated, '2021-10-28T21:30:00Z');
+
+  // Shanghai: a timed date with same-day dates, and a date with an early-morning update.
+  zone('Asia/Shanghai');
+  reset();
+  record('timed-then-dates.md', 'date: 2026-10-05T20:00:00+08:00\ndone: 2026-10-05\nwithdrawn: 2026-10-05');
+  record('date-then-morning.md', 'date: 2026-10-05\nupdated: 2026-10-05T06:00:00+08:00');
+  const shanghai = build();
+  assert.equal(shanghai.status, 0, shanghai.output);
+  const shanghaiItems = JSON.parse(readFileSync(join(site, 'dist/island/outbox.json'), 'utf8')).items;
+  assert.equal(shanghaiItems.find((item) => item.type === 'delete').published, '2026-10-05T12:00:00Z');
+  const morning = shanghaiItems.find((item) => item.type === 'post');
+  assert.equal(morning.published, '2026-10-04T16:00:00Z');
+  assert.equal(morning.updated, '2026-10-04T22:00:00Z');
+
+  console.log(`record loader: ${cases} failing-build cases rejected; leap day, date-only, offsets, UTC midnight, lifecycle dates, year boundary, Amman's repeated midnight and Shanghai's mixed dates passed`);
 } finally {
   rmSync(scratch, { recursive: true, force: true });
 }

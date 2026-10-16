@@ -115,3 +115,18 @@ test('a date without a time is that whole local day', () => {
   assert.throws(() => one({ date: '2026-10-05', updated: '2026-10-05' }), /updated must be later than date/);
   assert.throws(() => one({ date: '2026-10-05', updated: '2026-10-04' }), /updated cannot be before date/);
 });
+
+test('days at clock changes: the first midnight counts, and a skipped day is an error', () => {
+  const at = (/** @type {string} */ timeZone, /** @type {Record<string, unknown>} */ extra) =>
+    normalizeRecords([{ slug: 'a', kind: 'article', title: 't', html: '<p>x</p>', ...extra }], { ...options, timeZone })[0];
+  // Amman: 00:30 in the first hour of 2021-10-29 is after the day began.
+  const amman = at('Asia/Amman', { date: '2021-10-29', updated: '2021-10-29T00:30:00+03:00' });
+  assert.equal(amman.published, '2021-10-28T21:00:00Z');
+  assert.equal(amman.updated, '2021-10-28T21:30:00Z');
+  // Samoa skipped 2011-12-30: reported with the other problems, not signed as the next day.
+  assert.throws(
+    () => at('Pacific/Apia', { date: '2011-12-30' }),
+    (error) => error instanceof RecordError && /a: date: 2011-12-30 does not exist in Pacific\/Apia/.test(error.problems.join('\n')),
+  );
+  assert.throws(() => at('Pacific/Apia', { date: '2011-12-29', withdrawn: '2011-12-30' }), /withdrawn: 2011-12-30 does not exist/);
+});
