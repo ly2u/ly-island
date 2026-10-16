@@ -111,8 +111,14 @@ try {
   let cron = await request(`/cdn-cgi/local/scheduled?cron=${encodeURIComponent('* * * * *')}`);
   if (cron.status === 404) cron = await request(`/__scheduled?cron=${encodeURIComponent('* * * * *')}`);
   expect('cron run', cron.status, 200);
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-  expect('cron report', log, /island cron \{"retried":0,"polled":\[\],"verified":0,.*"used":\d+\}/);
+  // The example island follows https://neighbor.example, which does not
+  // exist: the run tries it, fails quietly, and stays within the budget.
+  const deadline = Date.now() + 10_000;
+  while (!/island cron \{.*\}/.test(log) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 200));
+  const line = /island cron (\{.*\})/.exec(log)?.[1];
+  const report = line ? JSON.parse(line) : null;
+  expect('cron report', line, /"polled":\["https:\/\/neighbor\.example"\]/);
+  expect('cron stays within the budget of 45', report !== null && report.used <= 45, true);
 } catch (error) {
   problems.push(String(/** @type {Error} */ (error).message));
 } finally {
