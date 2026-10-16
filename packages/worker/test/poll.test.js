@@ -36,6 +36,11 @@ test('a first sync reads every page quietly; later posts, edits and withdrawals 
   const quiet = await a.cron();
   assert.deepEqual([quiet.polled, quiet.verified], [[b.origin], 0]);
 
+  // Not due again yet, so cron leaves it; the owner's "sync now" does not wait.
+  assert.deepEqual((await a.cron()).polled, []);
+  const owner = ownerCall(a, await team.token(team.claims(time.now())));
+  assert.deepEqual((await (await owner('/island/api/poll', {})).json()).polled, [b.origin]);
+
   // A new record.
   await b.republish((list) => [...list, { slug: 'fresh', kind: 'note', date: '2026-10-15', html: '<p>新的一条</p>', summary: '新的一条' }]);
   time.advance(DAY + 3_600_000);

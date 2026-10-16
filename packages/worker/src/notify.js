@@ -6,6 +6,9 @@
 // and sent once a day at digestAt), or "off" (not recorded).
 // Channel secrets come from the platform's secrets, never from the policy:
 // TELEGRAM_BOT_TOKEN, NTFY_TOPIC (and optional NTFY_TOKEN), WEBHOOK_URL.
+// When the policy lists no channels, every channel whose secrets are set is
+// used (TELEGRAM_CHAT_ID and NTFY_SERVER may then come from the same
+// settings), so an island built from a shared repository needs no commit.
 
 import { checkOutboundUrl } from '../../protocol/src/index.js';
 
@@ -62,6 +65,20 @@ export function checkPolicy(raw = {}, defaultTimeZone = 'UTC') {
   }
   if (problems.length > 0) throw new TypeError(`island/notify.json: ${problems.join('; ')}`);
   return { timeZone, quietHours: quiet, digestAt, rules, channels };
+}
+
+/**
+ * The channels to use: the policy's, or else those whose secrets are set.
+ * @param {Record<string, any>[]} listed @param {Record<string, any>} env
+ */
+export function channelsFor(listed, env) {
+  if (listed.length > 0) return listed;
+  /** @type {Record<string, any>[]} */
+  const found = [];
+  if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID) found.push({ type: 'telegram' });
+  if (env.NTFY_TOPIC) found.push({ type: 'ntfy', ...(env.NTFY_SERVER ? { server: String(env.NTFY_SERVER) } : {}) });
+  if (env.WEBHOOK_URL) found.push({ type: 'webhook' });
+  return found;
 }
 
 /** Local "HH:MM" and date in a time zone. @param {number} now @param {string} timeZone */
@@ -133,11 +150,12 @@ export async function sendToChannels(ctx, title, text, events) {
  */
 export function channelRequest(channel, env, title, text, events) {
   if (channel.type === 'telegram') {
-    if (!env.TELEGRAM_BOT_TOKEN || !channel.chatId) return null;
+    const chatId = channel.chatId ?? env.TELEGRAM_CHAT_ID;
+    if (!env.TELEGRAM_BOT_TOKEN || !chatId) return null;
     return {
       url: `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ chat_id: channel.chatId, text: `${title}\n${text}`, disable_web_page_preview: true }),
+      body: JSON.stringify({ chat_id: chatId, text: `${title}\n${text}`, disable_web_page_preview: true }),
     };
   }
   if (channel.type === 'ntfy') {

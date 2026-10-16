@@ -1,7 +1,7 @@
 # 部署
 
-- **状态：** 第 1 阶段，静态部分已实现（`site/`）
-- **日期：** 2026-10-13，2026-10-15 更新
+- **状态：** 静态部分已实现（第 1 阶段，`site/`）；岛务 Worker 已实现，待审查（第 2 阶段，`packages/worker/`、`site/worker/`）
+- **日期：** 2026-10-13，2026-10-15、2026-10-16 更新
 
 **目标：** 普通人点一个按钮，就能在 Cloudflare 免费档上拥有一座岛；想自己托管的人，用同一套代码跑在自己的服务器上。
 
@@ -138,17 +138,18 @@
 免费条款是一家公司定的，随时可能变。所以：
 
 - **协议和静态页面不依赖任何平台。**
-- **岛务 Worker 用 Hono 编写。** Hono 是一个成熟的轻量框架，同一份代码能跑在 Cloudflare Workers 和 Node.js 上。
+- **岛务服务是一个 Web 标准的处理函数** `{ fetch, scheduled }`，不依赖任何框架和平台（`packages/worker/`）。原计划用 Hono，实现时改成了不用框架，这是对[决定 F4](decisions.md#f4-部署目标已定) 的修改提议，等站主确认。
 - **平台相关的部分只留在适配层：**
 
   | 能力 | Cloudflare | 自托管 |
   |---|---|---|
-  | 数据库 | D1 | SQLite |
+  | 数据库 | D1（`store-d1.js`） | SQLite，Node 自带的 `node:sqlite`（`store-node.js`） |
   | 定时任务 | Cron Triggers | 进程内定时器或 systemd timer |
   | 凭据 | Worker secrets | 环境变量文件 |
   | 站主登录 | Cloudflare Access | 反向代理层的访问控制或通行密钥 |
+  | 出站地址检查 | 平台的网络 | 先解析域名，拒绝内网地址，再连接（`resolver` 参数） |
 
-- **CI 同时测两种适配层。**
+- **两种数据库适配层用同一套接口**（`all`、`first`、`run`、`batch`）。Node 里的测试用 SQLite 跑完整的多岛场景；CI 另外在 workerd 里（`wrangler dev`，本地 D1）跑一遍冒烟测试。
 
 Cloudflare 是"推荐的一键部署"，不是"唯一能跑的地方"。
 
@@ -167,8 +168,8 @@ Cloudflare 是"推荐的一键部署"，不是"唯一能跑的地方"。
 
 - 一个独立的 Cloudflare Worker 项目，从 `framework` 分支构建部署，绑定自定义域名 dev.rqly.com。
 - rqly.com 的 DNS 已经在 Cloudflare，加一个子域名不影响 rqly.com 本身，也不经过 VPS、Caddy 和 `scripts/release.py`。
-- 第 2 阶段再部署第二座测试岛（例如 dev2.rqly.com），用来测试邻居、投递和漂流瓶。
-- 后台路径（第 2 阶段才有）用 Cloudflare Access 保护，只允许站主。
+- 第二座测试岛 dev2.rqly.com 用来测试邻居、投递和漂流瓶，见下文第 2 阶段的清单。
+- 岛务的站主路径用 Cloudflare Access 保护，只允许站主。
 - 测试数据只用合成内容，不用真实文章和私信，这和 ly-island 仓库现有的规则一致。dev.rqly.com 显示的就是 `site/content/` 里的示例记录。
 
 ### 站主操作清单
@@ -226,6 +227,96 @@ npm run keygen
 
 **出了问题：** 在 Deployments 里回滚到上一个版本即可。静态岛没有数据库，回滚不丢东西。
 
+### 第 2 阶段：岛务 Worker
+
+第 2 阶段的模块 PR 合并进 `framework` 之后做，在第 1 阶段的 Worker 上继续。同样只在 Cloudflare 控制台操作。
+
+**1. 改部署命令：** Worker → Settings → Build：
+
+| 设置 | 值 |
+|---|---|
+| 构建命令 | `npm run build`（不变） |
+| 部署命令 | `npm run deploy` |
+
+`npm run deploy` 先按本岛地址生成 `wrangler.generated.json`，再部署。生成的配置里有：
+
+- 定时任务：每小时 4 次，分钟由 `hash(本岛 origin)` 决定。dev.rqly.com 是 `8,23,38,53 * * * *`；
+- D1 数据库 `island-data`：第一次部署时自动创建并绑定，不用手动建，也不用填 ID。服务第一次运行时自己建表；
+- 变量 `ISLAND_TIME_ZONE`：取自设置里的时区，用于通知的免打扰时段和摘要时间。
+
+**2. 运行时密钥：** Worker → Settings → **Variables and secrets**。这是运行时的设置，和第 1 阶段的构建密钥是两处，都要填。
+
+| 名称 | 类型 | 值 |
+|---|---|---|
+| `ISLAND_SIGNING_KEY` | Secret | 和构建密钥相同的 64 位十六进制。没有它，岛能收信但不能寄信 |
+| `ACCESS_TEAM_DOMAIN` | Text | 第 3 步的团队域名，例如 `myteam.cloudflareaccess.com` |
+| `ACCESS_AUD` | Text | 第 3 步应用的 AUD 标签。分在几个应用里时，用逗号隔开 |
+| `NTFY_TOPIC` | Secret | 可选，见第 4 步 |
+
+`wrangler.jsonc` 设了 `keep_vars: true`，部署不会清掉在控制台里加的变量。
+
+**3. 用 Cloudflare Access 保护站主路径：** Zero Trust → Access → Applications → Add an application → Self-hosted。
+
+- **要保护的路径**（Path 末尾的 `*` 覆盖下面的所有路径）：
+  - `dev.rqly.com/island/admin*`
+  - `dev.rqly.com/island/api*`
+  - `dev.rqly.com/island/compose*`
+- 一个应用里能加几个地址，就都加进同一个应用；不能的话分成几个应用，把各自的 AUD 标签都填进 `ACCESS_AUD`。
+- **策略：** Allow，Include → Emails → 只填站主自己的邮箱。
+- **不要保护这些路径，**它们本来就是公开的，或者有自己的凭据：`/island/inbox`（别的岛投递）、`/island/go`（访客的回信入口）、`/island/ai/*`（AI 令牌）、所有静态页面。不要开"保护整个 Worker"，那会把收件箱也挡住。
+- 应用的 AUD 标签在应用的概览里；团队域名在 Zero Trust → Settings → Custom pages 里。
+- 服务自己会再验证一次 Access 的令牌（签名、`iss`、`aud`、时间）。Access 漏配时，站主路径只会拒绝所有人，不会放人进来。
+
+**4. 通知（可选）：** `site/island/notify.json` 里没有列渠道时，设了密钥的渠道都会用上，不用改仓库。
+
+- **ntfy：** 想一个别人猜不到的长主题名，设成 `NTFY_TOPIC`，在手机的 ntfy 应用里订阅它。
+- **Telegram：** `TELEGRAM_BOT_TOKEN`（Secret）和 `TELEGRAM_CHAT_ID`。
+- **webhook：** `WEBHOOK_URL`（Secret），会收到 `{ title, text, events }`。
+
+**5. 部署并检查：** 在 Deployments 里重试，或者等下一次合并。然后：
+
+- 打开 https://dev.rqly.com/island/admin/，应先跳到 Access 登录页。登录后到"设置"：
+  - 显示"可以寄信"，说明运行时密钥和名片一致；
+  - 点"发一条测试通知"，手机应该收到。
+- 在任意电脑上：
+
+  ```bash
+  curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'content-type: application/json' -d '{}' https://dev.rqly.com/island/inbox   # 400
+  curl -s -o /dev/null -w '%{http_code}\n' https://dev.rqly.com/island/ai/inbox                                                      # 401
+  ```
+
+- Worker → Logs：每 15 分钟一行 `island cron {...}`，其中 `used` 是这次用掉的外部请求数，应当不超过 45。
+
+**6. 第二座测试岛 dev2.rqly.com：** 同一个仓库再建一个 Worker，按第 1 阶段的第 2 到 6 步和本节的第 1 到 5 步做，不同的地方：
+
+| 设置 | 值 |
+|---|---|
+| Worker 名称 | `island-dev2` |
+| 构建变量 `ISLAND_CONFIG` | `examples/second-island.config.json`（英文界面、纯文字主题、柏林时区） |
+| 构建变量 `ISLAND_ORIGIN` | `https://dev2.rqly.com` |
+| 构建变量 `ISLAND_WORKER_NAME` | `island-dev2`（数据库随之叫 `island-dev2-data`，两座岛的数据不会混） |
+| 构建密钥和运行时密钥 `ISLAND_SIGNING_KEY` | 另跑一次 `npm run keygen` 得到的新钥匙，不和 dev.rqly.com 共用 |
+| Access | 把 `dev2.rqly.com/island/admin*` 等三个路径加进第 3 步的应用，或另建一个 |
+| 自定义域名 | `dev2.rqly.com` |
+
+**7. 两座岛之间的验收：**
+
+| 做什么 | 预期 |
+|---|---|
+| 在 dev2 的岛务"岛屿"里关注 `https://dev.rqly.com` | dev 还没关注 dev2，所以这条关注在 dev 的"陌生来信"里；当天的摘要只说陌生来信有几封 |
+| 在 dev 的岛务里回关 dev2 | 两边互为邻居；之后 dev2 的来信进 dev 的收件箱，留言即时通知 |
+| 打开 dev 的一篇记录，在"从你的岛回信"里填 `dev2.rqly.com`，点"写留言" | 跳到 dev2 的写信页（先登录 Access），收件人和"关于"已填好；寄出后回到原来的记录页，显示"已经寄到了"；dev 的手机马上收到留言通知 |
+| 同一页点"浇水"，以及在 dev2 的收件箱里点"回访" | dev 收到浇水和拜访，按默认策略进摘要 |
+| 互相关注后，先在两边的"邻居动态"里点"现在同步"（第一次同步只记下已有的记录，不发通知）；再在 `framework` 合并一篇新的示例记录，等两座岛重新部署后再点一次 | 两边的"邻居动态"里都有对方的这篇记录，并进入当天的摘要。不点的话，定时任务按对方的活跃程度在 1 到 24 小时内读到 |
+| 在 dev 的"岛屿"里屏蔽 dev2，再从 dev2 寄一条 | dev2 显示已送达，dev 不显示也不通知 |
+| 一周后看两个 Worker 的用量 | 请求、CPU、D1 读写都在免费额度内 |
+
+**出了问题：**
+
+- 代码可以在 Deployments 里回滚。数据库的表只增不减，旧代码也能读；
+- 数据先在岛务"设置"里点"导出全部互动数据"留一份 JSON；
+- D1 自带按时间点恢复（Time Travel），可保留的天数以控制台为准。
+
 ## rqly.com 以后怎么迁移
 
 这是以后单独做的决定，现在不动 rqly.com。可选的路径：
@@ -255,11 +346,22 @@ npm run keygen
   - 要求部署的子目录完全自包含，包括依赖。
   - 现在的 `site/` 引用了仓库里的 `packages/`，所以一键部署留到第 4 阶段的模板仓库解决：要么把依赖打包进模板，要么改成由 Worker 在请求时签名并缓存动态。
 
+2026-10-16 按 Cloudflare 官方文档核对（第 2 阶段用到的）：
+
+- **免费档的运行限制：** 每次 HTTP 请求和每次定时运行都是 10 ms CPU；每次最多 50 个外部请求，D1 的查询也算在内。服务按每次 45 个的预算计数（`BUDGET`）。
+- **只让服务路径进 Worker：** `assets.run_worker_first` 可以写成路径列表，其余请求直接走静态资源，不计 Worker 请求。
+- **D1 自动创建：** Wrangler 4.45 起，配置里只写数据库名、不写 ID 时，第一次部署自动创建并绑定。
+- **Access 令牌：** 请求头 `Cf-Access-Jwt-Assertion`，RS256 签名；公钥在 `https://<团队>.cloudflareaccess.com/cdn-cgi/access/certs`，按 `kid` 匹配；`iss` 是团队域名，`aud` 是应用的 AUD 标签。
+- **Access 的路径：** Path 末尾的通配符覆盖下面的所有路径；更具体的规则优先。"保护整个 Worker"会连同 `workers.dev` 和预览地址一起保护，但也会挡住公开的收件箱，所以这里按路径保护。
+- **本地测试定时任务：** `wrangler dev --test-scheduled` 打开 `/cdn-cgi/local/scheduled` 路径，CI 的冒烟测试就用它。
+
 ## 待核实
 
-- Cloudflare Access 免费档的人数和功能。第三方资料显示 2026 年 8 月仍是 50 人以内免费，第 2 阶段依赖它之前要以官方页面为准；
+- Cloudflare Access 免费档的人数和功能。第三方资料显示 2026 年仍是 50 人以内免费，部署第 2 阶段之前在控制台的套餐页确认；
+- 一个 Access 应用能不能同时保护几个路径（控制台里叫"public hostname"或"destination"）。不能就按清单分成几个应用；
+- **Worker 能不能连到内网地址。** 文档没有写。服务在 Worker 上没有自己的 DNS 解析，只检查地址本身，靠平台挡住内网。部署后实测：在岛务里关注 `https://localtest.me`（公共 DNS 解析到 `127.0.0.1`），"已寄出"里应显示失败而不是送达，把结果记到这里；
+- Workers 上 Ed25519 验签的实际 CPU 耗时。定时任务每轮最多验 40 个签名，部署后看 Worker 的 CPU 用量，按实际值调整 `POLL.verifyLimit`；
 - Worker 在免费档发送邮件的条件（只能发给已验证地址，还是可以发给任意地址）；
-- Workers 的 WebCrypto 对 Ed25519 签名和验签的支持情况，以及在 10 ms CPU 内一次验签的实际耗时（第 2 阶段）；
 - `wrangler deploy` 是否保留在控制台里添加的自定义域名。第一次部署 dev.rqly.com 后实测；如果不保留，改为在 `wrangler.jsonc` 里声明 `routes`，地址由部署方提供。
 
 ## 参考
@@ -274,3 +376,7 @@ npm run keygen
 - [Workers Builds 的构建镜像：Node 版本、自动安装依赖](https://developers.cloudflare.com/workers/ci-cd/builds/build-image/)
 - [静态资源的 `_headers`](https://developers.cloudflare.com/workers/static-assets/headers/)
 - [Deploy to Cloudflare 按钮：密钥和子目录](https://developers.cloudflare.com/workers/platform/deploy-buttons/)
+- [静态资源：`run_worker_first`](https://developers.cloudflare.com/workers/static-assets/binding/#run_worker_first)
+- [Access 的应用路径](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/app-paths/)
+- [用 Access 保护 Worker](https://developers.cloudflare.com/workers/configuration/cloudflare-access/)
+- [定时任务的本地测试](https://developers.cloudflare.com/workers/examples/cron-trigger/)

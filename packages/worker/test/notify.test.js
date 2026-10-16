@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { budget } from '../src/budget.js';
-import { checkPolicy, eventStatement, flushDigest, flushNow, inQuietHours } from '../src/notify.js';
+import { channelsFor, checkPolicy, eventStatement, flushDigest, flushNow, inQuietHours } from '../src/notify.js';
 import { migrate, SCHEMA_VERSION } from '../src/schema.js';
 import { sqliteStore } from '../src/store-node.js';
 import { stringsFor } from '../src/strings.js';
@@ -76,6 +76,22 @@ test('channels without their secret are skipped; bad policies are refused', asyn
   assert.throws(() => checkPolicy({ quietHours: ['25:00', '08:00'] }), /quietHours/);
   assert.throws(() => checkPolicy({ channels: [{ type: 'email' }] }), /channels/);
   assert.throws(() => checkPolicy({ timezone: 'Mars/Olympus' }), /timezone/);
+});
+
+test('with no channels listed, the channels whose secrets are set are used', async () => {
+  assert.deepEqual(channelsFor([], {}), []);
+  assert.deepEqual(channelsFor([], { TELEGRAM_BOT_TOKEN: 't' }), [], 'Telegram also needs the chat');
+  assert.deepEqual(
+    channelsFor([], { TELEGRAM_BOT_TOKEN: 't', TELEGRAM_CHAT_ID: '7', NTFY_TOPIC: 'x', NTFY_SERVER: 'https://ntfy.example', WEBHOOK_URL: 'https://hooks.example/in' }).map((c) => c.type),
+    ['telegram', 'ntfy', 'webhook'],
+  );
+  assert.deepEqual(channelsFor([{ type: 'ntfy' }], { TELEGRAM_BOT_TOKEN: 't', TELEGRAM_CHAT_ID: '7' }), [{ type: 'ntfy' }], 'a listed policy wins');
+  const { sent, ctx, record, at } = await setup({}, { TELEGRAM_BOT_TOKEN: 't', TELEGRAM_CHAT_ID: '42' });
+  ctx.policy = { ...ctx.policy, channels: channelsFor(ctx.policy.channels, ctx.env) };
+  at('2026-10-14T12:00:00Z');
+  await record('message.received', 'hello');
+  assert.equal(await flushNow(ctx), 1);
+  assert.equal(sent[0].body.chat_id, '42');
 });
 
 test('migrations are idempotent and versioned', async () => {

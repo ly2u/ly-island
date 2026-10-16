@@ -73,9 +73,10 @@ export function nextPoll(self, origin, lastActivity, now) {
 /**
  * One cron run's worth of reading.
  * @param {PollContext} ctx
+ * @param {{ force?: boolean }} [options] force: also islands not yet due (the owner's "sync now")
  * @returns {Promise<{ polled: string[], verified: number, events: number }>}
  */
-export async function pollNeighbors(ctx) {
+export async function pollNeighbors(ctx, { force = false } = {}) {
   const now = ctx.now();
   const rows = await ctx.store.all('SELECT * FROM islands WHERE following = 1 OR origin IN (SELECT value FROM json_each(?))', [JSON.stringify([...ctx.publicFriends])]);
   const byOrigin = new Map(rows.map((row) => [row.origin, row]));
@@ -83,7 +84,7 @@ export async function pollNeighbors(ctx) {
 
   const due = [...byOrigin.entries()]
     .map(([origin, row]) => ({ origin, row, state: { ...freshState(), ...(row?.poll ? JSON.parse(row.poll) : {}) } }))
-    .filter(({ row, state }) => !row?.blocked && state.nextAt <= now)
+    .filter(({ row, state }) => !row?.blocked && (force || state.nextAt <= now))
     .sort((a, b) => a.state.nextAt - b.state.nextAt || hash32(`${now} ${a.origin}`) - hash32(`${now} ${b.origin}`));
 
   const verify = { left: POLL.verifyLimit };

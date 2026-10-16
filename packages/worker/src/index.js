@@ -20,7 +20,7 @@ import { budget, countedStore } from './budget.js';
 import { retryDue } from './deliver.js';
 import { receive } from './inbox.js';
 import { outbound } from './net.js';
-import { checkPolicy, flushDigest, flushNow } from './notify.js';
+import { channelsFor, checkPolicy, flushDigest, flushNow } from './notify.js';
 import { pollNeighbors } from './poll.js';
 import { migrate } from './schema.js';
 import { stringsFor } from './strings.js';
@@ -35,7 +35,8 @@ export const BUDGET = 45;
  * @param {object} options
  * @param {(env: Record<string, any>) => import('./store-d1.js').Store} options.storeFor
  * @param {Record<string, any>} [options.notify] the owner's notification policy (island/notify.json)
- * @param {string} [options.timeZone] the island's time zone, the default for the policy
+ * @param {string} [options.timeZone] the island's time zone, the default for the policy;
+ *   the ISLAND_TIME_ZONE variable, when set, takes its place
  * @param {typeof fetch} [options.fetch]
  * @param {() => number} [options.now]
  * @param {((host: string) => Promise<string[]>) | null} [options.resolver]
@@ -96,7 +97,8 @@ export function createIsland({ storeFor, notify = {}, timeZone = 'UTC', fetch = 
     const { manifest, publicFriends } = await loadSelf(env);
     const self = manifest.id;
     const language = Array.isArray(manifest.language) ? manifest.language[0] : 'en';
-    const policy = checkPolicy(notify, timeZone);
+    const checked = checkPolicy(notify, env.ISLAND_TIME_ZONE || timeZone);
+    const policy = { ...checked, channels: channelsFor(checked.channels, env) };
     const { signer, problem } = await loadSigner(env, manifest);
     /** @type {any} */
     const ctx = {
@@ -143,6 +145,9 @@ export function createIsland({ storeFor, notify = {}, timeZone = 'UTC', fetch = 
           const page = await env.ASSETS.fetch(request);
           const headers = new Headers(page.headers);
           headers.set('cache-control', 'no-store');
+          headers.set('x-robots-tag', 'noindex');
+          // The public "/island/*" rule in _headers allows any origin; the owner's pages do not.
+          headers.delete('access-control-allow-origin');
           return new Response(page.body, { status: page.status, headers });
         }
         return env.ASSETS.fetch(request);
@@ -173,14 +178,72 @@ export function createIsland({ storeFor, notify = {}, timeZone = 'UTC', fetch = 
 }
 
 /**
+ * The visitor's island address as typed: "a.example", "https://a.example/".
+ * Only an https origin with nothing after it counts. @param {string} value
+ */
+export function homeOrigin(value) {
+  let text = value.trim();
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(text)) text = `https://${text}`;
+  try {
+    const url = new URL(text);
+    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || url.pathname !== '/') return null;
+    return isHttpsOrigin(url.origin) ? url.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+/** @param {string} text */
+const escapeHtml = (text) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+/**
+ * A tiny page of the service's own. The record page's form submits here, and
+ * a redirect to another origin after a form submission would be blocked by
+ * the page's "form-action 'self'", so this page moves on by itself instead.
+ * @param {string} language @param {string} title @param {string} body HTML @param {{ status?: number, refresh?: string }} [options]
+ */
+function smallPage(language, title, body, { status = 200, refresh } = {}) {
+  const html = `<!doctype html>
+<html lang="${escapeHtml(language)}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+${refresh ? `<meta http-equiv="refresh" content="0; url=${escapeHtml(refresh)}">\n` : ''}<title>${escapeHtml(title)}</title>
+</head>
+<body>
+${body}
+</body>
+</html>
+`;
+  return new Response(html, {
+    status,
+    headers: {
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store',
+      'content-security-policy': "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      'referrer-policy': 'no-referrer',
+      'x-content-type-options': 'nosniff',
+    },
+  });
+}
+
+/**
  * "Reply from my island": sends the visitor to their own island's compose
  * page (its links.compose, same origin as their island).
  * @param {any} ctx @param {URL} url
  */
 async function goHome(ctx, url) {
-  const home = url.searchParams.get('home') ?? '';
+  const language = Array.isArray(ctx.manifest.language) ? ctx.manifest.language[0] : 'en';
+  const home = homeOrigin(url.searchParams.get('home') ?? '');
   const type = url.searchParams.get('type') ?? 'message';
-  if (!isHttpsOrigin(home) || !['message', 'visit', 'water', 'follow'].includes(type)) return json({ error: 'home must be the https address of your island' }, 400);
+  const own = (/** @type {string | null} */ value) => (value?.startsWith(`${ctx.self}/`) ? value : null);
+  const inReplyTo = own(url.searchParams.get('inReplyTo'));
+  const returnTo = own(url.searchParams.get('returnTo'));
+  if (!home || home === ctx.self || !['message', 'visit', 'water', 'follow'].includes(type)) {
+    const back = returnTo ?? `${ctx.self}/`;
+    return smallPage(language, ctx.strings.goTitle, `<p>${escapeHtml(ctx.strings.goBadHome)}</p>\n<p><a href="${escapeHtml(back)}">${escapeHtml(ctx.strings.goBack)}</a></p>`, { status: 400 });
+  }
   let compose = `${home}/island/compose`;
   try {
     const response = await ctx.net.get(`${home}/.well-known/island.json`, { sameOriginAs: home, limit: 64 * 1024 });
@@ -192,9 +255,8 @@ async function goHome(ctx, url) {
   const target = new URL(compose);
   target.searchParams.set('type', type);
   target.searchParams.set('to', ctx.self);
-  const inReplyTo = url.searchParams.get('inReplyTo');
-  if (inReplyTo?.startsWith(`${ctx.self}/`)) target.searchParams.set('inReplyTo', inReplyTo);
-  const returnTo = url.searchParams.get('returnTo');
-  if (returnTo?.startsWith(`${ctx.self}/`)) target.searchParams.set('returnTo', returnTo);
-  return Response.redirect(target.href, 303);
+  if (inReplyTo) target.searchParams.set('inReplyTo', inReplyTo);
+  if (returnTo) target.searchParams.set('returnTo', returnTo);
+  const link = `<a href="${escapeHtml(target.href)}">${escapeHtml(ctx.strings.goContinue(home))}</a>`;
+  return smallPage(language, ctx.strings.goTitle, `<p>${link}</p>`, { refresh: target.href });
 }

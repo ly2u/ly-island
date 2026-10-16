@@ -10,9 +10,11 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "deploy": "wrangler deploy",
+    "deploy": "node scripts/wrangler-config.mjs && wrangler deploy --config wrangler.generated.json",
     "keygen": "node scripts/keygen.mjs",
-    "unlocks:save": "node scripts/unlocks.mjs"
+    "unlocks:save": "node scripts/unlocks.mjs",
+    "dev:worker": "npm run build && node scripts/wrangler-config.mjs && wrangler dev --config wrangler.generated.json",
+    "smoke:worker": "node scripts/smoke-worker.mjs"
   },
   "dependencies": {
     "astro": "7.3.8",

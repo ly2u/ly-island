@@ -145,7 +145,9 @@ export async function island({ net, time, origin, seed, name = new URL(origin).h
     if (!file) return new Response('not found', { status: 404 });
     const etag = await etagOf(file.body);
     if (request.headers.get('if-none-match') === etag) return new Response(null, { status: 304, headers: { etag } });
-    return new Response(file.body, { headers: { 'content-type': file.type, etag } });
+    // Like public/_headers: the public protocol paths are readable from any origin.
+    const cors = path.startsWith('/island/') || path === '/.well-known/island.json' ? { 'access-control-allow-origin': '*' } : {};
+    return new Response(file.body, { headers: { 'content-type': file.type, etag, ...cors } });
   }
 
   const service = createIsland({ storeFor: () => store, notify, fetch: net.fetch, now: time.now, resolver });

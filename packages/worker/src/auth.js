@@ -58,9 +58,13 @@ export function clearAccessCache() {
  * @returns {Promise<{ ok: true, who: 'owner', email: string | null } | { ok: false, reason: string }>}
  */
 export async function owner(ctx, request) {
-  const team = String(ctx.env.ACCESS_TEAM_DOMAIN ?? '').replace(/\/+$/, '');
-  const aud = String(ctx.env.ACCESS_AUD ?? '');
-  if (!/^https:\/\/[a-z0-9-]+\.cloudflareaccess\.com$/.test(team) || aud === '') return { ok: false, reason: 'access-not-configured' };
+  // "team.cloudflareaccess.com" or "https://team.cloudflareaccess.com".
+  const domain = String(ctx.env.ACCESS_TEAM_DOMAIN ?? '').trim().toLowerCase().replace(/\/+$/, '');
+  const team = domain.startsWith('https://') ? domain : `https://${domain}`;
+  // One AUD tag, or several separated by commas when the owner's paths are
+  // split over more than one Access application.
+  const allowed = String(ctx.env.ACCESS_AUD ?? '').split(',').map((tag) => tag.trim()).filter(Boolean);
+  if (!/^https:\/\/[a-z0-9-]+\.cloudflareaccess\.com$/.test(team) || allowed.length === 0) return { ok: false, reason: 'access-not-configured' };
   const token = request.headers.get('cf-access-jwt-assertion');
   if (!token) return { ok: false, reason: 'no-token' };
   const parts = token.split('.');
@@ -92,7 +96,7 @@ export async function owner(ctx, request) {
   const now = Math.floor(ctx.now() / 1000);
   if (claims.iss !== team) return { ok: false, reason: 'wrong-issuer' };
   const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-  if (!audiences.includes(aud)) return { ok: false, reason: 'wrong-audience' };
+  if (!audiences.some((tag) => allowed.includes(tag))) return { ok: false, reason: 'wrong-audience' };
   if (typeof claims.exp !== 'number' || claims.exp <= now - CLOCK_SKEW_S) return { ok: false, reason: 'expired' };
   if (typeof claims.nbf === 'number' && claims.nbf > now + CLOCK_SKEW_S) return { ok: false, reason: 'not-yet-valid' };
   if (typeof claims.iat === 'number' && claims.iat > now + CLOCK_SKEW_S) return { ok: false, reason: 'not-yet-valid' };

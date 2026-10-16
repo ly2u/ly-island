@@ -22,6 +22,8 @@ describe('owner endpoints', () => {
     const page = await get(a, '/island/admin/', { 'cf-access-jwt-assertion': token });
     assert.equal(page.status, 200);
     assert.equal(page.headers.get('cache-control'), 'no-store');
+    assert.equal(page.headers.get('access-control-allow-origin'), null);
+    assert.equal(page.headers.get('x-robots-tag'), 'noindex');
     const compose = await get(a, '/island/compose?type=message&to=https://b.example', { 'cf-access-jwt-assertion': token });
     assert.equal(compose.status, 303);
     assert.equal(compose.headers.get('location'), 'https://a.example/island/admin/#compose?type=message&to=https://b.example');
@@ -63,8 +65,18 @@ describe('owner endpoints', () => {
       const response = await get(a, '/island/api/me', { 'cf-access-jwt-assertion': await team.token(team.claims(time.now())) });
       assert.equal((await response.json()).reason, 'access-not-configured', JSON.stringify(env));
     }
-    void TEAM;
-    void AUD;
+  });
+
+  test('the team domain may leave out https://, and several AUD tags may be listed', async () => {
+    const env = { ACCESS_TEAM_DOMAIN: TEAM.replace('https://', ''), ACCESS_AUD: `other-app, ${AUD}` };
+    const { time, team, a } = await setup(env);
+    const token = await team.token(team.claims(time.now()));
+    assert.equal((await get(a, '/island/api/me', { 'cf-access-jwt-assertion': token })).status, 200);
+    const wrong = await team.token({ ...team.claims(time.now()), aud: ['third-app'] });
+    assert.equal((await (await get(a, '/island/api/me', { 'cf-access-jwt-assertion': wrong })).json()).reason, 'wrong-audience');
+    const empty = await setup({ ACCESS_AUD: ' , ' });
+    const response = await get(empty.a, '/island/api/me', { 'cf-access-jwt-assertion': await empty.team.token(empty.team.claims(empty.time.now())) });
+    assert.equal((await response.json()).reason, 'access-not-configured');
   });
 
   test('owner writes must be same-origin JSON POSTs', async () => {

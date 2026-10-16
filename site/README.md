@@ -1,6 +1,9 @@
 # 岛屿模板
 
-这个文件夹是一座完整的岛：Markdown 记录、设置、两个主题，以及部署到 Cloudflare 的配置。构建出来的是纯静态文件，访问不经过任何服务器代码。
+这个文件夹是一座完整的岛：Markdown 记录、设置、两个主题、站主后台，以及部署到 Cloudflare 的配置。
+
+- 页面、订阅源、名片和动态是构建出来的静态文件，访问不经过任何服务器代码；
+- 互动（收件箱、寄信、同步邻居、通知）由同一个 Worker 里的岛务服务处理（`worker/index.js`，代码在 [`packages/worker`](../packages/worker/README.md)），只有这些路径会运行 Worker 代码。
 
 > 这里的示例内容都是虚构的。做自己的岛时，删掉 `content/records/` 里的示例，改 `island.config.json`。
 
@@ -10,6 +13,7 @@
 - [写记录](#写记录)
 - [设置](#设置)
 - [签名密钥](#签名密钥)
+- [互动和站主后台](#互动和站主后台)
 - [部署到 Cloudflare](#部署到-cloudflare)
 - [成长和解锁台账](#成长和解锁台账)
 - [检查](#检查)
@@ -85,6 +89,9 @@ tags: [点云, BIM]
 | `discoverable` | 是否允许灯塔收录，默认 `false` |
 | `ai` | `read`：是否允许 AI 读取来回答问题；`train`：是否允许用于训练。`robots.txt` 随之生成 |
 | `keyName` | 钥匙的名字，默认 `k1` |
+| `interactions` | `enabled`：是否接收别的岛的投递，默认 `true`。`accepts`：各类活动收谁的，`signed`（任何签了名的岛）、`friends`（只收邻居）或 `none`，默认都是 `signed`；捡瓶子 `pickup` 在第 3 阶段之前固定为 `none` |
+
+设置文件也可以换一个：构建时设 `ISLAND_CONFIG=examples/second-island.config.json`，用来从同一个仓库再部署一座测试岛（见[部署文档](../docs/deployment.md#第-2-阶段岛务-worker)）。
 
 关注的岛写在 `island/friends.json` 里：
 
@@ -106,7 +113,7 @@ npm run keygen
 
 它会打印一行 `ISLAND_SIGNING_KEY=…`：
 
-- 把这一行设成部署平台的**构建密钥**（见下文）；
+- 把这一行设成部署平台的**构建密钥**，同一个值再设成 Worker 的**运行时密钥**（见下文）：构建时用它签公开的动态，运行时用它签寄出的信；
 - 同时存进密码管理器；
 - **不要**提交到仓库，也不要发给任何人。
 
@@ -116,9 +123,24 @@ npm run keygen
 - 只有地址是 `https://example.org` 并且设置了 `ISLAND_ALLOW_TEST_KEY=1` 时，才会改用公开的测试密钥，这只给 CI 用；
 - 测试密钥谁都能用，所以不能用在真实的岛上。
 
+## 互动和站主后台
+
+`interactions.enabled` 为 `true` 时，名片里会写上收件箱和写信页的地址，别的岛就能给你寄信。
+
+- **站主后台：** `/island/admin/`，用 Cloudflare Access 挡在外面，服务自己也会再验证一次。里面有收件箱、陌生来信、邻居动态、关注的岛、写信、已寄出、AI 起草的草稿，以及 AI 令牌和测试通知；
+- **从你的岛回信：** 每篇记录下面有一个小表单，不需要 JavaScript。访客填自己的岛的地址，就会跳到他自己岛上的写信页，在那里签名寄出，再回到这篇记录；
+- **通知：** 规则在 `island/notify.json`：哪些事即时发、哪些进每天的摘要、免打扰时段。渠道的凭据放在部署平台的密钥设置里，不写进仓库，见[扩展接口](../docs/extensions.md#通知)。
+
+在本地连同 Worker 一起试：
+
+```bash
+cp .dev.vars.example .dev.vars   # 填上要用的值；.dev.vars 不进 Git
+npm run dev:worker
+```
+
 ## 部署到 Cloudflare
 
-岛部署成一个只有静态资源的 Worker：访问不计入 Worker 的请求额度，免费档就够用。以下是 2026 年 10 月的界面，名称可能会变。
+岛部署成一个 Worker：静态页面的访问不计入 Worker 的请求额度，只有互动路径和定时任务运行 Worker 代码，免费档就够用。以下是 2026 年 10 月的界面，名称可能会变。
 
 1. **导入仓库：** 在 Cloudflare 控制台创建一个 Worker，选择从 Git 仓库导入，连接你的 GitHub 仓库。
 2. **构建设置：**
@@ -129,17 +151,22 @@ npm run keygen
    | 生产分支 | 你写记录的分支 |
    | 根目录（Root directory） | 这个文件夹，例如 `site` |
    | 构建命令 | `npm run build` |
-   | 部署命令 | `npx wrangler deploy` |
+   | 部署命令 | `npm run deploy` |
 
-   依赖由 Cloudflare 按 `package-lock.json` 自动安装。
+   依赖由 Cloudflare 按 `package-lock.json` 自动安装。`npm run deploy` 先生成 `wrangler.generated.json`：定时任务的分钟按岛的地址错开，D1 数据库第一次部署时自动创建。
 
 3. **构建变量和密钥：** 在 Worker 的 Settings → Build → Variables and secrets 里：
    - 添加 `ISLAND_SIGNING_KEY`，类型选 **Secret**；
    - 如果 `island.config.json` 里的 `origin` 不是你的域名，再添加 `ISLAND_ORIGIN`，例如 `https://example.org`。
-4. **绑定域名：** Worker → Settings → Domains & Routes → 添加 Custom domain。`wrangler.jsonc` 关掉了 `workers.dev` 和预览地址，所以岛只能通过你自己的域名访问。
-5. **部署后检查：**
+4. **运行时的设置：** Worker → Settings → Variables and secrets（和上一步的构建设置是两处）。按 `.dev.vars.example` 填：
+   - `ISLAND_SIGNING_KEY`：和构建密钥相同，没有它就不能寄信；
+   - `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`：Cloudflare Access 的团队域名和应用的 AUD 标签。Access 只保护 `/island/admin*`、`/island/api*`、`/island/compose*`，别的路径不要保护，详见[部署文档](../docs/deployment.md#第-2-阶段岛务-worker)；
+   - 通知渠道的凭据，可选。
+5. **绑定域名：** Worker → Settings → Domains & Routes → 添加 Custom domain。`wrangler.jsonc` 关掉了 `workers.dev` 和预览地址，所以岛只能通过你自己的域名访问。
+6. **部署后检查：**
    - 打开 `https://<你的域名>/.well-known/island.json`，`id` 应该是你的地址，`keys` 里的公钥和 `npm run keygen` 打印的一致；
-   - 打开 `/feed.xml` 和 `/island/outbox.json`，能看到内容。
+   - 打开 `/feed.xml` 和 `/island/outbox.json`，能看到内容；
+   - 打开 `/island/admin/`，先要求登录；登录后"设置"里显示可以寄信。
 
 之后每次推送到生产分支，Cloudflare 都会自动构建和部署。
 
@@ -168,6 +195,7 @@ npm run unlocks:save
 - 协议文件：通过校验；每一条动态都能验签，并由 Python 实现再验一次；
 - 订阅源：严格解析的 XML；
 - 关掉 JavaScript：从首页出发能读到每一条记录；
+- 回信表单：关掉 JavaScript 时也在，寄出后的感谢语只在 `#island-sent` 时显示；
 - 首屏：真实浏览器首次加载到 `networkidle`，所有实际请求的唯一 URL 内容按 gzip level 9 合计，不超过 200 KiB。包含间接 JS/CSS 导入和运行时数据；HTML 静态检查给出的只是直接资源下界；
 - 安全：
   - 不加载第三方资源；
@@ -185,4 +213,11 @@ python3 -m playwright install chromium
 python3 ../tools/browser-check/check.py dist
 ```
 
-完整验收需要两种检查都通过。CI 还用大模块、嵌套 CSS 导入和运行时 JSON 请求三个负例证明浏览器能拦住超预算资源。原始文件名和日期的负例由 `node scripts/check-record-loader.mjs` 在临时副本中运行实际 Astro 构建。
+岛务服务在 workerd 里的冒烟测试（需要先用测试密钥构建）：
+
+```bash
+ISLAND_ALLOW_TEST_KEY=1 npm run build
+npm run smoke:worker
+```
+
+完整验收需要这些检查都通过。浏览器检查还会用一个替身接口打开站主后台，故意塞进带 HTML 的"别人的文字"，确认它们只作为文字显示。CI 还用大模块、嵌套 CSS 导入和运行时 JSON 请求三个负例证明浏览器能拦住超预算资源。原始文件名和日期的负例由 `node scripts/check-record-loader.mjs` 在临时副本中运行实际 Astro 构建。

@@ -80,6 +80,9 @@ jobs:
         run: node tools/site-check/cli.mjs site/dist --compare site/dist-first --theme isometric
       - name: check the built documents with the Python implementation
         run: python packages/protocol/scripts/check_schemas.py --documents site/dist
+      - name: island service in workerd (wrangler dev, local D1)
+        working-directory: site
+        run: node ../tools/run-annotated.mjs smoke-worker -- npm run smoke:worker
       - name: build and check the text theme
         working-directory: site
         env:
@@ -95,6 +98,18 @@ jobs:
           python tools/browser-check/check.py site/dist-isometric --theme isometric
           python tools/browser-check/check.py site/dist --theme text
           python tools/browser-check/check_budget_regressions.py site/dist-isometric
+      - name: second test island (another settings file, English, text theme)
+        working-directory: site
+        env:
+          ISLAND_CONFIG: examples/second-island.config.json
+          # The public test key only signs https://example.org.
+          ISLAND_ORIGIN: https://example.org
+        run: |
+          mv dist dist-text
+          node ../tools/run-annotated.mjs build-second -- npm run build
+          node ../tools/site-check/cli.mjs dist --theme text
+          python ../tools/browser-check/check.py dist --theme text
+          grep -q '<html lang="en"' dist/island/admin/index.html
       - name: owner tools
         working-directory: site
         run: |
@@ -103,4 +118,6 @@ jobs:
           git diff --exit-code -- island/unlocks.json
       - name: wrangler configuration (dry run)
         working-directory: site
-        run: node ../tools/run-annotated.mjs wrangler -- npx wrangler deploy --dry-run --outdir ../.wrangler-dry-run
+        run: |
+          node scripts/wrangler-config.mjs
+          node ../tools/run-annotated.mjs wrangler -- npx wrangler deploy --dry-run --config wrangler.generated.json --outdir ../.wrangler-dry-run

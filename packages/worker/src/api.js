@@ -173,7 +173,8 @@ export async function ownerApi(ctx, request, url) {
       return json({ ok: failed.length === 0, failed });
     }
     case '/poll': {
-      const result = await pollNeighbors(ctx);
+      // The owner asked: every neighbor, not only those due (still within the budget).
+      const result = await pollNeighbors(ctx, { force: true });
       await flushNow(ctx);
       return json(result);
     }

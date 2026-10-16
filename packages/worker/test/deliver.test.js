@@ -98,17 +98,36 @@ test('without its signing key the service still receives, but refuses to send', 
 
 test('"reply from my island" goes to the visitor\'s own compose page, never elsewhere', async () => {
   const { a, b } = await setup();
-  const go = await b.request(`/island/go?home=${encodeURIComponent(a.origin)}&type=message&inReplyTo=${encodeURIComponent(`${b.origin}/records/r1/`)}&returnTo=${encodeURIComponent(`${b.origin}/records/r1/`)}`);
-  assert.equal(go.status, 303);
-  const target = new URL(go.headers.get('location'));
+  /** The page moves on by itself (a redirect after a form would break the record page's form-action). */
+  const next = async (/** @type {Response} */ response) => {
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-security-policy'), /default-src 'none'/);
+    const html = await response.text();
+    const refresh = /<meta http-equiv="refresh" content="0; url=([^"]+)">/.exec(html)?.[1].replaceAll('&#38;', '&');
+    const link = /<a href="([^"]+)">/.exec(html)?.[1].replaceAll('&#38;', '&');
+    assert.equal(refresh, link);
+    return new URL(/** @type {string} */ (link));
+  };
+  const record = `${b.origin}/records/r1/`;
+  const target = await next(await b.request(`/island/go?home=${encodeURIComponent(a.origin)}&type=message&inReplyTo=${encodeURIComponent(record)}&returnTo=${encodeURIComponent(record)}`));
   assert.equal(`${target.origin}${target.pathname}`, 'https://a.example/island/compose');
   assert.equal(target.searchParams.get('to'), b.origin);
-  assert.equal(target.searchParams.get('inReplyTo'), `${b.origin}/records/r1/`);
+  assert.equal(target.searchParams.get('inReplyTo'), record);
+  assert.equal(target.searchParams.get('returnTo'), record);
+  // Typed the way people type it.
+  for (const home of ['a.example', 'https://a.example/', ' A.EXAMPLE ']) {
+    assert.equal((await next(await b.request(`/island/go?home=${encodeURIComponent(home)}`))).origin, 'https://a.example', home);
+  }
   // returnTo and inReplyTo must belong to this island; home must be an island address.
-  const sneaky = new URL((await b.request(`/island/go?home=${encodeURIComponent(a.origin)}&returnTo=${encodeURIComponent('https://evil.example/')}`)).headers.get('location'));
+  const sneaky = await next(await b.request(`/island/go?home=${encodeURIComponent(a.origin)}&returnTo=${encodeURIComponent('https://evil.example/')}&inReplyTo=${encodeURIComponent('https://evil.example/x')}`));
   assert.equal(sneaky.searchParams.get('returnTo'), null);
-  for (const home of ['javascript:alert(1)', 'http://a.example', 'https://a.example/path', '']) {
-    assert.equal((await b.request(`/island/go?home=${encodeURIComponent(home)}`)).status, 400, home);
+  assert.equal(sneaky.searchParams.get('inReplyTo'), null);
+  for (const home of ['javascript:alert(1)', 'http://a.example', 'https://a.example/path', 'https://a.example/?x=1', 'https://user@a.example', '', b.origin]) {
+    const response = await b.request(`/island/go?home=${encodeURIComponent(home)}&returnTo=${encodeURIComponent('"><script>')}`);
+    assert.equal(response.status, 400, home);
+    const html = await response.text();
+    assert.doesNotMatch(html, /<script|http-equiv/, home);
+    assert.match(html, /<a href="https:\/\/b\.example\/">/, home);
   }
 });
 

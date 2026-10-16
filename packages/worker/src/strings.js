@@ -12,6 +12,10 @@ const zh = {
   deliveryFailed: (/** @type {string} */ name) => `发给${name}的消息没有送达`,
   strangerCount: (/** @type {number} */ n) => `陌生来信里有 ${n} 封新信`,
   more: (/** @type {number} */ n) => `还有 ${n} 条`,
+  goTitle: '前往你的岛',
+  goContinue: (/** @type {string} */ home) => `前往 ${home}`,
+  goBadHome: '请填写你的岛的地址，例如 https://example.org。',
+  goBack: '返回',
 };
 
 /** @type {typeof zh} */
@@ -27,6 +31,10 @@ const en = {
   deliveryFailed: (name) => `Your message to ${name} was not delivered`,
   strangerCount: (n) => `${n} new letters from strangers`,
   more: (n) => `${n} more`,
+  goTitle: 'To your island',
+  goContinue: (home) => `Continue to ${home}`,
+  goBadHome: 'Enter the address of your island, e.g. https://example.org.',
+  goBack: 'Back',
 };
 
 /** @param {string} language */
