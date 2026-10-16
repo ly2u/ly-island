@@ -68,3 +68,17 @@ test('date-times are RFC 3339 in UTC without fractions', () => {
   assert.equal(dateTime('2026-10-01T08:00:00+08:00'), '2026-10-01T00:00:00Z');
   assert.throws(() => dateTime('soon'), RangeError);
 });
+
+test('a calendar day starts at local midnight, or at the first instant a clock change leaves', async () => {
+  const { startOfDay } = await import('../src/dates.js');
+  const iso = (/** @type {number} */ time) => new Date(time).toISOString();
+  assert.equal(iso(startOfDay('2026-10-05', 'Asia/Shanghai')), '2026-10-04T16:00:00.000Z');
+  assert.equal(iso(startOfDay('2026-10-05', 'Asia/Kolkata')), '2026-10-04T18:30:00.000Z');
+  assert.equal(iso(startOfDay('2026-03-08', 'America/Los_Angeles')), '2026-03-08T08:00:00.000Z');
+  assert.equal(iso(startOfDay('2026-11-01', 'America/Los_Angeles')), '2026-11-01T07:00:00.000Z');
+  // Cuba moves its clocks at midnight: 2026-03-08 begins at 01:00 local.
+  assert.equal(iso(startOfDay('2026-03-08', 'America/Havana')), '2026-03-08T05:00:00.000Z');
+  assert.equal(iso(startOfDay('0099-01-01', 'UTC')), '0099-01-01T00:00:00.000Z');
+  assert.equal(dateTime('2026-10-05', 'Asia/Shanghai'), '2026-10-04T16:00:00Z');
+  assert.equal(dateTime('2026-10-05'), '2026-10-05T00:00:00Z');
+});

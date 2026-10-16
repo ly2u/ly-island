@@ -2,12 +2,12 @@
 // against the protocol limits, with every problem reported at once.
 
 import { LIMITS } from '../../protocol/src/index.js';
-import { dateTime, localDate } from './dates.js';
+import { dateTime, isCalendarDate, localDate } from './dates.js';
 
 export const RECORD_KINDS = Object.freeze(['article', 'note', 'project']);
 /** File names become URLs, so they are kept to lowercase ASCII words joined by "-". */
-// The explicit end assertion also rejects a final newline (unlike JS "$"
-// alone, which can match just before that newline).
+// The explicit end assertion states that nothing, not even a newline, may follow
+// (JavaScript's "$" already behaves so without the m flag; Python's does not).
 export const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*(?![\s\S])/;
 const EXCERPT_LENGTH = 80;
 
@@ -77,6 +77,9 @@ export function excerpt(text, length = EXCERPT_LENGTH) {
   return chars.length <= length ? text : `${chars.slice(0, length).join('').trimEnd()}…`;
 }
 
+/** @param {string} a @param {string} b */
+const later = (a, b) => (a > b ? a : b);
+
 /** @param {unknown} value @param {number} max */
 const textOk = (value, max) => typeof value === 'string' && value.trim() !== '' && Array.from(value).length <= max;
 
@@ -125,24 +128,30 @@ export function normalizeRecords(inputs, { origin, timeZone, language }) {
     if (input.date === undefined) issue('date is required');
     const done = day(input.done, 'done');
     const withdrawn = day(input.withdrawn, 'withdrawn');
+    const updatedDay = day(input.updated, 'updated');
     if (done !== undefined && input.kind !== 'project') issue('only projects can be done');
-    if (date && done && done < date) issue('done cannot be before date');
-    if (date && withdrawn && withdrawn < date) issue('withdrawn cannot be before date');
+    if (!date || input.date === undefined) continue;
+
+    // A date without a time means that whole local day: compare days when
+    // either side has no time, and instants only when both have one.
+    const published = dateTime(input.date, timeZone);
+    const dateOnly = (/** @type {unknown} */ value) => typeof value === 'string' && isCalendarDate(value);
+    /** @param {Date | string} value @param {string} local */
+    const before = (value, local) => (dateOnly(value) || dateOnly(input.date) ? local < date : dateTime(value, timeZone) < published);
+    if (done !== undefined && input.done !== undefined && before(input.done, done)) issue('done cannot be before date');
+    if (withdrawn !== undefined && input.withdrawn !== undefined && before(input.withdrawn, withdrawn)) issue('withdrawn cannot be before date');
+    // Within the same day, a date without a time is not before the record itself.
+    const doneAt = done !== undefined && input.done !== undefined ? later(dateTime(input.done, timeZone), published) : undefined;
+    const withdrawnAt = withdrawn !== undefined && input.withdrawn !== undefined ? later(dateTime(input.withdrawn, timeZone), published) : undefined;
     let updated;
-    if (input.updated !== undefined) {
-      try {
-        updated = dateTime(input.updated);
-      } catch {
-        issue('updated is not a date');
+    if (updatedDay !== undefined && input.updated !== undefined) {
+      updated = dateTime(input.updated, timeZone);
+      if (before(input.updated, updatedDay)) issue('updated cannot be before date');
+      else if (updated <= published) {
+        // Receivers only replace a post with a later version; say so instead of dropping it.
+        issue('updated must be later than date; on the same day, write a time with an offset, e.g. 2026-10-05T21:00:00+08:00');
       }
     }
-    if (!date || input.date === undefined) continue;
-    const published = dateTime(input.date);
-    const doneAt = done ? dateTime(input.done) : undefined;
-    const withdrawnAt = withdrawn ? dateTime(input.withdrawn) : undefined;
-    if (doneAt && doneAt < published) issue('done cannot be before date');
-    if (withdrawnAt && withdrawnAt < published) issue('withdrawn cannot be before date');
-    if (updated && updated < published) issue('updated cannot be before date');
 
     const html = input.html ?? '';
     const text = plainText(html);
@@ -156,7 +165,7 @@ export function normalizeRecords(inputs, { origin, timeZone, language }) {
       kind: input.kind,
       date,
       published,
-      ...(updated && updated !== published ? { updated } : {}),
+      ...(updated && updated > published ? { updated } : {}),
       ...(input.summary !== undefined ? { summary: input.summary } : {}),
       tags: Array.isArray(tags) ? [...tags] : [],
       language: input.language ?? language,

@@ -20,7 +20,7 @@ test('records are normalized, newest first, and drafts are left out', () => {
   assert.equal(note.url, `${ORIGIN}/records/new/`);
   assert.equal(note.title, undefined);
   assert.equal(note.displayTitle, '一句话也算一次记录。');
-  assert.equal(note.published, '2026-10-02T00:00:00Z');
+  assert.equal(note.published, '2026-10-01T16:00:00Z'); // the start of 10-02 in Asia/Shanghai
   assert.equal(note.language, 'zh-CN');
   assert.equal(note.text, '雨停了');
 });
@@ -93,4 +93,25 @@ test('instants are converted consistently for records, weeks, completion and wit
   assert.equal(list.find((r) => r.slug === 'gone').withdrawnAt, '2026-10-05T00:00:00Z');
   assert.deepEqual(recordStats(list).activeWeeks, ['2026-W40', '2026-W41']);
   assert.throws(() => records([{ slug: 'trailing-newline\n' }]), /file name/);
+});
+
+test('a date without a time is that whole local day', () => {
+  const one = (/** @type {Record<string, unknown>} */ extra) =>
+    normalizeRecords([{ slug: 'a', kind: 'project', title: 't', html: '<p>x</p>', ...extra }], options)[0];
+  // Timed date, date-only lifecycle fields on the same day: allowed, and never before the record.
+  const timed = one({ date: '2026-10-05T20:00:00+08:00', done: '2026-10-05', withdrawn: '2026-10-05' });
+  assert.equal(timed.published, '2026-10-05T12:00:00Z');
+  assert.equal(timed.doneAt, '2026-10-05T12:00:00Z');
+  assert.equal(timed.withdrawnAt, '2026-10-05T12:00:00Z');
+  // Date-only date, an early-morning time on the same local day: allowed and later.
+  const morning = one({ date: '2026-10-05', withdrawn: '2026-10-05T07:00:00+08:00', updated: '2026-10-05T06:00:00+08:00' });
+  assert.equal(morning.published, '2026-10-04T16:00:00Z');
+  assert.equal(morning.withdrawnAt, '2026-10-04T23:00:00Z');
+  assert.equal(morning.updated, '2026-10-04T22:00:00Z');
+  // Really earlier, or an update receivers could not see: errors that say what to do.
+  assert.throws(() => one({ date: '2026-10-05T20:00:00+08:00', withdrawn: '2026-10-05T19:00:00+08:00' }), /withdrawn cannot be before date/);
+  assert.throws(() => one({ date: '2026-10-05T20:00:00+08:00', done: '2026-10-04' }), /done cannot be before date/);
+  assert.throws(() => one({ date: '2026-10-05T20:00:00+08:00', updated: '2026-10-05' }), /updated must be later than date; on the same day, write a time/);
+  assert.throws(() => one({ date: '2026-10-05', updated: '2026-10-05' }), /updated must be later than date/);
+  assert.throws(() => one({ date: '2026-10-05', updated: '2026-10-04' }), /updated cannot be before date/);
 });

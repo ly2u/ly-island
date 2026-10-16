@@ -22,7 +22,7 @@ test('a well-formed RSS feed with summaries and full text', () => {
   assert.equal(textOf(childElements(note, 'description')[0]), '一句话');
   assert.equal(textOf(childElements(article, 'title')[0]), 'A & B <桥>');
   assert.equal(textOf(childElements(article, 'link')[0]), `${ORIGIN}/records/r1/`);
-  assert.equal(textOf(childElements(article, 'pubDate')[0]), 'Thu, 01 Oct 2026 00:00:00 GMT');
+  assert.equal(textOf(childElements(article, 'pubDate')[0]), 'Wed, 30 Sep 2026 16:00:00 GMT'); // 10-01 00:00 in Asia/Shanghai
   const encoded = article.children.find((child) => typeof child !== 'string' && child.local === 'encoded');
   assert.equal(typeof encoded === 'object' && encoded.namespace, 'http://purl.org/rss/1.0/modules/content/');
   assert.match(String(typeof encoded === 'object' && textOf(encoded)), /href="https:\/\/example\.org\/records\/r2\/".*src="https:\/\/example\.org\/img\/a\.png"/);

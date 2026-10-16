@@ -21,7 +21,7 @@ describe('buildIsland', () => {
     ]);
     const island = await build(list);
     assert.equal(island.manifest.id, ORIGIN);
-    assert.equal(island.manifest.updated, '2026-10-08T00:00:00Z');
+    assert.equal(island.manifest.updated, '2026-10-07T16:00:00Z'); // done 10-08 starts then in Asia/Shanghai
     assert.deepEqual(island.manifest.stats.records, { article: 1, note: 0, project: 1 });
     assert.deepEqual(island.manifest.stats.growth, { rules: 'default@0', points: 18, stage: 'seed', unlocked: [] });
     assert.equal(island.outbox.length, 1);
@@ -72,7 +72,7 @@ describe('buildIsland', () => {
     const edited = await build(records(input.map((r, i) => i ? r : { ...r, title: '修改旧文章', updated: '2026-10-14' })));
     const head = edited.outbox.at(-1).document;
     assert.equal(head.items[0].object.title, '修改旧文章');
-    assert.equal(head.items[0].updated, '2026-10-14T00:00:00Z');
+    assert.equal(head.items[0].updated, '2026-10-13T16:00:00Z');
     assert.notEqual(head.snapshot, before.outbox.at(-1).document.snapshot);
     const historicalEdit = await build(records(input.map((r, i) => i ? r : {
       ...r, title: '仍早于首页的修改', updated: '2026-01-01T01:00:00Z',

@@ -59,14 +59,42 @@ export function localDate(value, timeZone = 'UTC') {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
+/** Wall-clock time in a time zone minus UTC, in milliseconds, at an instant. @param {number} time @param {string} timeZone */
+function zoneOffset(time, timeZone) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      .formatToParts(new Date(time))
+      .map((part) => [part.type, part.value]),
+  );
+  const wall = new Date(0);
+  wall.setUTCFullYear(Number(parts.year), Number(parts.month) - 1, Number(parts.day)); // Date.UTC would read years 0-99 as 19xx
+  wall.setUTCHours(Number(parts.hour), Number(parts.minute), Number(parts.second), 0);
+  return wall.getTime() - Math.floor(time / 1000) * 1000;
+}
+
+/**
+ * The first instant of a calendar day in a time zone, in milliseconds.
+ * Where a clock change skips midnight, the first instant that day has.
+ * @param {string} date YYYY-MM-DD @param {string} [timeZone]
+ */
+export function startOfDay(date, timeZone = 'UTC') {
+  if (!isCalendarDate(date)) throw new RangeError(`not a date: ${JSON.stringify(date)}`);
+  const midnight = dayNumber(date) * DAY_MS;
+  let time = midnight - zoneOffset(midnight, timeZone);
+  time = midnight - zoneOffset(time, timeZone);
+  for (let step = 0; step < 96 && localDate(new Date(time), timeZone) < date; step += 1) time += 15 * 60 * 1000;
+  return time;
+}
+
 /**
  * RFC 3339 time in UTC without fractions, as protocol activities use.
- * A calendar date becomes midnight UTC of that day.
- * @param {Date | string} value
+ * A calendar date means that whole local day, so its instant is the start of
+ * the day in `timeZone`.
+ * @param {Date | string} value @param {string} [timeZone]
  */
-export function dateTime(value) {
+export function dateTime(value, timeZone = 'UTC') {
   if (!(value instanceof Date) && !isRecordDate(value)) throw new RangeError(`not a date: ${String(value)}`);
-  const time = typeof value === 'string' && isCalendarDate(value) ? Date.parse(`${value}T00:00:00Z`) : new Date(value).getTime();
+  const time = typeof value === 'string' && isCalendarDate(value) ? startOfDay(value, timeZone) : new Date(value).getTime();
   if (!Number.isFinite(time)) throw new RangeError(`not a date: ${String(value)}`);
   return new Date(Math.floor(time / 1000) * 1000).toISOString().replace('.000Z', 'Z');
 }
