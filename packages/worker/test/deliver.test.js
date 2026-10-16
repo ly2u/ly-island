@@ -1,0 +1,124 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
+import { access, clock, island, network, ownerCall, SEEDS } from './harness.js';
+
+async function setup({ resolver = null } = {}) {
+  const net = network();
+  const time = clock();
+  const team = await access(net);
+  const a = await island({ net, time, origin: 'https://a.example', seed: SEEDS.a, resolver });
+  const b = await island({ net, time, origin: 'https://b.example', seed: SEEDS.b });
+  const asA = ownerCall(a, await team.token(team.claims(time.now())));
+  return { net, time, team, a, b, asA };
+}
+
+const message = (to) => ({ type: 'message', to, text: '你好' });
+
+test('an inbox that redirects is never followed, and the failure is final', async () => {
+  const { net, a, b, asA } = await setup();
+  const original = net.hosts.get('b.example');
+  net.route('b.example', (request) =>
+    new URL(request.url).pathname === '/island/inbox' ? new Response(null, { status: 307, headers: { location: 'https://evil.example/collect' } }) : original(request));
+  net.route('evil.example', () => {
+    throw new Error('must not be reached');
+  });
+  const result = await (await asA('/island/api/send', message(b.origin))).json();
+  assert.deepEqual([result.status, result.reason], ['failed', 'redirect-not-followed']);
+  assert.equal(net.count((entry) => entry.url.includes('evil.example')), 0);
+  assert.deepEqual((await a.rows("SELECT type FROM events WHERE type = 'delivery.failed'")).length, 1);
+});
+
+test('with a resolver (self-hosting), names that resolve to private addresses are never connected', async () => {
+  const resolver = async (/** @type {string} */ host) => (host === 'b.example' ? ['10.0.0.7'] : ['93.184.216.34']);
+  const { net, b, asA } = await setup({ resolver });
+  const before = net.count((entry) => entry.url.startsWith(b.origin));
+  const result = await (await asA('/island/api/send', message(b.origin))).json();
+  assert.deepEqual([result.status, result.reason], ['failed', 'forbidden-address']);
+  assert.equal(net.count((entry) => entry.url.startsWith(b.origin)), before, 'no request reached b.example');
+});
+
+test('addresses from other islands must follow the rules: no IPs, ports, local names or plain http', async () => {
+  const { net, asA } = await setup();
+  for (const to of ['http://b.example', 'https://10.0.0.1', 'https://b.example:8443', 'https://localhost', 'https://intranet']) {
+    const response = await asA('/island/api/send', message(to));
+    assert.equal(response.status, 400, to);
+  }
+  assert.equal(net.count((entry) => entry.method === 'POST' && entry.url.endsWith('/island/inbox')), 0);
+});
+
+test('5xx retries at most 3 times within a day; 429 waits for Retry-After', async () => {
+  const { net, time, team, a, b, asA } = await setup();
+  const original = net.hosts.get('b.example');
+  let answer = 503;
+  net.route('b.example', (request) =>
+    new URL(request.url).pathname === '/island/inbox' && answer !== 202 ? new Response(null, { status: answer, headers: answer === 429 ? { 'retry-after': '120' } : {} }) : original(request));
+
+  const first = await (await asA('/island/api/send', message(b.origin))).json();
+  assert.deepEqual([first.status, first.reason], ['pending', 'HTTP 503']);
+  await a.cron();
+  assert.equal((await a.rows('SELECT attempts FROM sent'))[0].attempts, 1, 'not due yet');
+  time.advance(61 * 60_000);
+  answer = 429;
+  await a.cron();
+  let [row] = await a.rows('SELECT status, attempts, next_at FROM sent');
+  assert.equal(row.status, 'pending');
+  assert.equal(row.next_at, time.now() + 120_000);
+  time.advance(121_000);
+  answer = 202;
+  await a.cron();
+  [row] = await a.rows('SELECT status FROM sent');
+  assert.equal(row.status, 'delivered');
+  assert.equal((await b.rows('SELECT * FROM received')).length, 1);
+
+  // And a recipient that stays down fails after the third retry, with one event.
+  answer = 500;
+  // The first login has expired by now: log in again.
+  await ownerCall(a, await team.token(team.claims(time.now())))('/island/api/send', message(b.origin));
+  for (const wait of [61, 4 * 60 + 1, 12 * 60 + 1]) {
+    time.advance(wait * 60_000);
+    await a.cron();
+  }
+  const failed = await a.rows("SELECT status, attempts FROM sent WHERE status != 'delivered'");
+  assert.deepEqual(failed, [{ status: 'failed', attempts: 4 }]);
+  assert.equal((await a.rows("SELECT * FROM events WHERE type = 'delivery.failed'")).length, 1);
+});
+
+test('without its signing key the service still receives, but refuses to send', async () => {
+  const { a, b, asA } = await setup();
+  a.env.ISLAND_SIGNING_KEY = '';
+  // A new isolate would read the secret afresh; the cache is per key value.
+  const me = await (await asA('/island/api/me')).json();
+  assert.equal(me.canSend, false);
+  const result = await (await asA('/island/api/send', message(b.origin))).json();
+  assert.equal(result.reason, 'no-signing-key');
+  a.env.ISLAND_SIGNING_KEY = SEEDS.c;
+  assert.match((await (await asA('/island/api/me')).json()).signingProblem, /does not match/);
+});
+
+test('"reply from my island" goes to the visitor\'s own compose page, never elsewhere', async () => {
+  const { a, b } = await setup();
+  const go = await b.request(`/island/go?home=${encodeURIComponent(a.origin)}&type=message&inReplyTo=${encodeURIComponent(`${b.origin}/records/r1/`)}&returnTo=${encodeURIComponent(`${b.origin}/records/r1/`)}`);
+  assert.equal(go.status, 303);
+  const target = new URL(go.headers.get('location'));
+  assert.equal(`${target.origin}${target.pathname}`, 'https://a.example/island/compose');
+  assert.equal(target.searchParams.get('to'), b.origin);
+  assert.equal(target.searchParams.get('inReplyTo'), `${b.origin}/records/r1/`);
+  // returnTo and inReplyTo must belong to this island; home must be an island address.
+  const sneaky = new URL((await b.request(`/island/go?home=${encodeURIComponent(a.origin)}&returnTo=${encodeURIComponent('https://evil.example/')}`)).headers.get('location'));
+  assert.equal(sneaky.searchParams.get('returnTo'), null);
+  for (const home of ['javascript:alert(1)', 'http://a.example', 'https://a.example/path', '']) {
+    assert.equal((await b.request(`/island/go?home=${encodeURIComponent(home)}`)).status, 400, home);
+  }
+});
+
+test('export returns everything except token hashes', async () => {
+  const { a, b, asA } = await setup();
+  await asA('/island/api/send', message(b.origin));
+  await asA('/island/api/tokens', { scope: 'read', label: 'x' });
+  const response = await asA('/island/api/export');
+  assert.match(response.headers.get('content-disposition'), /attachment; filename="island-export-/);
+  const data = await response.json();
+  assert.equal(data.sent.length, 1);
+  assert.deepEqual(Object.keys(data.tokens[0]).sort(), ['created', 'label', 'revoked', 'scope']);
+});
