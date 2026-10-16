@@ -1,0 +1,21 @@
+---
+permalink: /feed.xml
+eleventyExcludeFromCollections: true
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>{{ site.name }}</title>
+    <description>{{ site.summary }}</description>
+    <link>{{ site.url }}/</link>
+    {%- for note in collections.notes | reverse %}
+    <item>
+      <title>{{ note.data.title }}</title>
+      <link>{{ site.url }}{{ note.url }}</link>
+      <guid isPermaLink="true">{{ site.url }}{{ note.url }}</guid>
+      <description>{{ note.data.summary }}</description>
+      <pubDate>{{ note.date | dateToRfc822 }}</pubDate>
+    </item>
+    {%- endfor %}
+  </channel>
+</rss>

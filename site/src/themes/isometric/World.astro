@@ -1,0 +1,60 @@
+---
+// Default theme: a 2.5D island drawn from public data only (appearance seed,
+// colors, record counts and unlocks), so neighbors can be drawn the same way.
+// The picture is plain SVG and works without JavaScript; a small script then
+// adds what depends on today: fog after quiet weeks, and the current streak.
+
+import './theme.css';
+import { islandScene } from '../../../../packages/core/src/scene.js';
+import { strings } from '../../lib/i18n.js';
+
+const { island } = Astro.props;
+const { config, manifest, growth, shown } = island;
+const t = strings(config.language[0]);
+const scene = islandScene({
+  seed: config.appearance.seed,
+  colors: config.appearance.colors,
+  counts: manifest.stats.records,
+  done: shown.filter((record) => record.kind === 'project' && record.done).length,
+  unlocked: growth.unlocked,
+});
+const shapes = [...scene.background, ...scene.island];
+---
+<section class="world" data-island-world data-stats={JSON.stringify(manifest.stats)} aria-labelledby="island-name">
+  <h1 id="island-name" class="sr-only">{config.name}</h1>
+  <svg class="island" viewBox={`0 0 ${scene.width} ${scene.height}`} role="img" aria-labelledby="island-title island-desc">
+    <title id="island-title">{config.name}</title>
+    <desc id="island-desc">{t.describe(scene.drawn, growth.stage)}</desc>
+    {shapes.map(({ tag: Tag, attributes }) => <Tag {...attributes} />)}
+    <rect data-island-fog {...scene.fog.attributes} />
+  </svg>
+  <dl class="growth">
+    <div><dt>{t.stage}</dt><dd>{t.stages[growth.stage as 'seed'] ?? growth.stage}</dd></div>
+    <div><dt>{t.points}</dt><dd>{growth.points}{growth.next && <small> · {t.nextStage(growth.next.stage, growth.next.points - growth.points)}</small>}</dd></div>
+    <div hidden data-island-streak-row><dt>{t.streak}</dt><dd data-island-streak data-template={t.streakTemplate}></dd></div>
+    {manifest.stats.lastRecord && <div><dt>{t.lastRecord}</dt><dd><time datetime={manifest.stats.lastRecord}>{manifest.stats.lastRecord}</time></dd></div>}
+  </dl>
+</section>
+
+<script>
+  import { presentStats } from '../../../../packages/core/src/growth/index.js';
+
+  const world = document.querySelector('[data-island-world]');
+  if (world instanceof HTMLElement) {
+    try {
+      const now = new Date();
+      const today = [now.getFullYear(), now.getMonth() + 1, now.getDate()].map((n) => String(n).padStart(2, '0')).join('-');
+      const view = presentStats(JSON.parse(world.dataset.stats ?? '{}'), today);
+      world.querySelector('[data-island-fog]')?.setAttribute('opacity', String(Math.round((1 - view.vitality) * 55) / 100));
+      world.dataset.vitality = String(view.vitality);
+      const streak = world.querySelector('[data-island-streak]');
+      const row = world.querySelector('[data-island-streak-row]');
+      if (streak instanceof HTMLElement && row instanceof HTMLElement && view.streakWeeks > 0) {
+        streak.textContent = (streak.dataset.template ?? '{n}').replace('{n}', String(view.streakWeeks));
+        row.hidden = false;
+      }
+    } catch {
+      // The static picture stays as it is.
+    }
+  }
+</script>

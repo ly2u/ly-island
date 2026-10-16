@@ -13,6 +13,11 @@
    thousand generated strings that are run through both the schema patterns
    and the JavaScript rules (via node) and must get the same answers.
 
+With --documents DIR, it instead checks a built island (a site's dist
+folder): the manifest, every outbox page reached through `next`, and the
+friends list pass the schemas, and every activity verifies with the
+manifest's key, using the Python implementation only.
+
 Requires: jsonschema, cryptography, and node on PATH.
 """
 
@@ -208,8 +213,56 @@ def check_vector() -> None:
         fail("signing vector: signature does not verify")
 
 
+def served_file(dist: Path, url: str, origin: str) -> Path:
+    if not url.startswith(origin + "/"):
+        raise ValueError(f"{url} is not on {origin}")
+    path = url[len(origin) + 1:]
+    return dist / (path + "index.html" if path == "" or path.endswith("/") else path)
+
+
+def check_built(validators: dict[str, Draft202012Validator], dist: Path) -> int:
+    manifest = json.loads((dist / ".well-known" / "island.json").read_text(encoding="utf-8"))
+    errors = schema_errors(validators, "manifest", manifest)
+    if errors:
+        fail(f"built manifest: {errors[:3]}")
+        return 1
+    origin = manifest["id"]
+    keys = {key["id"]: b64url(key["publicKey"]) for key in manifest["keys"]}
+    documents, activities = 1, 0
+    url, seen = manifest["links"]["outbox"], set()
+    while url and url not in seen and len(seen) < 1000:
+        seen.add(url)
+        page = json.loads(served_file(dist, url, origin).read_text(encoding="utf-8"))
+        documents += 1
+        errors = schema_errors(validators, "outbox", page)
+        if errors:
+            fail(f"built outbox {url}: {errors[:3]}")
+        for item in page.get("items", []):
+            activities += 1
+            errors = schema_errors(validators, "activity", item)
+            if errors:
+                fail(f"built activity {item.get('id')}: {errors[:3]}")
+            elif item["proof"]["key"] not in keys or not verifies(item, keys[item["proof"]["key"]]):
+                fail(f"built activity {item['id']}: signature does not verify")
+        url = page.get("next")
+    friends = json.loads(served_file(dist, manifest["links"]["friends"], origin).read_text(encoding="utf-8"))
+    documents += 1
+    errors = schema_errors(validators, "friends", friends)
+    if errors:
+        fail(f"built friends: {errors[:3]}")
+    print(f"built island {origin}: {documents} documents, {activities} activities verified")
+    return documents
+
+
 def main() -> int:
     validators = load_validators()
+    if len(sys.argv) == 3 and sys.argv[1] == "--documents":
+        check_built(validators, Path(sys.argv[2]))
+        if failures:
+            print(f"{len(failures)} failure(s)")
+            return 1
+        print("ok")
+        return 0
     fixtures = check_fixtures(validators)
     addresses = check_addresses(validators)
     generated = check_address_differential(validators)

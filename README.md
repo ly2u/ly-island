@@ -25,15 +25,19 @@
 | 审查和测试 | VPS 上的审查者 | 对照 `docs/` 审查每个 PR，在独立环境里运行测试和构建 |
 | 决定和合并 | 站主 | 确认决定，合并 PR，操作 Cloudflare 账号 |
 
-详见[决定 F15](docs/decisions.md#f15-分工已定)。
+审查按模块集中进行：一个模块做完提交一个 PR，审查一次。详见[决定 F15](docs/decisions.md#f15-分工已定)。
 
 ## 代码
 
-第 1 阶段进行中。
+第 1 阶段：一座静态岛。
 
 | 目录 | 内容 |
 |---|---|
 | [`packages/protocol`](packages/protocol/README.md) | 协议核心：格式校验、签名、密钥历史、撤回归属、出站校验、收件箱预检查。没有依赖 |
+| `packages/core` | 构建核心：记录、统计、成长规则 `default@0`、签名的协议文件、订阅源、小岛的图形。只依赖协议核心 |
+| [`site`](site/README.md) | 岛屿模板：Astro 站点、示例记录、两个主题、部署到 Cloudflare 的配置 |
+| `tools` | 检查工具：严格的 XML 解析器、构建产物检查、浏览器检查 |
+| `spikes/ssg-compare` | Astro 与 Eleventy 的对比实验，结果见[静态生成器对比](docs/ssg-comparison.md) |
 
 在仓库根目录运行检查：
 
@@ -41,6 +45,15 @@
 node --test
 python3 packages/protocol/scripts/check_schemas.py   # 需要 jsonschema 和 cryptography
 python3 scripts/check_docs.py
+```
+
+构建并检查示例岛：
+
+```bash
+cd site
+npm ci
+ISLAND_ALLOW_TEST_KEY=1 npm run build
+node ../tools/site-check/cli.mjs dist --theme isometric
 ```
 
 ## 文档
@@ -53,6 +66,7 @@ python3 scripts/check_docs.py
 | [部署](docs/deployment.md) | Cloudflare 免费档、自托管、测试环境 dev.rqly.com |
 | [路线](docs/roadmap.md) | 各阶段的内容和验收，拆成独立仓库的步骤 |
 | [决定记录](docs/decisions.md) | 已定和待定的事项 |
+| [静态生成器对比](docs/ssg-comparison.md) | Astro 与 Eleventy 的实测对比和建议 |
 
 ## 许可证
 

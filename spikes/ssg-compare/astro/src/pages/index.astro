@@ -1,0 +1,20 @@
+---
+import Base from '../layouts/Base.astro';
+import Island from '../components/Island.astro';
+import { allNotes } from '../notes.js';
+import { islandShape } from '../../../shared/island-data.mjs';
+
+const notes = await allNotes();
+const shape = islandShape(notes);
+---
+<Base title="示例岛">
+  <Island {...shape} />
+  <ul>
+    {notes.map((note) => (
+      <li>
+        <a href={`/notes/${note.slug}/`}>{note.title}</a>
+        <time datetime={note.date.toISOString()}>{note.date.toISOString().slice(0, 10)}</time>
+      </li>
+    ))}
+  </ul>
+</Base>

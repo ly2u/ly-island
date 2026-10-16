@@ -1,0 +1,13 @@
+---
+import Base from '../layouts/Base.astro';
+import { island } from '../lib/island.js';
+import { strings } from '../lib/i18n.js';
+
+const { config } = await island();
+const t = strings(config.language[0]);
+---
+<Base title="404">
+  <h1>404</h1>
+  <p>{t.notFound}</p>
+  <p><a href="/">{t.back}</a></p>
+</Base>

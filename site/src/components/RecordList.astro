@@ -1,0 +1,27 @@
+---
+import { strings } from '../lib/i18n.js';
+
+interface Props {
+  records: { slug: string; path: string; displayTitle: string; kind: string; date: string; done?: string }[];
+  language: string;
+}
+
+const { records, language } = Astro.props;
+const t = strings(language);
+---
+{records.length === 0 ? (
+  <p class="empty">{t.noRecords}</p>
+) : (
+  <ul class="record-list">
+    {records.map((record) => (
+      <li class={`record kind-${record.kind}`}>
+        <a href={record.path}>{record.displayTitle}</a>
+        <span class="meta">
+          <span class="kind">{t.kinds[record.kind as 'article']}</span>
+          {record.done && <span class="done">{t.done}</span>}
+          <time datetime={record.date}>{record.date}</time>
+        </span>
+      </li>
+    ))}
+  </ul>
+)}

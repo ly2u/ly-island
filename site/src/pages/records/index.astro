@@ -1,0 +1,20 @@
+---
+import RecordList from '../../components/RecordList.astro';
+import Base from '../../layouts/Base.astro';
+import { island } from '../../lib/island.js';
+import { strings } from '../../lib/i18n.js';
+
+const { config, shown } = await island();
+const t = strings(config.language[0]);
+const years = [...new Set(shown.map((record) => record.date.slice(0, 4)))];
+---
+<Base title={t.allRecords}>
+  <h1>{t.allRecords}</h1>
+  {shown.length === 0 && <p class="empty">{t.noRecords}</p>}
+  {years.map((year) => (
+    <section aria-labelledby={`y${year}`}>
+      <h2 id={`y${year}`}>{year}</h2>
+      <RecordList records={shown.filter((record) => record.date.startsWith(year))} language={config.language[0]} />
+    </section>
+  ))}
+</Base>
