@@ -130,7 +130,7 @@ def admin_fixtures(origin: str) -> dict[str, object]:
                                                             "folder": "inbox", "received": "2026-10-01T08:00:01.000Z", "read": False, "activity": message}]},
         "/island/api/feed": {"items": [{"actor": NEIGHBOR, "name": HOSTILE, "activity": post}]},
         "/island/api/islands": {"items": [{"origin": NEIGHBOR, "name": HOSTILE, "following": True, "publicFriend": False, "follower": True,
-                                           "allowed": False, "blocked": False, "paused": True, "lastActivity": None}]},
+                                           "allowed": False, "blocked": False, "paused": True, "lastActivity": None, "problem": HOSTILE}]},
         "/island/api/sent": {"items": [{"id": "a", "recipient": NEIGHBOR, "type": "message", "created": "2026-10-01T08:00:00.000Z",
                                         "status": "failed", "attempts": 4, "last_error": HOSTILE}]},
         "/island/api/drafts": {"items": [{"id": 1, "type": "message", "by": HOSTILE, "created": 0, "data": {"to": NEIGHBOR, "text": HOSTILE}}]},

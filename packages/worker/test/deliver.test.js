@@ -34,7 +34,8 @@ test('with a resolver (self-hosting), names that resolve to private addresses ar
   const { net, b, asA } = await setup({ resolver });
   const before = net.count((entry) => entry.url.startsWith(b.origin));
   const result = await (await asA('/island/api/send', message(b.origin))).json();
-  assert.deepEqual([result.status, result.reason], ['failed', 'forbidden-address']);
+  assert.equal(result.status, 'failed');
+  assert.match(result.reason, /forbidden-address/);
   assert.equal(net.count((entry) => entry.url.startsWith(b.origin)), before, 'no request reached b.example');
 });
 
@@ -223,6 +224,24 @@ test('a pending retry that waited past the window expires instead of being refus
   assert.equal(posts, 2, 'the first send and one retry; the second retry would have been too old');
   assert.equal((await a.rows('SELECT status FROM sent'))[0].status, 'expired');
   assert.equal((await a.rows("SELECT * FROM events WHERE type = 'delivery.failed'")).length, 1);
+});
+
+test('a refusal by Cloudflare is recorded with its code; a network failure with the runtime\'s words', async () => {
+  const { net, a, b, asA } = await setup();
+  const original = net.hosts.get('b.example');
+  let mode = 'cloudflare';
+  net.route('b.example', (request) => {
+    if (new URL(request.url).pathname !== '/island/inbox') return original(request);
+    if (mode === 'cloudflare') return new Response('error code: 1003', { status: 403, headers: { 'content-type': 'text/plain' } });
+    throw new TypeError('Network connection lost.');
+  });
+  const refused = await (await asA('/island/api/send', message(b.origin))).json();
+  assert.deepEqual([refused.status, refused.reason], ['failed', 'HTTP 403 (Cloudflare 1003)']);
+  mode = 'network';
+  const lost = await (await asA('/island/api/send', message(b.origin))).json();
+  assert.deepEqual([lost.status, lost.reason], ['pending', 'network-error: Network connection lost.']);
+  const rows = await a.rows('SELECT last_error FROM sent ORDER BY created');
+  assert.deepEqual(rows.map((r) => r.last_error), ['HTTP 403 (Cloudflare 1003)', 'network-error: Network connection lost.']);
 });
 
 test('without its signing key the service still receives, but refuses to send', async () => {

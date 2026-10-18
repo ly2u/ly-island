@@ -20,7 +20,7 @@
 import { DELIVERY_WINDOW, signActivity, validateActivity } from '../../protocol/src/index.js';
 import { timeOf } from '../../protocol/src/util.js';
 import { BudgetExceeded } from './budget.js';
-import { OutboundError } from './net.js';
+import { httpReason, OutboundError } from './net.js';
 import { eventStatement } from './notify.js';
 import { islandColumns, learnIsland, pausedEvent, upsertIsland } from './remote.js';
 
@@ -202,7 +202,7 @@ export async function attempt(ctx, row) {
 async function post(ctx, row, writes) {
   const island = await ctx.store.first('SELECT * FROM islands WHERE origin = ?', [row.recipient]);
   const learned = await learnIsland(ctx, row.recipient, island);
-  if (!learned.ok) return { kind: learned.retry ? 'retry' : 'final', reason: learned.reason };
+  if (!learned.ok) return { kind: learned.retry ? 'retry' : 'final', reason: learned.detail ?? learned.reason };
   if (learned.fetched) {
     writes.push(upsertIsland(row.recipient, ctx.now(), islandColumns(learned, ctx.now())));
     const keyEvent = pausedEvent(ctx, row.recipient, island, learned, ctx.now());
@@ -220,12 +220,12 @@ async function post(ctx, row, writes) {
     if (!(error instanceof OutboundError)) throw error;
     // Address rules and refused redirects will not change by retrying.
     const final = !['timeout', 'network-error'].includes(error.reason);
-    return { kind: final ? 'final' : 'retry', reason: error.reason };
+    return { kind: final ? 'final' : 'retry', reason: error.message };
   }
   if (response.status >= 200 && response.status < 300) return { kind: 'delivered' };
   if (response.status === 429) return { kind: 'wait', seconds: Math.max(60, response.retryAfter ?? 3600), reason: 'HTTP 429' };
-  if (response.status >= 500) return { kind: 'retry', reason: `HTTP ${response.status}` };
-  return { kind: 'final', reason: `HTTP ${response.status}` };
+  if (response.status >= 500) return { kind: 'retry', reason: httpReason(response) };
+  return { kind: 'final', reason: httpReason(response) };
 }
 
 /**

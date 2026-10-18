@@ -117,7 +117,7 @@ const views = {
         h('thead', {}, h('tr', {}, h('th', {}, t.island), h('th', {}, t.relation), h('th', {}, ''))),
         h('tbody', {}, ...items.map((/** @type {any} */ item) => h('tr', {},
           h('td', {}, link(item.origin, item.name)),
-          h('td', {}, [item.publicFriend ? t.publicFriend : item.following && t.following, item.follower && t.follower, item.allowed && t.allowed, item.blocked && t.blocked, item.paused && t.paused].filter(Boolean).join(' · ')),
+          h('td', {}, [item.publicFriend ? t.publicFriend : item.following && t.following, item.follower && t.follower, item.allowed && t.allowed, item.blocked && t.blocked, item.paused && t.paused, item.problem && `${t.syncProblem}: ${item.problem}`].filter(Boolean).join(' · ')),
           h('td', { class: 'actions' },
             item.following && !item.publicFriend ? h('button', { type: 'button', onclick: () => act(() => api('/unfollow', { origin: item.origin })) }, t.unfollow) : null,
             !item.following ? h('button', { type: 'button', onclick: () => act(() => api('/follow', { origin: item.origin })) }, t.follow) : null, ' ',

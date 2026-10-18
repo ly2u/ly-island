@@ -162,7 +162,7 @@ npm run dev:worker
    - `ISLAND_SIGNING_KEY`：和构建密钥相同，没有它就不能寄信；
    - `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`：Cloudflare Access 的团队域名和应用的 AUD 标签。Access 只保护 `/island/admin*`、`/island/api*`、`/island/compose*`，别的路径不要保护，详见[部署文档](../docs/deployment.md#第-2-阶段岛务-worker)；
    - 通知渠道的凭据，可选。
-5. **绑定域名：** Worker → Settings → Domains & Routes → 添加 Custom domain。`wrangler.jsonc` 关掉了 `workers.dev` 和预览地址，所以岛只能通过你自己的域名访问。
+5. **绑定域名：** Worker → Settings → Domains & Routes → 添加 Custom domain。`wrangler.jsonc` 关掉了 `workers.dev` 和预览地址，所以岛只能通过你自己的域名访问。不绑定的话，即使域名有一条通配记录能解析，请求也到不了 Worker。
 6. **部署后检查：**
    - 打开 `https://<你的域名>/.well-known/island.json`，`id` 应该是你的地址，`keys` 里的公钥和 `npm run keygen` 打印的一致；
    - 打开 `/feed.xml` 和 `/island/outbox.json`，能看到内容；

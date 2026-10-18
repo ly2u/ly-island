@@ -15,7 +15,7 @@
 | `src/deliver.js` | 寄出关注、拜访、留言、浇水：签名、存下、投递，按协议重试 |
 | `src/poll.js` | 定时同步邻居的动态：分页续读、快照摘要、只验新版本、首次同步不发通知 |
 | `src/remote.js` | 读别的岛的名片，首次信任和密钥日志，密钥对不上时暂停 |
-| `src/net.js` | 出站请求：地址检查、同源重定向、大小和时间上限、计入预算 |
+| `src/net.js` | 出站请求：地址检查、同源重定向、大小和时间上限、计入预算；失败时记下 HTTP 状态和 Cloudflare 的错误码，或运行时的原话，供站主判断 |
 | `src/notify.js` | 通知事件、免打扰、摘要，Telegram、ntfy、webhook |
 | `src/auth.js` | 站主（Cloudflare Access 令牌，服务自己再验一次）、AI 令牌、站主写操作的 CSRF 检查 |
 | `src/api.js` | 站主接口 `/island/api/*` 和 AI 接口 `/island/ai/*` |
