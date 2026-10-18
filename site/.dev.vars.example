@@ -1,0 +1,21 @@
+# Settings of the island's Worker (runtime). In Cloudflare: Worker, Settings,
+# Variables and secrets. For `npm run dev:worker`, copy this file to
+# .dev.vars (which Git ignores) and fill it in. Never commit real values.
+
+# The island's signing key, the same value as the ISLAND_SIGNING_KEY build
+# secret (npm run keygen). Without it the island receives but cannot send.
+ISLAND_SIGNING_KEY=
+
+# Cloudflare Access in front of /island/admin, /island/api and /island/compose:
+# the team domain (e.g. myteam.cloudflareaccess.com) and the application's
+# AUD tag (several, comma-separated, if the paths are in several applications).
+ACCESS_TEAM_DOMAIN=
+ACCESS_AUD=
+
+# Notifications: fill in the ones you use. When island/notify.json lists no
+# channels, every channel set here is used.
+NTFY_TOPIC=
+NTFY_TOKEN=
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+WEBHOOK_URL=

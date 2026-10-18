@@ -18,6 +18,11 @@ export function readJson(path) {
   }
 }
 
+/**
+ * The island's settings: island.config.json, or the file named by
+ * ISLAND_CONFIG (relative to the site folder), so one repository can build
+ * a second island, such as a test island next to the real one.
+ */
 export function loadConfig(env = process.env) {
-  return islandConfig(readJson('island.config.json'), env, { themes: THEMES });
+  return islandConfig(readJson(env.ISLAND_CONFIG || 'island.config.json'), env, { themes: THEMES });
 }

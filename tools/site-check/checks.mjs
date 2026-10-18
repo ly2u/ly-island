@@ -126,6 +126,8 @@ export async function checkSite(dist, options = {}) {
     manifestValid = check.ok;
     if (!check.ok) problems.push(`.well-known/island.json: ${JSON.stringify(check.issues)}`);
     for (const [name, url] of Object.entries(isObject(manifest.links) ? manifest.links : {})) {
+      // The inbox and compose page are answered by the island service, not by static files.
+      if (name === 'inbox' || name === 'compose') continue;
       const file = fileFor(String(url), origin);
       if (file === null || !fileSet.has(file)) problems.push(`manifest link ${name} (${url}) is not in the build`);
     }

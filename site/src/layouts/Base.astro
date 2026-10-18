@@ -6,11 +6,13 @@ import { strings } from '../lib/i18n.js';
 interface Props {
   title?: string;
   description?: string;
+  /** Pages search engines should leave out, such as the owner's desk. */
+  noindex?: boolean;
 }
 
 const { config } = await island();
 const t = strings(config.language[0]);
-const { title, description } = Astro.props;
+const { title, description, noindex = false } = Astro.props;
 const pageTitle = title ? `${title} · ${config.name}` : config.name;
 ---
 <!doctype html>
@@ -21,6 +23,7 @@ const pageTitle = title ? `${title} · ${config.name}` : config.name;
     <meta name="color-scheme" content="light dark" />
     <title>{pageTitle}</title>
     <meta name="description" content={description ?? config.summary ?? config.name} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
     <link rel="island" href="/.well-known/island.json" />
     <link rel="alternate" type="application/rss+xml" title={config.name} href="/feed.xml" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />

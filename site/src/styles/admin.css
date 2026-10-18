@@ -1,0 +1,137 @@
+/* The owner's desk (/island/admin/). Plain and dense: lists, tables, forms. */
+
+.admin h1 {
+  margin-bottom: 0.5rem;
+}
+
+.admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-tabs a[aria-current],
+.admin .tabs a[aria-current] {
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--fg);
+}
+
+.admin-status {
+  min-height: 1.75em;
+  color: var(--muted);
+}
+
+.admin .error {
+  color: #b3261e;
+}
+
+@media (prefers-color-scheme: dark) {
+  .admin .error {
+    color: #f2b8b5;
+  }
+}
+
+.admin .items {
+  list-style: none;
+  padding: 0;
+}
+
+.admin .items > li {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin .items > li.unread {
+  border-left: 3px solid var(--island-accent, var(--link));
+  padding-left: 0.75rem;
+}
+
+.admin .items p {
+  margin: 0.25rem 0;
+}
+
+.admin .meta,
+.admin .empty {
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
+.admin .text {
+  white-space: pre-wrap;
+}
+
+.admin p.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.admin table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.admin th,
+.admin td {
+  text-align: left;
+  padding: 0.4rem 0.5rem 0.4rem 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  /* Island addresses are long; on a phone they wrap instead of widening the page. */
+  overflow-wrap: anywhere;
+}
+
+.admin td.actions button {
+  margin: 0 0.25rem 0.25rem 0;
+}
+
+.admin .stack {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.admin .stack label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.admin .stack label.check {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.admin .inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: end;
+  margin: 1rem 0;
+}
+
+.admin input[type="url"],
+.admin input[type="text"],
+.admin textarea,
+.admin select {
+  font: inherit;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.admin textarea {
+  width: 100%;
+}
+
+.admin .new-token {
+  font-family: ui-monospace, monospace;
+  word-break: break-all;
+}
+
+.admin button {
+  font: inherit;
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@islands/worker",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The island service: inbox, deliveries, neighbor sync, notifications and the owner API, written as a Web-standard fetch handler with no dependencies besides @islands/protocol.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./d1": "./src/store-d1.js",
+    "./node-sqlite": "./src/store-node.js"
+  },
+  "files": [
+    "src"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

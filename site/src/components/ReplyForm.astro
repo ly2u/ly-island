@@ -1,0 +1,37 @@
+---
+// "Reply from your island", without JavaScript: the visitor types their own
+// island's address, the service here (/island/go) looks up its compose page
+// and sends them there; they write and sign at home, and the message comes
+// back to this island's inbox. After sending, their island returns them to
+// this page with #island-sent, which shows the thank-you line.
+import { island } from '../lib/island.js';
+import { strings } from '../lib/i18n.js';
+
+interface Props {
+  /** The record being replied to. */
+  url: string;
+}
+
+const { url } = Astro.props;
+const { config } = await island();
+const t = strings(config.language[0]).reply;
+---
+{config.interactions.enabled && (
+  <section class="reply" aria-labelledby="reply-title">
+    <p id="island-sent" class="reply-sent" tabindex="-1">{t.sent}</p>
+    <h2 id="reply-title">{t.title}</h2>
+    <form method="get" action="/island/go">
+      <input type="hidden" name="inReplyTo" value={url} />
+      <input type="hidden" name="returnTo" value={url} />
+      <label>
+        {t.home}
+        <input type="text" name="home" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://" required />
+      </label>
+      <p class="reply-actions">
+        <button type="submit" name="type" value="message">{t.message}</button>
+        <button type="submit" name="type" value="water">{t.water}</button>
+      </p>
+    </form>
+    <p class="reply-hint">{t.hint}</p>
+  </section>
+)}

@@ -247,3 +247,53 @@ pre {
 .empty {
   color: var(--muted);
 }
+
+/* "Reply from your island" on record pages (components/ReplyForm.astro). */
+.reply {
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.reply h2 {
+  font-size: 1.1rem;
+  margin: 0 0 0.5rem;
+}
+
+.reply label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.reply input {
+  font: inherit;
+  width: 100%;
+  max-width: 24rem;
+}
+
+.reply button {
+  font: inherit;
+}
+
+.reply-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.reply-hint {
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
+/* Shown only when the visitor's island sends them back after delivering. */
+.reply-sent {
+  display: none;
+}
+
+.reply-sent:target {
+  display: block;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--island-accent, var(--link));
+  background: var(--code-bg);
+}
