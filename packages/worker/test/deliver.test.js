@@ -162,7 +162,52 @@ test('a letter held longer than the inbox window expires instead of going out, a
   assert.notEqual(again.id, expired.id);
   assert.equal(posts(), before + 1);
   assert.deepEqual((await a.rows('SELECT status FROM sent WHERE id = ?', [expired.id]))[0].status, 'resent');
-  assert.equal((await owner('/island/api/resend', { id: expired.id })).status, 400, 'only once');
+  const twice = await owner('/island/api/resend', { id: expired.id });
+  assert.deepEqual([twice.status, (await twice.json()).id], [409, again.id], 'only once; the answer names the new letter');
+});
+
+test('concurrent requests to send a failed letter again create one new letter', async () => {
+  const { net, a, b, asA } = await setup();
+  const original = net.hosts.get('b.example');
+  let refuse = true;
+  net.route('b.example', (request) => (new URL(request.url).pathname === '/island/inbox' && refuse ? new Response(null, { status: 400 }) : original(request)));
+  const first = await (await asA('/island/api/send', message(b.origin))).json();
+  assert.equal(first.status, 'failed');
+  refuse = false;
+
+  const responses = await Promise.all(Array.from({ length: 5 }, () => asA('/island/api/resend', { id: first.id })));
+  const bodies = await Promise.all(responses.map((r) => r.json()));
+  assert.deepEqual(responses.map((r) => r.status).sort(), [200, 409, 409, 409, 409]);
+  const winner = bodies.find((body) => body.status === 'delivered');
+  assert.ok(winner);
+  assert.ok(bodies.filter((body) => body.status === 'already-resent').every((body) => body.id === winner.id), 'the others name the one new letter');
+  assert.equal((await a.rows('SELECT * FROM sent')).length, 2, 'the old letter and one new one');
+  assert.deepEqual((await a.rows('SELECT status, replaced_by FROM sent WHERE id = ?', [first.id]))[0], { status: 'resent', replaced_by: winner.id });
+  assert.equal((await b.rows('SELECT * FROM received')).length, 1, 'the recipient got one letter');
+  // The old letter itself was never changed.
+  const [old] = await a.rows('SELECT activity FROM sent WHERE id = ?', [first.id]);
+  assert.equal(JSON.parse(old.activity).id, first.id);
+});
+
+test('if storing the new letter fails, the old one can still be sent again', async () => {
+  const { net, a, b, asA } = await setup();
+  const original = net.hosts.get('b.example');
+  let refuse = true;
+  net.route('b.example', (request) => (new URL(request.url).pathname === '/island/inbox' && refuse ? new Response(null, { status: 400 }) : original(request)));
+  const first = await (await asA('/island/api/send', message(b.origin))).json();
+  refuse = false;
+  // The claim and the new letter are one transaction: make it fail once.
+  const batch = a.store.batch;
+  a.store.batch = async (statements) => {
+    a.store.batch = batch;
+    if (statements.some(([sql]) => sql.includes('replaced_by = ?'))) throw new Error('D1 unavailable');
+    return batch(statements);
+  };
+  assert.equal((await asA('/island/api/resend', { id: first.id })).status, 503);
+  assert.deepEqual((await a.rows('SELECT status FROM sent')).map((r) => r.status), ['failed'], 'nothing changed');
+  const again = await (await asA('/island/api/resend', { id: first.id })).json();
+  assert.equal(again.status, 'delivered');
+  assert.equal((await b.rows('SELECT * FROM received')).length, 1);
 });
 
 test('a pending retry that waited past the window expires instead of being refused', async () => {

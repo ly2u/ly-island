@@ -484,3 +484,82 @@ test('a rejection is checked again when the key history changes', async () => {
   await runUntil(a, time, async () => (await pollState(a, b.origin)).snapshot === next.snapshot, 6);
   assert.deepEqual((await a.rows('SELECT id FROM feed ORDER BY id')).map((r) => r.id), [id2, id]);
 });
+
+/** b's second key k2, added by a key log entry signed with k1, and a manifest listing both. */
+async function rotateToK2(b) {
+  const k1 = await b.signer();
+  const k2 = await islandSigner({ ISLAND_SIGNING_KEY: 'f6'.repeat(32) }, { origin: b.origin, keyName: 'k2' });
+  const entry = await signActivity(
+    { id: `${b.origin}/island/keys/1`, type: 'key', actor: b.origin, published: '2026-10-14T00:00:00Z', to: 'public', object: { add: { id: k2.keyId, type: 'Ed25519', publicKey: k2.publicKey } } },
+    { keyId: k1.keyId, privateKey: k1.privateKey },
+  );
+  return {
+    k2,
+    entry,
+    publish() {
+      b.serve('/island/keys.json', { protocol: 'islands/0', id: `${b.origin}/island/keys.json`, owner: b.origin, updated: '2026-10-15T00:00:00Z', items: [entry] });
+      const manifest = b.json('/.well-known/island.json');
+      b.serve('/.well-known/island.json', { ...manifest, keys: [...manifest.keys, { id: k2.keyId, type: 'Ed25519', publicKey: k2.publicKey }] });
+    },
+  };
+}
+
+test('after a key rotation, items rejected under the old history are read, though the outbox did not change (scan waiting for its head check)', async () => {
+  const net = network();
+  const time = clock();
+  const team = await access(net);
+  const a = await island({ net, time, origin: 'https://a.example', seed: SEEDS.a });
+  const b = await island({ net, time, origin: 'https://b.example', seed: SEEDS.b, keyLog: [], records: 1 });
+  await a.store.run('INSERT INTO islands (origin, first_seen, following) VALUES (?, ?, 1)', [b.origin, time.now()]);
+  await runUntil(a, time, async () => (await pollState(a, b.origin)).synced, 4);
+
+  // b rotates properly: log entry, manifest with k2, and an outbox with the key hint and a k2 post.
+  const rotation = await rotateToK2(b);
+  rotation.publish();
+  const template = allItems(b).find((item) => item.type === 'post');
+  const id = `${b.origin}/records/after-rotation/`;
+  const post = await signedBy(b, { id, type: 'post', published: '2026-10-15T00:00:00Z', object: { ...template.object, url: id } }, rotation.k2);
+  const page = await serveOutbox(b, [template, rotation.entry, post]);
+
+  // a's cached manifest is still fresh: the k2 post is rejected for now, the key hint asks for a manifest read.
+  const owner = ownerCall(a, await team.token(team.claims(time.now())));
+  const sync = async () => (await owner('/island/api/poll', {})).json();
+  const first = await sync();
+  assert.ok(first.verified <= POLL.verifyLimit);
+  assert.equal((await a.rows('SELECT * FROM feed WHERE id = ?', [id])).length, 0);
+  assert.equal((await pollState(a, b.origin)).scan?.recheck, true, 'the digest matched; waiting for the head check');
+
+  // The next sync reads the log and trusts k2. The outbox is unchanged (304), yet the post must be read.
+  const reports = [];
+  for (let i = 0; i < 4 && !(await a.rows('SELECT * FROM feed WHERE id = ?', [id])).length; i += 1) reports.push(await sync());
+  assert.equal((await a.rows('SELECT * FROM feed WHERE id = ?', [id])).length, 1, `reports: ${JSON.stringify(reports)}`);
+  assert.ok(reports.every((report) => report.verified <= POLL.verifyLimit));
+  for (let i = 0; i < 3; i += 1) await sync();
+  const state = await pollState(a, b.origin);
+  assert.deepEqual([state.synced, state.snapshot === page.snapshot, state.scan], [true, true, null]);
+});
+
+test('after a key rotation, items rejected under the old history are read, though the outbox did not change (completed sync)', async () => {
+  const { net, time, a, b, feed } = await followed(1, { keyLog: [] });
+  const rotation = await rotateToK2(b);
+  const template = allItems(b).find((item) => item.type === 'post');
+  const id = `${b.origin}/records/early-k2/`;
+  // b posts with k2 before publishing the key: a cannot verify it yet.
+  const post = await signedBy(b, { id, type: 'post', published: '2026-10-15T00:00:00Z', object: { ...template.object, url: id } }, rotation.k2);
+  const page = await serveOutbox(b, [template, post]);
+  await runUntil(a, time, async () => (await pollState(a, b.origin)).synced, 6);
+  assert.deepEqual(await feed(), [template.id]);
+  assert.equal((await a.rows('SELECT * FROM rejected')).length, 1);
+
+  // Now b publishes the key log and manifest; the outbox stays byte for byte the same.
+  rotation.publish();
+  const outboxReads = () => net.count((entry) => entry.url === `${b.origin}/island/outbox.json`);
+  const before = outboxReads();
+  time.advance(DAY + 3_600_000);
+  const reports = await runUntil(a, time, async () => (await feed()).includes(id), 4);
+  assert.deepEqual((await feed()).sort(), [template.id, id].sort());
+  assert.ok(reports.every((report) => report.verified <= POLL.verifyLimit));
+  assert.ok(outboxReads() > before);
+  await runUntil(a, time, async () => (await pollState(a, b.origin)).synced, 4);
+  assert.equal((await pollState(a, b.origin)).snapshot, page.snapshot);
+});

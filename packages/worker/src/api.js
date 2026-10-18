@@ -5,7 +5,7 @@
 import { LIMITS, retrust } from '../../protocol/src/index.js';
 import { isHttpsOrigin } from '../../protocol/src/util.js';
 import { newToken, sameOriginJsonPost, tokenHash } from './auth.js';
-import { send, SEND_WINDOW_MS } from './deliver.js';
+import { resend, send, SEND_WINDOW_MS } from './deliver.js';
 import { flushDigest, flushNow, sendToChannels } from './notify.js';
 import { islandColumns, learnIsland, upsertIsland } from './remote.js';
 import { pollNeighbors } from './poll.js';
@@ -171,12 +171,10 @@ export async function ownerApi(ctx, request, url) {
       return json(result, result.status === 'not-sent' ? 400 : 200);
     }
     case '/resend': {
-      // An expired or failed letter, sent again as a new activity (new id, new time, new signature).
-      const old = await ctx.store.first("SELECT id, recipient, type, activity FROM sent WHERE id = ? AND status IN ('expired', 'failed')", [String(body.id)]);
-      if (!old) return json({ error: 'not-resendable' }, 400);
-      const result = await send(ctx, { type: String(old.type), to: String(old.recipient), object: JSON.parse(String(old.activity)).object ?? {} });
-      if (result.id) await ctx.store.run("UPDATE sent SET status = 'resent', last_error = ? WHERE id = ?", [result.id, old.id]);
-      return json(result, result.status === 'not-sent' ? 400 : 200);
+      // An expired or failed letter, sent again as a new activity (new id, new time, new signature), once.
+      const result = await resend(ctx, String(body.id));
+      const status = result.status === 'already-resent' ? 409 : result.status === 'not-sent' ? 400 : 200;
+      return json(result, status);
     }
     case '/drafts/delete':
       await ctx.store.run('DELETE FROM drafts WHERE id = ?', [Number(body.id)]);

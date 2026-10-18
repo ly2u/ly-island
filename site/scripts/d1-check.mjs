@@ -10,7 +10,8 @@
 // - concurrent copies of one delivery: one letter, one event;
 // - concurrent different deliveries stop at the hourly quota;
 // - a 120-record neighbor syncs to its verified snapshot (page cache, json_each);
-// - a letter held for a paused recipient is released by retrust (RETURNING).
+// - a letter held for a paused recipient is released by retrust (RETURNING);
+// - concurrent requests to send a failed letter again create one new letter.
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -27,7 +28,7 @@ import { stringsFor } from '../../packages/worker/src/strings.js';
 import { access, clock, island, network, ownerCall, SEEDS } from '../../packages/worker/test/harness.js';
 
 const dir = mkdtempSync(join(tmpdir(), 'island-d1-'));
-const names = ['digest', 'same', 'quota', 'poll', 'held'];
+const names = ['digest', 'same', 'quota', 'poll', 'held', 'resend'];
 writeFileSync(join(dir, 'wrangler.json'), JSON.stringify({
   name: 'island-d1-check',
   compatibility_date: '2026-09-01',
@@ -147,6 +148,25 @@ try {
     await a.cron();
     const statuses = (await a.rows('SELECT status FROM sent ORDER BY created')).map((r) => r.status);
     expect('D1: held for a paused recipient, released by retrust', held.status === 'held' && released.released === 1 && statuses.join() === 'delivered,delivered', `${held.status}, released ${released.released}, ${statuses.join()}`);
+  }
+
+  // Concurrent "send again" of one failed letter: one new letter.
+  {
+    const net = network();
+    const time = clock();
+    const team = await access(net);
+    const a = await island({ net, time, origin: 'https://a.example', seed: SEEDS.a, store: d1('resend') });
+    const b = await island({ net, time, origin: 'https://b.example', seed: SEEDS.b });
+    const original = net.hosts.get('b.example');
+    let refuse = true;
+    net.route('b.example', (request) => (new URL(request.url).pathname === '/island/inbox' && refuse ? new Response(null, { status: 400 }) : original(request)));
+    const owner = ownerCall(a, await team.token(team.claims(time.now())));
+    const first = await (await owner('/island/api/send', { type: 'message', to: b.origin, text: 'hello' })).json();
+    refuse = false;
+    const statuses = (await Promise.all(Array.from({ length: 4 }, () => owner('/island/api/resend', { id: first.id })))).map((r) => r.status).sort();
+    const rows = (await a.rows('SELECT COUNT(*) AS n FROM sent'))[0].n;
+    const received = (await b.rows('SELECT COUNT(*) AS n FROM received'))[0].n;
+    expect('D1: 4 concurrent resends, one new letter', statuses.join() === '200,409,409,409' && rows === 2 && received === 1, `${statuses.join()}, ${rows} rows, ${received} received`);
   }
 } catch (error) {
   problems.push(String(/** @type {Error} */ (error)?.stack ?? error));

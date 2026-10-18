@@ -59,14 +59,16 @@ export const POLL = Object.freeze({
 });
 
 /**
- * @typedef {{ target: string | null, headEtag: string | null, visited: string[], pending: string | null, recheck: boolean }} Scan
+ * @typedef {{ target: string | null, headEtag: string | null, visited: string[], pending: string | null, recheck: boolean,
+ *   historyTag: string }} Scan  historyTag: the key history the scan verifies against
  * @typedef {{ etag: string | null, snapshot: string | null, synced: boolean, baseline: boolean, scan: Scan | null,
- *   nextAt: number, failures: number, lastActivity: string | null, fullAt: number, problem: string | null }} PollState
+ *   historyTag: string | null, nextAt: number, failures: number, lastActivity: string | null, fullAt: number,
+ *   problem: string | null }} PollState  historyTag: the key history the last complete sync verified against
  */
 
 /** @returns {PollState} */
 function freshState() {
-  return { etag: null, snapshot: null, synced: false, baseline: false, scan: null, nextAt: 0, failures: 0, lastActivity: null, fullAt: 0, problem: null };
+  return { etag: null, snapshot: null, synced: false, baseline: false, scan: null, historyTag: null, nextAt: 0, failures: 0, lastActivity: null, fullAt: 0, problem: null };
 }
 
 /** @param {string} self @param {string} origin @param {string | null} lastActivity @param {number} now */
@@ -234,6 +236,13 @@ async function pollOne(ctx, { origin, row, state }, verify, writes, keep) {
   };
 
   let scan = state.scan;
+  // What was checked against another key history (a key added by the log, a
+  // retrust) is read again, whatever the head says: items rejected then may
+  // verify now, even if the outbox itself did not change. Unchanged pages
+  // come from the page cache.
+  const checkedWith = scan ? scan.historyTag : state.synced ? state.historyTag : historyTag;
+  const historyChanged = checkedWith !== historyTag;
+  if (historyChanged) scan = null;
   /** @type {{ url: string, items: any[], itemOk: boolean[], next: string | null, etag: string | null, fresh: boolean, entries?: [string, string][] }} */
   let current;
   let known;
@@ -241,7 +250,7 @@ async function pollOne(ctx, { origin, row, state }, verify, writes, keep) {
   if (!scan || scan.recheck) {
     // The head: either the regular conditional check, or the check after a scan.
     const fullDue = state.snapshot === null && now - state.fullAt >= POLL.fullScanEvery;
-    const etag = scan ? scan.headEtag : state.synced && !fullDue ? state.etag : null;
+    const etag = scan ? scan.headEtag : state.synced && !fullDue && !historyChanged ? state.etag : null;
     const response = await fetchPage(head, etag);
     if (response.status === 304 && etag !== null) {
       if (!scan) {
@@ -255,13 +264,13 @@ async function pollOne(ctx, { origin, row, state }, verify, writes, keep) {
     if (!read) return failed('invalid-outbox');
     const snapshot = read.page.snapshot ?? null;
     if (scan && snapshot !== null && snapshot === scan.target) return complete(scan, response.etag);
-    if (!scan && snapshot !== null && state.synced && snapshot === state.snapshot) {
+    if (!scan && !historyChanged && snapshot !== null && state.synced && snapshot === state.snapshot) {
       // Same content under a new ETag.
       save({ ...state, etag: response.etag, failures: 0, problem: null, nextAt: nextPoll(ctx.self, origin, state.lastActivity, now) });
       return 0;
     }
     // Something changed: scan the chain, starting with this head page.
-    scan = { target: snapshot, headEtag: response.etag, visited: [], pending: head, recheck: false };
+    scan = { target: snapshot, headEtag: response.etag, visited: [], pending: head, recheck: false, historyTag };
     current = { url: head, items: read.page.items, itemOk: read.check.items.map((i) => i.ok), next: read.page.next ?? null, etag: response.etag, fresh: true };
     known = await readKnown(null);
   } else {
@@ -319,7 +328,7 @@ async function pollOne(ctx, { origin, row, state }, verify, writes, keep) {
   // The chain ended.
   if (scan.target === null) {
     // No digest to check against (a publisher without the extension).
-    save({ ...state, scan: null, snapshot: null, synced: true, baseline: true, etag: scan.headEtag, fullAt: now, lastActivity, failures: 0, problem: null, nextAt: nextPoll(ctx.self, origin, lastActivity, now) });
+    save({ ...state, scan: null, snapshot: null, synced: true, baseline: true, etag: scan.headEtag, historyTag: scan.historyTag, fullAt: now, lastActivity, failures: 0, problem: null, nextAt: nextPoll(ctx.self, origin, lastActivity, now) });
     writes.push(['DELETE FROM pages WHERE actor = ? AND url NOT IN (SELECT value FROM json_each(?))', [origin, JSON.stringify(visited)]]);
     await readFriends(ctx, origin, manifest, row, now, writes);
     return processed.events;
@@ -348,7 +357,7 @@ async function pollOne(ctx, { origin, row, state }, verify, writes, keep) {
 
   /** The head still shows the scanned snapshot: the scan is complete. @param {Scan} done @param {string | null} etag */
   function complete(done, etag) {
-    save({ ...state, scan: null, snapshot: done.target, synced: true, baseline: true, etag, failures: 0, problem: null, nextAt: nextPoll(ctx.self, origin, state.lastActivity, now) });
+    save({ ...state, scan: null, snapshot: done.target, synced: true, baseline: true, etag, historyTag: done.historyTag, failures: 0, problem: null, nextAt: nextPoll(ctx.self, origin, state.lastActivity, now) });
     writes.push(['DELETE FROM pages WHERE actor = ? AND url NOT IN (SELECT value FROM json_each(?))', [origin, JSON.stringify(done.visited)]]);
     return 0;
   }

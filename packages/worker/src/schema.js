@@ -43,6 +43,7 @@ export const MIGRATIONS = Object.freeze([
       // Accepted deliveries per sender and per registrable domain, by hour.
       'CREATE TABLE IF NOT EXISTS rate (key TEXT NOT NULL, hour INTEGER NOT NULL, count INTEGER NOT NULL, PRIMARY KEY (key, hour)) STRICT',
       // Directed activities this island sent, one recipient each, with delivery state.
+      // `replaced_by`: the new activity an expired or failed one was sent again as.
       `CREATE TABLE IF NOT EXISTS sent (
         id TEXT PRIMARY KEY,
         recipient TEXT NOT NULL,
@@ -52,7 +53,8 @@ export const MIGRATIONS = Object.freeze([
         status TEXT NOT NULL,
         attempts INTEGER NOT NULL DEFAULT 0,
         next_at INTEGER,
-        last_error TEXT
+        last_error TEXT,
+        replaced_by TEXT
       ) STRICT`,
       'CREATE INDEX IF NOT EXISTS sent_due ON sent (status, next_at)',
       // Public activities read from followed islands, one row per activity id.

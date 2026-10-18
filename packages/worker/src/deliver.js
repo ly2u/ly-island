@@ -44,12 +44,12 @@ const MAX_ATTEMPTS = RETRY_DELAYS_MS.length + 1;
  */
 
 /**
- * Creates, stores and sends one activity.
+ * Signs a new activity for one recipient, or says why it cannot be sent.
  * @param {SendContext} ctx
  * @param {{ type: string, to: string, object?: Record<string, unknown> }} request
- * @returns {Promise<{ ok: boolean, status: string, id?: string, reason?: string }>}
+ * @returns {Promise<{ ok: true, activity: Record<string, any>, insert: [string, unknown[]] } | { ok: false, status: 'not-sent', reason: string }>}
  */
-export async function send(ctx, { type, to, object = {} }) {
+async function newActivity(ctx, { type, to, object = {} }) {
   if (!ctx.signer) return { ok: false, status: 'not-sent', reason: 'no-signing-key' };
   if (!SENDABLE.includes(type)) return { ok: false, status: 'not-sent', reason: 'unknown-type' };
   if (to === ctx.self) return { ok: false, status: 'not-sent', reason: 'to-self' };
@@ -65,11 +65,62 @@ export async function send(ctx, { type, to, object = {} }) {
   const activity = await signActivity(unsigned, ctx.signer);
   const check = validateActivity(activity);
   if (!check.ok) return { ok: false, status: 'not-sent', reason: `invalid-activity ${JSON.stringify(check.issues.map((issue) => issue.code))}` };
-  await ctx.store.run(
-    "INSERT INTO sent (id, recipient, type, activity, created, status, attempts, next_at) VALUES (?, ?, ?, ?, ?, 'pending', 0, ?)",
-    [activity.id, to, type, JSON.stringify(activity), now, now],
-  );
-  const result = await attempt(ctx, { id: activity.id, recipient: to, activity: JSON.stringify(activity), attempts: 0 });
+  return {
+    ok: true,
+    activity,
+    insert: [
+      "INSERT INTO sent (id, recipient, type, activity, created, status, attempts, next_at) VALUES (?, ?, ?, ?, ?, 'pending', 0, ?)",
+      [activity.id, to, type, JSON.stringify(activity), now, now],
+    ],
+  };
+}
+
+/**
+ * Creates, stores and sends one activity.
+ * @param {SendContext} ctx
+ * @param {{ type: string, to: string, object?: Record<string, unknown> }} request
+ * @returns {Promise<{ ok: boolean, status: string, id?: string, reason?: string }>}
+ */
+export async function send(ctx, request) {
+  const created = await newActivity(ctx, request);
+  if (!created.ok) return created;
+  await ctx.store.run(...created.insert);
+  const { activity } = created;
+  const result = await attempt(ctx, { id: activity.id, recipient: request.to, activity: JSON.stringify(activity), attempts: 0 });
+  return { ...result, id: activity.id };
+}
+
+/**
+ * Sends an expired or failed activity again, as a new activity (new id,
+ * time and signature). The old one is claimed and the new one stored in one
+ * transaction, so concurrent requests create exactly one new activity: the
+ * others get `already-resent` with its id. If that write fails, nothing
+ * changed and the old one can be sent again; once it succeeded, the new
+ * activity is in the queue and the normal retries deliver it.
+ * @param {SendContext} ctx @param {string} oldId
+ * @returns {Promise<{ ok: boolean, status: string, id?: string, reason?: string }>}
+ */
+export async function resend(ctx, oldId) {
+  const old = await ctx.store.first("SELECT id, recipient, type, activity FROM sent WHERE id = ? AND status IN ('expired', 'failed')", [oldId]);
+  if (!old) {
+    const done = await ctx.store.first("SELECT replaced_by FROM sent WHERE id = ? AND status = 'resent'", [oldId]);
+    return done ? { ok: false, status: 'already-resent', reason: 'already-resent', id: String(done.replaced_by) } : { ok: false, status: 'not-sent', reason: 'not-resendable' };
+  }
+  const created = await newActivity(ctx, { type: String(old.type), to: String(old.recipient), object: JSON.parse(String(old.activity)).object ?? {} });
+  if (!created.ok) return created;
+  const { activity, insert } = created;
+  const [sql, params] = insert;
+  const mine = "EXISTS (SELECT 1 FROM sent WHERE id = ? AND status = 'resent' AND replaced_by = ?)";
+  const results = await ctx.store.batch([
+    // The claim: only one request turns this one into "resent".
+    ["UPDATE sent SET status = 'resent', replaced_by = ? WHERE id = ? AND status IN ('expired', 'failed')", [activity.id, oldId]],
+    // The new activity, only for the request whose claim holds.
+    [sql.replace(/VALUES \((.*)\)$/, `SELECT $1 WHERE ${mine}`), [...params, oldId, activity.id]],
+    ['SELECT replaced_by FROM sent WHERE id = ?', [oldId]],
+  ]);
+  const winner = String(results[2][0]?.replaced_by ?? '');
+  if (winner !== activity.id) return { ok: false, status: 'already-resent', reason: 'already-resent', id: winner };
+  const result = await attempt(ctx, { id: activity.id, recipient: String(old.recipient), activity: JSON.stringify(activity), attempts: 0 });
   return { ...result, id: activity.id };
 }
 

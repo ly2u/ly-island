@@ -190,7 +190,13 @@ const views = {
         h('td', {}, link(item.recipient, item.recipient)), h('td', {}, t.types[item.type] ?? item.type),
         h('td', {}, t.statuses[item.status] ?? item.status, item.last_error && item.status !== 'resent' ? ` (${item.last_error})` : ''),
         h('td', { class: 'actions' }, when(item.created), ' ',
-          ['expired', 'failed'].includes(item.status) ? h('button', { type: 'button', onclick: () => act(() => api('/resend', { id: item.id }), t.resent) }, t.resend) : null)))))];
+          ['expired', 'failed'].includes(item.status) ? h('button', { type: 'button', onclick: (/** @type {MouseEvent} */ event) => {
+            /** @type {HTMLButtonElement} */ (event.currentTarget).disabled = true;
+            // The server sends it again only once; a second click is answered "already-resent".
+            act(() => api('/resend', { id: item.id }).catch((error) => {
+              if (error.message !== 'already-resent') throw error;
+            }), t.resent);
+          } }, t.resend) : null)))))];
   },
 
   async drafts() {
