@@ -2,7 +2,7 @@
 
 岛与岛之间的互动：收件箱、投递、邻居同步、通知，以及站主和 AI 的接口。对应[路线的第 2 阶段](../../docs/roadmap.md#第-2-阶段岛务-worker)。
 
-- **一个 Web 标准的处理函数：** `createIsland(...)` 返回 `{ fetch, scheduled }`，不依赖框架。数据库、静态资源、`fetch` 和时钟都从外面传进来，所以同一份代码跑在 Cloudflare Workers 上，也跑在 Node.js 的测试里。为什么不用 Hono，见[决定 F4 的修改提议](../../docs/decisions.md#f4-部署目标已定)。
+- **一个 Web 标准的处理函数：** `createIsland(...)` 返回 `{ fetch, scheduled }`，不依赖框架。数据库、静态资源、`fetch` 和时钟都从外面传进来，所以同一份代码跑在 Cloudflare Workers 上，也跑在 Node.js 的测试里。为什么不用 Hono，见[决定 F4](../../docs/decisions.md#f4-部署目标已定)。
 - **除了协议核心，没有依赖。** `src/psl-data.js` 是公共后缀列表的 ASCII 部分，用于按可注册域名限速，许可证是 MPL-2.0，用 `scripts/update-psl.mjs` 更新。
 - **每次运行最多 45 个外部请求**（免费档上限是 50），D1 的查询也计入。预算用完就停下，剩下的留到下一轮。
 
