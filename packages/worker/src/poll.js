@@ -31,7 +31,7 @@ import {
   verifyActivity,
 } from '../../protocol/src/index.js';
 import { BudgetExceeded } from './budget.js';
-import { OutboundError, parseJson } from './net.js';
+import { httpReason, OutboundError, parseJson } from './net.js';
 import { timeOf } from '../../protocol/src/util.js';
 import { eventStatement } from './notify.js';
 import { islandColumns, learnIsland, pausedEvent, upsertIsland } from './remote.js';
@@ -180,7 +180,7 @@ async function pollOne(ctx, { origin, row, state }, verify, writes, keep) {
   };
 
   const learned = await learnIsland(ctx, origin, row);
-  if (!learned.ok) return failed(learned.reason);
+  if (!learned.ok) return failed(learned.detail ?? learned.reason);
   if (learned.fetched) {
     keep.push(upsertIsland(origin, now, islandColumns(learned, now)));
     const keyEvent = pausedEvent(ctx, origin, row, learned, now);
@@ -222,12 +222,12 @@ async function pollOne(ctx, { origin, row, state }, verify, writes, keep) {
     try {
       return await ctx.net.get(address, { sameOriginAs: origin, etag, limit: DOCUMENT_LIMITS.outboxBytes });
     } catch (error) {
-      if (error instanceof OutboundError) return { status: 0, error: error.reason, body: new Uint8Array(0), etag: null, retryAfter: null };
+      if (error instanceof OutboundError) return { status: 0, error: error.message, body: new Uint8Array(0), etag: null, retryAfter: null, cloudflare: null };
       throw error;
     }
   };
   /** @param {any} response */
-  const httpProblem = (response) => (response.status === 0 ? response.error : `HTTP ${response.status}`);
+  const httpProblem = (response) => (response.status === 0 ? response.error : httpReason(response));
   /** A parsed, valid page of this island, or null. @param {Uint8Array} body */
   const pageFrom = (body) => {
     const page = parseJson(body);

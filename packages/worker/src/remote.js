@@ -16,7 +16,7 @@ import {
   validateKeyLog,
   validateManifest,
 } from '../../protocol/src/index.js';
-import { OutboundError, parseJson } from './net.js';
+import { httpReason, OutboundError, parseJson } from './net.js';
 import { eventStatement } from './notify.js';
 
 export const MANIFEST_TTL_MS = 24 * 60 * 60 * 1000;
@@ -25,7 +25,9 @@ const KEY_LOG_BYTES = 256 * 1024;
 /**
  * @typedef {{ status: string, pauseReason?: string, keys: any[], logHead: any, origin: string }} KeyHistory
  * @typedef {{ ok: true, manifest: Record<string, any>, history: KeyHistory, fetched: boolean, paused: boolean }
- *   | { ok: false, reason: string, retry: boolean }} Learned
+ *   | { ok: false, reason: string, retry: boolean, detail?: string }} Learned
+ *   detail: what exactly failed (the HTTP status with any Cloudflare code, or the
+ *   runtime's message), for the owner's pages; never sent to other islands
  */
 
 /** @param {unknown} text */
@@ -43,7 +45,7 @@ function parsed(text) {
  * 429, 5xx), or the log the manifest points to is missing or invalid.
  * @param {{ net: ReturnType<typeof import('./net.js').outbound> }} ctx
  * @param {string} origin @param {string} address
- * @returns {Promise<{ ok: true, log: Record<string, any> } | { ok: false, reason: string, retry: boolean }>}
+ * @returns {Promise<{ ok: true, log: Record<string, any> } | { ok: false, reason: string, retry: boolean, detail?: string }>}
  */
 async function readKeyLog(ctx, origin, address) {
   let response;
@@ -51,10 +53,10 @@ async function readKeyLog(ctx, origin, address) {
     response = await ctx.net.get(address, { sameOriginAs: origin, limit: KEY_LOG_BYTES });
   } catch (error) {
     if (!(error instanceof OutboundError)) throw error;
-    return { ok: false, reason: `key-log-${error.reason}`, retry: ['timeout', 'network-error'].includes(error.reason) };
+    return { ok: false, reason: `key-log-${error.reason}`, retry: ['timeout', 'network-error'].includes(error.reason), detail: `key log: ${error.message}` };
   }
-  if (response.status === 429 || response.status >= 500) return { ok: false, reason: `key-log-${response.status}`, retry: true };
-  if (response.status !== 200) return { ok: false, reason: 'invalid-key-log', retry: false };
+  if (response.status === 429 || response.status >= 500) return { ok: false, reason: `key-log-${response.status}`, retry: true, detail: `key log: ${httpReason(response)}` };
+  if (response.status !== 200) return { ok: false, reason: 'invalid-key-log', retry: false, detail: `key log: ${httpReason(response)}` };
   const log = parseJson(response.body);
   const check = validateKeyLog(log);
   if (!check.ok || log.owner !== origin) return { ok: false, reason: 'invalid-key-log', retry: false };
@@ -82,10 +84,10 @@ export async function learnIsland(ctx, origin, row, { force = false } = {}) {
     response = await ctx.net.get(`${origin}/.well-known/island.json`, { sameOriginAs: origin, limit: DOCUMENT_LIMITS.manifestBytes });
   } catch (error) {
     // Only network trouble is worth retrying; refused addresses and redirects stay refused.
-    if (error instanceof OutboundError) return { ok: false, reason: error.reason, retry: ['timeout', 'network-error'].includes(error.reason) };
+    if (error instanceof OutboundError) return { ok: false, reason: error.reason, retry: ['timeout', 'network-error'].includes(error.reason), detail: `manifest: ${error.message}` };
     throw error;
   }
-  if (response.status !== 200) return { ok: false, reason: `manifest-${response.status}`, retry: response.status === 429 || response.status >= 500 };
+  if (response.status !== 200) return { ok: false, reason: `manifest-${response.status}`, retry: response.status === 429 || response.status >= 500, detail: `manifest: ${httpReason(response)}` };
   const manifest = parseJson(response.body);
   if (!validateManifest(manifest, { fetchedOrigin: origin }).ok) return { ok: false, reason: 'invalid-manifest', retry: false };
 
@@ -97,7 +99,7 @@ export async function learnIsland(ctx, origin, row, { force = false } = {}) {
     let keyLog = null;
     if (keysAddress) {
       const read = await readKeyLog(ctx, origin, keysAddress);
-      if (!read.ok) return { ok: false, reason: read.reason, retry: read.retry };
+      if (!read.ok) return { ok: false, reason: read.reason, retry: read.retry, detail: read.detail };
       keyLog = read.log;
     }
     history = await trustOnFirstUse(manifest, { now, keyLog });
@@ -107,7 +109,7 @@ export async function learnIsland(ctx, origin, row, { force = false } = {}) {
       // Temporarily unreadable: keep what we know, save nothing, try again
       // later. The cached manifest is not refreshed, so nothing new is
       // accepted on the strength of a log we could not check.
-      if (!read.ok && read.retry) return { ok: false, reason: read.reason, retry: true };
+      if (!read.ok && read.retry) return { ok: false, reason: read.reason, retry: true, detail: read.detail };
       // Missing, invalid, rewritten or forked: the protocol pauses the island.
       history = read.ok ? (await syncKeyLog(history, read.log)).history : pause(history, read.reason);
     }

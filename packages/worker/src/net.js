@@ -28,11 +28,53 @@ import {
 } from '../../protocol/src/index.js';
 
 export class OutboundError extends Error {
-  /** @param {string} reason */
-  constructor(reason) {
-    super(reason);
+  /** @param {string} reason @param {string} [detail] what the platform said, for the owner's diagnosis */
+  constructor(reason, detail = '') {
+    super(detail ? `${reason}: ${detail}` : reason);
     this.reason = reason;
+    this.detail = detail;
   }
+}
+
+/**
+ * Cloudflare answers some refused subrequests itself, with an error page
+ * that names a code (1000 and 1002 "DNS points to prohibited IP", 1003
+ * "direct IP access not allowed"). The code is the evidence of what refused
+ * a request, so failures keep it. Reads at most 1 KB of an error body.
+ * @param {Response} response
+ * @returns {Promise<string | null>} e.g. "1003"
+ */
+async function cloudflareCode(response) {
+  if (!response.body) return null;
+  const reader = response.body.getReader();
+  const chunks = [];
+  let size = 0;
+  try {
+    while (size < 1024) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      size += value.length;
+    }
+  } catch {
+    return null;
+  } finally {
+    await reader.cancel().catch(() => {});
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.length;
+  }
+  const text = new TextDecoder().decode(bytes.subarray(0, 1024));
+  return /error(?: code)?:?\s*(1\d{3})\b/i.exec(text)?.[1] ?? null;
+}
+
+/** "HTTP 403", or "HTTP 403 (Cloudflare 1003)" when Cloudflare refused it. @param {{ status: number, cloudflare?: string | null }} response */
+export function httpReason(response) {
+  return response.cloudflare ? `HTTP ${response.status} (Cloudflare ${response.cloudflare})` : `HTTP ${response.status}`;
 }
 
 /** @param {Response} response @param {number} limit */
@@ -92,7 +134,10 @@ export function outbound({ fetch, self, budget, resolver = null }) {
       return await fetch(url.href, { method, headers, body, redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT_MS) });
     } catch (error) {
       if (error instanceof OutboundError) throw error;
-      throw new OutboundError(/** @type {Error} */ (error)?.name === 'TimeoutError' ? 'timeout' : 'network-error');
+      const name = /** @type {Error} */ (error)?.name;
+      // The runtime's own words, shortened: they tell a refusal from a timeout.
+      const detail = String(/** @type {Error} */ (error)?.message ?? '').replace(/\s+/g, ' ').slice(0, 120);
+      throw new OutboundError(name === 'TimeoutError' ? 'timeout' : 'network-error', detail);
     }
   }
 
@@ -101,7 +146,7 @@ export function outbound({ fetch, self, budget, resolver = null }) {
      * A conditional GET of public data.
      * @param {string} address
      * @param {{ sameOriginAs?: string, etag?: string | null, lastModified?: string | null, kind?: 'read' | 'feed', limit: number }} options
-     * @returns {Promise<{ status: number, url: string, body: Uint8Array, etag: string | null, lastModified: string | null, retryAfter: number | null }>}
+     * @returns {Promise<{ status: number, url: string, body: Uint8Array, etag: string | null, lastModified: string | null, retryAfter: number | null, cloudflare: string | null }>}
      */
     async get(address, { sameOriginAs, etag = null, lastModified = null, kind = 'read', limit }) {
       const first = checkOutboundUrl(address, { sameOriginAs });
@@ -118,6 +163,7 @@ export function outbound({ fetch, self, budget, resolver = null }) {
           continue;
         }
         const ok = response.status >= 200 && response.status < 300;
+        const cloudflare = response.status >= 400 ? await cloudflareCode(response) : null;
         const body = ok ? await readLimited(response, limit) : (await response.body?.cancel(), new Uint8Array(0));
         return {
           status: response.status,
@@ -126,6 +172,7 @@ export function outbound({ fetch, self, budget, resolver = null }) {
           etag: response.headers.get('etag'),
           lastModified: response.headers.get('last-modified'),
           retryAfter: retryAfterSeconds(response.headers.get('retry-after')),
+          cloudflare,
         };
       }
     },
@@ -133,15 +180,16 @@ export function outbound({ fetch, self, budget, resolver = null }) {
     /**
      * An inbox delivery. Redirects are never followed.
      * @param {string} address @param {Uint8Array} body @param {{ sameOriginAs: string }} options
-     * @returns {Promise<{ status: number, retryAfter: number | null }>}
+     * @returns {Promise<{ status: number, retryAfter: number | null, cloudflare: string | null }>}
      */
     async post(address, body, { sameOriginAs }) {
       const target = checkOutboundUrl(address, { sameOriginAs });
       if (!target.ok) throw new OutboundError(target.reason);
       const response = await send('POST', target.url, buildOutboundHeaders({ kind: 'deliver', self }), body);
+      const cloudflare = response.status >= 400 ? await cloudflareCode(response) : null;
       await response.body?.cancel();
       if (response.status >= 300 && response.status < 400) throw new OutboundError('redirect-not-followed');
-      return { status: response.status, retryAfter: retryAfterSeconds(response.headers.get('retry-after')) };
+      return { status: response.status, retryAfter: retryAfterSeconds(response.headers.get('retry-after')), cloudflare };
     },
   };
 }

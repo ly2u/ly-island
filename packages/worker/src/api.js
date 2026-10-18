@@ -74,6 +74,8 @@ async function listIslands(ctx) {
       blocked: row.blocked === 1,
       paused: JSON.parse(row.history ?? 'null')?.status === 'paused',
       lastActivity: JSON.parse(row.poll ?? 'null')?.lastActivity ?? null,
+      // The last sync problem, with what exactly failed (src/net.js), until a sync succeeds.
+      problem: JSON.parse(row.poll ?? 'null')?.problem ?? null,
     })),
   });
 }

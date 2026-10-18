@@ -188,7 +188,7 @@ npm run keygen
 
 记下打印的 `ISLAND_SIGNING_KEY=…` 和公钥。这把钥匙只给 dev.rqly.com 用，存进密码管理器，不要发到 issue、PR 或聊天里。
 
-**2. 创建 Worker 并连接仓库：** Workers & Pages → Create → 从 Git 仓库导入 → 选 `ly2u/ly-island`。
+**2. 创建 Worker 并连接仓库：** 先在 Workers & Pages 的列表里看有没有名为 `island` 的项目。已经有了，就打开它核对下表；没有，就 Create → 从 Git 仓库导入 → 选 `ly2u/ly-island`。
 
 | 设置 | 值 |
 |---|---|
@@ -196,7 +196,7 @@ npm run keygen
 | 生产分支 | `framework` |
 | 根目录 | `site` |
 | 构建命令 | `npm run build` |
-| 部署命令 | `npx wrangler deploy` |
+| 部署命令 | `npm run deploy`（第 2 阶段起；它生成带定时任务和数据库的配置，再部署） |
 | 非生产分支的构建 | 关闭 |
 | 构建监视路径（如果有这个选项） | `site/**`、`packages/**` |
 
@@ -209,7 +209,12 @@ npm run keygen
 
 **4. 触发一次部署：** 在 Deployments 里重试，或者等下一次合并进 `framework`。
 
-**5. 绑定域名：** Worker → Settings → Domains & Routes → Add → Custom domain → `dev.rqly.com`。DNS 记录由 Cloudflare 自动添加，不要改 rqly.com 的其他记录。
+**5. 绑定域名：** Worker → Settings → Domains & Routes → Add → Custom domain → `dev.rqly.com`。DNS 记录和证书由 Cloudflare 自动添加，不要改 rqly.com 的其他记录。
+
+- **为什么必须做这一步：** rqly.com 有一条 `*` 通配记录指向 VPS。所以在绑定之前，dev.rqly.com 也能解析，但解析到的是 VPS 的地址，HTTPS 握手会失败，根本到不了 Worker。2026-10-18 审查者实测就是这样。
+- 绑定后，Cloudflare 给 `dev.rqly.com` 建一条专门的记录。按 DNS 的规则，名字有自己的记录时通配记录就不起作用，所以只有 dev 改为指向 Worker，通配记录和其他子域名不受影响。不要删改通配记录。
+- 如果提示 `dev` 已经有一条 CNAME 记录，绑定会失败。这时只删掉 `dev` 这一条再绑定，并告诉审查者删掉的是什么。
+- 绑定之后再检查解析：`dev.rqly.com` 不应再是 VPS 的地址。
 
 **6. 检查：**
 
@@ -232,7 +237,7 @@ npm run keygen
 
 第 2 阶段的模块 PR 合并进 `framework` 之后做，在第 1 阶段的 Worker 上继续。同样只在 Cloudflare 控制台操作。
 
-**1. 改部署命令：** Worker → Settings → Build：
+**1. 改部署命令：** 如果第 1 阶段时部署命令是 `npx wrangler deploy`，改掉。Worker → Settings → Build：
 
 | 设置 | 值 |
 |---|---|
@@ -363,7 +368,15 @@ npm run keygen
 
 - Cloudflare Access 免费档的人数和功能。第三方资料显示 2026 年仍是 50 人以内免费，部署第 2 阶段之前在控制台的套餐页确认；
 - 一个 Access 应用能不能同时保护几个路径（控制台里叫"public hostname"或"destination"）。不能就按清单分成几个应用；
-- **Worker 能不能连到内网地址。** 文档没有写。服务在 Worker 上没有自己的 DNS 解析，只检查地址本身，靠平台挡住内网；打开 `global_fetch_strictly_public` 后，请求都按公网路由。部署后实测：在岛务里关注 `https://localtest.me`（公共 DNS 解析到 `127.0.0.1`），"已寄出"里应显示失败而不是送达，把结果记到这里；
+- **Worker 能不能连到内网地址。** 文档没有写。服务在 Worker 上没有自己的 DNS 解析，只检查地址本身，靠平台挡住内网；打开 `global_fetch_strictly_public` 后，请求都按公网路由。
+  - **只看"失败"不够：** 失败可能是平台拦下了，也可能是那里没有服务、超时或者别的原因，不能证明平台会拦。
+  - **实测时看失败的具体内容：** 服务现在会把出站失败的细节记下来，在岛务的"已寄出"和"岛屿"里能看到：HTTP 状态和 Cloudflare 的错误码，例如 `HTTP 403 (Cloudflare 1003)`；或者运行时报的原文，例如 `network-error: …`。
+  - **做法：** 在 dev 的岛务里分别关注 `https://localtest.me`（公共 DNS 解析到 `127.0.0.1`）和一个解析到 `10.x` 或 `169.254.169.254` 的名字，再关注 dev2 作为对照（应当成功）。记下每一个的完整失败内容。
+  - **怎么判断：**
+    - Cloudflare 的拒绝码（1000、1002、1003 一类）才算平台拦截的证据；
+    - 只有网络错误或超时，不下结论，再用别的方法核实，例如向 Cloudflare 支持确认，或者查到明确的官方说明；
+    - 收到其他任何 HTTP 响应，说明连上了，立即停下并报告。
+  - 结果和判断依据都记到这里；
 - Workers 上 Ed25519 验签的实际 CPU 耗时。定时任务每轮最多验 40 个签名，部署后看 Worker 的 CPU 用量，按实际值调整 `POLL.verifyLimit`；
 - Worker 在免费档发送邮件的条件（只能发给已验证地址，还是可以发给任意地址）；
 - `wrangler deploy` 是否保留在控制台里添加的自定义域名。第一次部署 dev.rqly.com 后实测；如果不保留，改为在 `wrangler.jsonc` 里声明 `routes`，地址由部署方提供。
