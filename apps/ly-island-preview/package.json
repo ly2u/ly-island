@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "vite build"
+    "build": "vite build",
+    "test:scene": "node --test scripts/check-scene.mjs"
   },
   "dependencies": {
     "three": "0.186.1"

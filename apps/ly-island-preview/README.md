@@ -25,6 +25,8 @@
 
 依赖锁定 Three.js 0.186.1 / Vite 8.3.3，构建用 Node.js 24。先保留版本前快照，再构建到暂存目录，不能清空线上 dist：
 
+渲染优化（2026-11-06）：建筑、树木和信箱各自内部的静态几何按材质合并，道路独立合并，保留可编辑对象的根节点、坐标与点击归属。阴影在布置变化或小于一个阴影纹素的漂浮位移后更新；像素比与画布总像素设上限，持续低帧率时最多降档两次。阅读模式不加载场景，暂停/隐藏时不消耗降档样本。`npm run test:scene` 检查几何边界、点击、独立移动和画质策略；浏览器实测及 Homecraft 加载样本见 [性能记录](../../docs/reviews/2026-11-06-rendering-performance.md)。
+
 ```bash
 cd /opt/ly-stack/apps/ly-island-preview
 docker run --rm -v "$PWD:/app" -w /app node:24-alpine npm ci
