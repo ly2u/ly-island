@@ -78,3 +78,8 @@ midas.rqly.com {
     }
     reverse_proxy civilflow:3102
 }
+
+sec.ly2u.com {
+    encode zstd gzip
+    reverse_proxy secwatch-web:8000
+}
