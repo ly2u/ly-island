@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {routePath} from './paths.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {batchStaticMeshes,createRenderQuality} from './scene-performance.js';
+import {SceneFocus,readingFrame} from './scene-focus.js';
 
 const color = {
   grass:0xa9bba0,grass2:0xb5c7a8,earth:0xb5ac95,rock:0xaaa692,
@@ -270,6 +271,7 @@ export class IslandScene {
   this.camera=new THREE.OrthographicCamera(-10,10,10,-10,.1,130);this.camera.position.set(15,12,18);
   this.controls=new OrbitControls(this.camera,canvas);this.controls.target.set(.5,-.3,0);this.controls.enablePan=false;this.controls.enableDamping=true;this.controls.dampingFactor=.08;
   this.controls.minPolarAngle=.48;this.controls.maxPolarAngle=1.28;this.controls.minZoom=.65;this.controls.maxZoom=1.85;this.controls.rotateSpeed=.55;
+  this.focus=new SceneFocus(this.camera,this.controls);this.focusId=null;
   this.hemi=new THREE.HemisphereLight(0xfff5de,0x93a899,2.7);this.scene.add(this.hemi);
   this.sun=new THREE.DirectionalLight(0xffe8c0,3.4);this.sun.position.set(-9,16,8);this.sun.castShadow=true;
   const shadowSize=canvas.clientWidth<760?1024:2048;this.sun.shadow.mapSize.set(shadowSize,shadowSize);this.sun.shadow.camera.left=-17;this.sun.shadow.camera.right=17;this.sun.shadow.camera.top=17;this.sun.shadow.camera.bottom=-17;
@@ -379,7 +381,7 @@ export class IslandScene {
  resetLayout(){const phase=this.grown?'grown':'initial';this.scenery[phase]={postoffice:null,trees:{}};if(this.layouts)this.layouts[phase]=structuredClone(this.layoutRules?.defaults?.[phase]||{});this.build(this.grown);this.callbacks.layout?.(phase,this.getLayout());this.callbacks.scenery?.(phase,structuredClone(this.scenery[phase]));}
  updateIsland(value){this.scenery=structuredClone(value.scenery??{initial:{postoffice:null,trees:{}},grown:{postoffice:null,trees:{}}});this.decorations=value.decorations??[];this.layouts=structuredClone(value.layouts);this.build(value.phase==='grown');this.resize(true);this.setLight(value.lighting==='dusk');}
  setGrowth(grown){this.build(grown);this.resize(true);}
- setArrange(value){this.arranging=value;this.canvas.style.cursor=value?'grab':'default';this.dirty=true;}
+ setArrange(value){if(value){this.focus.restore({immediate:true});this.focusId=null;}this.arranging=value;this.canvas.style.cursor=value?'grab':'default';this.dirty=true;}
  setLight(dusk){
   this.dusk=dusk;this.hemi.color.set(dusk?0xbdc9e5:0xfff5de);this.hemi.groundColor.set(dusk?0x789485:0x93a899);this.hemi.intensity=dusk?1.9:2.7;
   this.sun.color.set(dusk?0xeac092:0xffe8c0);this.sun.intensity=dusk?1.75:3.4;this.fill.intensity=dusk?.65:.8;
@@ -390,13 +392,25 @@ export class IslandScene {
  setVisible(value){this.suspended=!value;this.controls.enabled=value;this.wasAnimating=false;this.quality.reset();this.dirty=true;}
  resize(reset=false) {
   const width=this.canvas.clientWidth,height=this.canvas.clientHeight,mobile=width<760;if(!width||!height)return;
+  if(reset)this.focus.restore({immediate:true});
   const vertical=this.callbacks.centered?(this.grown?26:20)/(width/height):mobile?(this.grown?26:19.5)/(width/height):this.grown?24:19.5;
   this.camera.left=-vertical*width/height/2;this.camera.right=vertical*width/height/2;this.camera.top=vertical/2;this.camera.bottom=-vertical/2;
-  this.camera.setViewOffset(width,height,this.callbacks.centered?0:mobile?0:-width*.12,this.callbacks.centered?0:mobile?-height*.07:height*.015,width,height);
+  this.focus.viewport(width,height,{x:this.callbacks.centered||mobile?0:-.12,y:this.callbacks.centered?0:mobile?-.07:.015});
   if(reset){this.camera.zoom=1;this.controls.target.set((this.grown?2:-.1)*LAND_SPREAD,-.3,0);}
   this.camera.updateProjectionMatrix();this.renderer.setPixelRatio(this.quality.ratio(width,height));this.renderer.setSize(width,height,false);this.dirty=true;
+  if(this.focusId)this.focusBuilding(this.focusId,{immediate:true,force:true});
  }
- resetView(){this.camera.position.set(15,12,18);this.camera.zoom=1;this.controls.target.set((this.grown?2:-.1)*LAND_SPREAD,-.3,0);this.camera.updateProjectionMatrix();this.controls.update();this.dirty=true;}
+ focusBuilding(id,{immediate=false,force=false}={}){
+  if(this.callbacks.centered||this.arranging)return;
+  const object=this.buildings.get(id)||this.landmarks.get(id),next=object?id:null;
+  if(next===this.focusId&&!force)return;
+  this.focusId=next;immediate||=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const frame=readingFrame(this.canvas.clientWidth);
+  if(object&&frame){const target=object.localToWorld(new THREE.Vector3(0,(this.heightMap.get(id)||1)/2,0));this.focus.focus(target.toArray(),frame,{immediate});}
+  else this.focus.restore({immediate});
+  this.dirty=true;
+ }
+ resetView(){this.focus.restore({immediate:true});this.focusId=null;this.camera.position.set(15,12,18);this.camera.zoom=1;this.controls.target.set((this.grown?2:-.1)*LAND_SPREAD,-.3,0);this.camera.updateProjectionMatrix();this.controls.update();this.dirty=true;}
  pick(event) {
   const bounds=this.canvas.getBoundingClientRect();this.pointer.set((event.clientX-bounds.left)/bounds.width*2-1,-(event.clientY-bounds.top)/bounds.height*2+1);this.ray.setFromCamera(this.pointer,this.camera);
   for(const hit of this.ray.intersectObjects([...this.buildings.values(),...(this.arranging?this.sceneryObjects.values():!this.callbacks.centered?this.landmarks.values():[])],true)){let o=hit.object;while(o&&!o.userData.building&&!o.userData.editable)o=o.parent;if(o)return o.userData.editable||o.userData.building;}return null;
@@ -432,10 +446,11 @@ export class IslandScene {
   requestAnimationFrame(this.animate);
   if(document.hidden||this.suspended){this.wasAnimating=false;this.quality.reset();return;}
   if(now-this.lastRender<1000/30)return;
-  const controlsChanged=this.controls.update();
+  const focusChanged=this.focus.step(now),controlsChanged=this.controls.update();
+  if(focusChanged)this.dirty=true;
   if(!this.paused){const t=(now-this.start)/1000;this.world.position.y=Math.sin(t*.48)*.10;for(let i=0;i<this.clouds.length;i++)this.clouds[i].position.x+=Math.sin(t*.15+i)*.0006;this.dirty=true;}
   if(!this.dirty&&!controlsChanged){this.wasAnimating=false;this.quality.reset();return;}
-  const animating=!this.paused||controlsChanged;
+  const animating=!this.paused||controlsChanged||focusChanged;
   if(animating&&this.wasAnimating&&this.quality.sample(now-this.lastRender))this.resize();
   if(!animating)this.quality.reset();this.wasAnimating=animating;
   this.lastRender=now;this.scene.updateMatrixWorld(true);this.camera.updateMatrixWorld(true);

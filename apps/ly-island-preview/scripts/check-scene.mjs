@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import * as THREE from 'three';
 import {batchStaticMeshes,createRenderQuality} from '../src/scene-performance.js';
+import {SceneFocus,readingFrame} from '../src/scene-focus.js';
 
 const bounds=root=>new THREE.Box3().setFromObject(root);
 const close=(a,b)=>assert.ok(a.distanceTo(b)<1e-5,`${a.toArray()} != ${b.toArray()}`);
@@ -54,4 +55,38 @@ test('sustained slow active frames lower quality at most twice; stable 30 fps do
 test('idle/hidden resets do not combine isolated slow frames into a downshift',()=>{
  const quality=createRenderQuality({dpr:2});for(let i=0;i<20;i++)quality.sample(100);quality.reset();for(let i=0;i<20;i++)quality.sample(100);
  assert.equal(quality.level,0);
+});
+
+function cameraFixture(){
+ const camera=new THREE.OrthographicCamera(-16,16,10,-10,.1,130);camera.position.set(13,11,17);camera.zoom=1.2;
+ const controls={target:new THREE.Vector3(2,.3,-1),enableDamping:true,update(){camera.lookAt(this.target);}};
+ const focus=new SceneFocus(camera,controls);focus.viewport(1280,800,{x:-.12,y:.015});controls.update();
+ return {camera,controls,focus};
+}
+test('reading focus keeps geometry stationary and restores the exact previous orbit and zoom',()=>{
+ const {camera,controls,focus}=cameraFixture(),before=focus.snapshot(),target=[-3,2,1];
+ focus.focus(target,readingFrame(1280),{now:0});assert.equal(focus.step(210),true);assert.notEqual(camera.zoom,before.zoom);
+ focus.step(420);close(controls.target,new THREE.Vector3(...target));assert.equal(camera.zoom,1.65);
+ const projected=new THREE.Vector3(...target).project(camera);assert.ok(Math.abs((projected.x+1)*640-168)<.001,'subject stays in the visible shore');
+ focus.restore({now:500});focus.step(920);assert.equal(focus.home,null);assert.equal(focus.step(950),false);
+ close(camera.position,new THREE.Vector3(...before.position));close(controls.target,new THREE.Vector3(...before.target));assert.equal(camera.zoom,before.zoom);
+ assert.deepEqual(focus.snapshot().offset,before.offset);
+});
+test('rapid room changes and interrupted return retain the original home view',()=>{
+ const {focus}=cameraFixture(),before=focus.snapshot();
+ focus.focus([3,2,1],readingFrame(1280),{now:0});focus.step(100);
+ focus.focus([-5,1,2],readingFrame(1280),{now:110});focus.step(220);
+ focus.restore({now:230});focus.step(300);
+ focus.focus([0,1,-4],readingFrame(1280),{now:310});focus.step(730);
+ focus.restore({now:740});focus.step(1160);assert.deepEqual(focus.snapshot(),before);
+});
+test('responsive framing and reduced-motion transitions finish immediately without rendering forever',()=>{
+ const {focus,camera}=cameraFixture(),before=focus.snapshot();
+ assert.equal(readingFrame(1099),null);
+ focus.focus([3,1,2],readingFrame(1280),{immediate:true,now:0});assert.equal(focus.transition,null);
+ focus.viewport(390,844,{x:0,y:-.07});focus.restore({immediate:true,now:1});assert.equal(focus.transition,null);assert.equal(focus.home,null);
+ assert.deepEqual(focus.snapshot().position,before.position);assert.equal(camera.view.fullWidth,390);assert.deepEqual(focus.snapshot().offset,{x:0,y:-.07});
+ focus.viewport(1600,900,{x:-.12,y:.015});focus.focus([3,1,2],readingFrame(1600),{immediate:true});
+ const target=new THREE.Vector3(3,1,2).project(camera);assert.ok(Math.abs((target.x+1)*800-268)<.001);
+ focus.restore({immediate:true});assert.equal(focus.step(99999),false);
 });
