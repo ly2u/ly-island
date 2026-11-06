@@ -20,6 +20,7 @@ const rooms=new IslandRooms({
   highlight(id);scene?.select(id==='search'?null:id,false);
   if(id&&!roomOpen){ambientPaused=scene?.paused??false;scene?.setPaused(true);}
   if(!id&&roomOpen)scene?.setPaused(ambientPaused);
+  scene?.focusBuilding(id);
   roomOpen=Boolean(id);
  }
 });
@@ -74,7 +75,7 @@ async function startScene(){
    labels:positions=>{for(const [id,p] of Object.entries(positions)){const b=buttons[id];b.style.left=p.x+'px';b.style.top=p.y+'px';b.hidden=!p.visible;}$('loading').hidden=true;}
   },island,rules);
   if(scene.paused){$('motion-toggle').setAttribute('aria-pressed','true');$('motion-toggle').setAttribute('aria-label','继续漂浮');}
-  if(roomOpen){ambientPaused=scene.paused;scene.setPaused(true);}
+  if(roomOpen){ambientPaused=scene.paused;scene.setPaused(true);scene.focusBuilding(rooms.room);}
   $('labels').hidden=false;if(island){scene.setLight(dusk);scene.canvas.dataset.revision=String(island.revision);}
  }catch{if(attempt===sceneAttempt)unavailable();}
  finally{clearTimeout(timeout);}
