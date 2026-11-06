@@ -431,7 +431,7 @@ export class IslandScene {
      if(this.canMove(this.drag,x,z)){const g=this.editable(this.drag);if(g.position.x!==worldX||g.position.z!==worldZ){this.dragChanged=true;g.position.set(worldX,g.position.y,worldZ);if(this.selectionRing)this.selectionRing.position.set(worldX,.125,worldZ);this.pathsDirty=true;this.dirty=true;}}
     }return;
    }
-   if(event.pointerType==='mouse'){const id=this.pick(event);this.canvas.style.cursor=id?(this.arranging?'grab':'pointer'):'default';}
+   if(event.pointerType==='mouse'){const id=this.pick(event);this.canvas.style.cursor=id?(this.arranging?'grab':'pointer'):'default';this.callbacks.hover?.(id);}
   });
   const end=event=>{
    if(this.drag){const id=this.drag;this.drag=null;this.controls.enabled=true;this.canvas.style.cursor=this.arranging?'grab':'default';this.rebuildPaths();if(this.dragChanged){if(this.buildings.has(id))this.saveLayout();else this.saveScenery(id);}}
@@ -439,6 +439,7 @@ export class IslandScene {
    this.down=null;
   };
   this.canvas.addEventListener('pointerup',end);this.canvas.addEventListener('pointercancel',()=>{if(this.drag){const id=this.drag;this.drag=null;this.rebuildPaths();if(this.dragChanged){if(this.buildings.has(id))this.saveLayout();else this.saveScenery(id);}}this.down=null;this.controls.enabled=true;});
+  this.canvas.addEventListener('pointerleave',()=>this.callbacks.hover?.(null));
   this.canvas.addEventListener('keydown',event=>{if(event.key==='Escape')this.select(null);if(event.key==='Home'){event.preventDefault();this.resetView();}});
  }
  animate(now) {

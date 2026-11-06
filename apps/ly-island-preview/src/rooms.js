@@ -1,6 +1,7 @@
 import {HTML_TAGS,MATH_TAGS,ARTICLE_CLASSES,MATH_ATTRIBUTES,validMathAttribute,validArticleLink} from '../../rqly-sites/public/rqly/article-policy.mjs';
 import '../../rqly-sites/public/rqly/writing.css';
 import {seriesRecords} from '../../rqly-sites/public/rqly/organization-core.mjs';
+import {recommendedRecords,readingPositions,relatedRecords,recordRoom} from '../../rqly-sites/public/rqly/island-content.mjs';
 import './organization.css';
 import './rooms.css';
 import {renderSearch,highlightArticleMatches} from './search.js';
@@ -48,7 +49,7 @@ function coverImage(post,cls){if(!/^\/media\/[a-f0-9]{32}\.webp$/.test(post.cove
 export class IslandRooms {
  get names(){return Object.fromEntries(Object.entries(names).map(([id,name])=>[id,this.callbacks.island?.()?.buildings?.[id]?.name||name]));}
  constructor(callbacks){
-  this.baseTitle=document.title;this.callbacks=callbacks;this.room=null;this.slug=null;this.token=0;this.pending=null;this.font=Math.max(16,Math.min(22,Number(readStored('ly-island-reader-font',18))||18));this.positions=readStored('ly-island-reading-v1',{});if(!this.positions||typeof this.positions!=='object'||Array.isArray(this.positions))this.positions={};
+  this.baseTitle=document.title;this.callbacks=callbacks;this.room=null;this.slug=null;this.token=0;this.pending=null;this.font=Math.max(16,Math.min(22,Number(readStored('ly-island-reader-font',18))||18));this.positions=readingPositions(readStored('ly-island-reading-v1',{}));
   this.dialog=el('dialog','island-room');this.dialog.id='room-dialog';this.dialog.setAttribute('aria-labelledby','room-name');
   this.dialog.innerHTML='<div class="room-window"><header class="room-top"><button class="room-home" id="room-close" aria-label="收起阅读空间，回到浮空岛">← <span>回到岛上</span></button><div class="room-heading"><span id="room-caption"></span><h2 id="room-name"></h2></div><nav class="room-switcher" aria-label="切换岛内空间"></nav><button class="room-close-icon" aria-label="关闭阅读空间">×</button></header><div class="room-scroll" tabindex="-1"><div class="room-content"></div></div><footer class="room-bottom"><span class="room-location">LY · 私人的小世界</span><span class="room-footer-hint">把写下的日子，放进书架</span><span class="room-coordinate">ISLAND / 01</span></footer></div>';
   document.body.append(this.dialog);this.content=this.dialog.querySelector('.room-content');this.scroll=this.dialog.querySelector('.room-scroll');
@@ -57,6 +58,8 @@ export class IslandRooms {
   this.dialog.addEventListener('cancel',e=>{e.preventDefault();this.close();});this.dialog.addEventListener('click',e=>{if(e.target===this.dialog)this.close();});
   this.scroll.addEventListener('scroll',()=>this.saveProgress(),{passive:true});
   window.addEventListener('popstate',()=>this.sync());window.addEventListener('hashchange',()=>this.sync());
+  window.addEventListener('pagehide',()=>{this.saveProgress();this.flushProgress();});
+  window.addEventListener('storage',event=>{if(event.key==='ly-island-reading-v1'||event.key===null){this.positions=readingPositions(readStored('ly-island-reading-v1',{}));this.callbacks.readingChanged?.();}});
   queueMicrotask(()=>this.sync());
  }
  open(room,slug=null,collection=null){const q=new URLSearchParams({room});if(slug)q.set('article',slug);if(collection||(slug&&room===this.room&&this.collectionId))q.set('collection',collection||this.collectionId);this.navigate('#'+q.toString());}
@@ -77,6 +80,12 @@ export class IslandRooms {
   if(room==='search'&&!slug)this.searchCollection();else if(room==='postoffice')this.readPostOffice();else if(room==='about')this.readAbout();else if(slug)this.readArticle(slug);else if(collection)this.renderDirectory(collection);else this.collection();
  }
  refresh(){if(this.room){this.dialog.querySelector('#room-name').textContent=this.names[this.room];for(const tab of this.dialog.querySelectorAll('.room-tab'))tab.textContent=this.names[tab.dataset.room];if(this.room==='search'&&!this.slug)this.searchCollection();else if(this.room==='postoffice')this.readPostOffice();else if(this.room==='about')this.readAbout();else if(!this.slug){if(this.collectionId)this.renderDirectory(this.collectionId);else this.collection();}}}
+ renderRecommendations(){
+  const {recommendations,curated}=recommendedRecords(this.callbacks.posts(),this.callbacks.island?.(),this.room);if(!recommendations.length)return;
+  const section=el('section','room-recommendations');section.setAttribute('aria-label',curated?'岛主精选':'最近记录');
+  const head=el('header');head.append(el('h2','',curated?'先从这几篇认识这里':'最近留在这里的记录'),el('span','',curated?'岛主精选 / PICKED FOR YOU':'最近更新 / LATEST'));section.append(head);
+  const grid=el('div','recommended-grid');for(const post of recommendations){const card=button('','recommended-record',()=>this.open(this.room,post.slug));card.dataset.article=post.slug;card.append(el('span','',({note:'笔记',blog:'博客',project:'项目'}[post.kind||'blog'])+' · '+post.date),el('h3','',post.title),el('p','',post.summary),el('small','','翻开这条记录 →'));grid.append(card);}section.append(grid);this.content.append(section);
+ }
  readPostOffice(){this.scroll.scrollTop=0;this.pending?.abort();this.pending=new AbortController();renderPostOffice(this.content,this.pending.signal);}
  async readAbout(){
   if(this.aboutData){this.renderAbout(this.aboutData);return;}const token=++this.token;this.pending?.abort();const controller=new AbortController();this.pending=controller;const timeout=setTimeout(()=>controller.abort(),8000);this.content.replaceChildren(el('p','room-empty','正在读岛主留下的介绍…'));
@@ -93,7 +102,7 @@ export class IslandRooms {
   if(this.callbacks.failed?.()){const notice=el('div','collection-error');notice.setAttribute('role','status');notice.append(el('p','','公开记录暂时没有取到，请稍后再试。'),button('重新读取记录','room-action',()=>this.callbacks.retry?.()));this.content.append(notice);}
   const intro=el('section','collection-intro');intro.append(el('p','room-eyebrow',this.room==='library'?'一本一本，慢慢积累':this.room==='projects'?'工程档案 / FIELD NOTES':'工作台 / IN PROGRESS'));
   intro.append(el('h1','',this.room==='library'?'写下的日子，\n都在这里。':this.room==='projects'?'让一项工程，\n留下可以追溯的过程。':'把想法，\n做成用得上的东西。'));
-  intro.append(el('p','collection-description',this.callbacks.island?.()?.buildings?.[this.room]?.description||(this.room==='library'?'挑一本，翻开看看。读完之后，小岛还在窗外。':this.room==='projects'?'这里先收录已有工程手记，项目档案会随着实践逐步补齐。':'桌上放着正在使用的工具，也留着每次尝试的手记。')));this.content.append(intro);if(this.room==='library')this.renderDirectoryIndex();renderSearch(this,this.room);const filterCards=()=>{};
+  intro.append(el('p','collection-description',this.callbacks.island?.()?.buildings?.[this.room]?.description||(this.room==='library'?'挑一本，翻开看看。读完之后，小岛还在窗外。':this.room==='projects'?'这里先收录已有工程手记，项目档案会随着实践逐步补齐。':'桌上放着正在使用的工具，也留着每次尝试的手记。')));this.content.append(intro);if(this.room!=='workshop')this.renderRecommendations();if(this.room==='library')this.renderDirectoryIndex();renderSearch(this,this.room);const filterCards=()=>{};
   if(this.room==='library'){
    const bar=el('div','shelf-bar');bar.append(el('span','',this.callbacks.loaded()?posts.filter(p=>p.kind!=='project').length+' 本记录 · 按最近更新排列':'正在整理书架…'));const filters=el('div','shelf-filters');let active='',kind='';const type=el('select','shelf-kind-select');type.setAttribute('aria-label','筛选笔记或博客');for(const [value,label] of [['','笔记和博客'],['note','笔记'],['blog','博客']]){const option=el('option','',label);option.value=value;type.append(option);}type.addEventListener('change',()=>{kind=type.value;draw();});
    const shelf=el('div','book-shelf');const draw=()=>{shelf.replaceChildren();for(const [i,p] of posts.filter(p=>p.kind!=='project'&&(!kind||(p.kind||'blog')===kind)&&(!active||p.topic===active)).entries())shelf.append(this.bookCard(p,i));filterCards();if(!shelf.children.length)shelf.append(this.empty(this.callbacks.loaded()?'这一层书架还空着。':'正在读取公开记录…'));};
@@ -106,7 +115,7 @@ export class IslandRooms {
   }else{
    const bench=el('div','tool-bench');for(const tool of [{name:'CivilFlow',label:'01 / 建模工作台',detail:'把桥梁参数连成节点工作流，校验、编译，再导出 Civil JSON。',url:'https://midas.rqly.com',svg:flowDrawing,tag:'工作流 · 校验 · 导出'},{name:'七嘴',label:'02 / 文字工作台',detail:'给一份稿件换三个视角，找到值得修改的表达。',url:'https://7zui.com',svg:wordsDrawing,tag:'专业人员 · 听众 · 编辑'}]){
     const t=el('article','tool-station');t.append(el('span','room-eyebrow',tool.label),illustration(tool.svg,'tool-drawing'),el('h2','',tool.name),el('p','',tool.detail),el('span','tool-tag',tool.tag));const a=el('a','tool-open','打开工具 ↗');a.href=tool.url;a.target='_blank';a.rel='noopener noreferrer';t.append(a);bench.append(t);
-   }this.content.append(bench);const log=el('section','workshop-log');log.append(el('h2','','研发手记'));for(const p of posts.filter(p=>p.kind!=='project'&&p.topic==='探索')){const b=button(p.title,'workshop-entry',()=>this.open(this.room,p.slug));b.dataset.search=(p.title+' '+p.summary).toLowerCase();b.append(el('span','',p.date+' →'));log.append(b);}this.content.append(log);
+   }this.content.append(bench);this.renderRecommendations();const log=el('section','workshop-log');log.append(el('h2','','研发手记'));for(const p of posts.filter(p=>p.kind!=='project'&&p.topic==='探索')){const b=button(p.title,'workshop-entry',()=>this.open(this.room,p.slug));b.dataset.search=(p.title+' '+p.summary).toLowerCase();b.append(el('span','',p.date+' →'));log.append(b);}this.content.append(log);
   }
  }
  searchCollection(){this.content.replaceChildren();this.scroll.scrollTop=0;const intro=el('section','collection-intro search-heading');intro.append(el('p','room-eyebrow','SEARCH / 小岛里的记录'),el('h1','','从一个词，找回一段记录。'),el('p','collection-description','搜索公开的笔记、博客与项目。标题、摘要、正文和项目资料都能找到；多个关键词用空格分开。'));this.content.append(intro);this.renderDirectoryIndex();renderSearch(this);}
@@ -123,7 +132,7 @@ export class IslandRooms {
  async readArticle(slug){
   const token=this.token;this.scroll.scrollTop=0;this.content.replaceChildren(el('div','room-empty','正在翻开这一页…'));const controller=new AbortController();this.pending=controller;const timeout=setTimeout(()=>controller.abort(),10000);
   try{
-   const response=await fetch('/api/posts/'+encodeURIComponent(slug),{signal:controller.signal});if(!response.ok)throw new Error(response.status===404?'这篇记录还未公开或已移走。':'暂时没有取到正文，请再试一次。');const data=await response.json();
+   const response=await fetch('/api/posts/'+encodeURIComponent(slug),{signal:controller.signal});if(!response.ok){if(response.status===404&&token===this.token){delete this.positions[slug];this.flushProgress();}throw new Error(response.status===404?'这篇记录还未公开或已移走。':'暂时没有取到正文，请再试一次。');}const data=await response.json();
    if(token!==this.token)return;const p=data.post;if(!p||p.published!==true||p.slug!==slug||typeof p.body!=='string'||typeof data.html!=='string')throw new Error('这篇记录暂时无法打开。');
    this.renderArticle(p,data.html);
   }catch(error){if(token!==this.token)return;const empty=el('div','reading-error');empty.setAttribute('role','status');empty.append(el('h2','','这一页暂时没有翻开'),el('p','',error.name==='AbortError'?'正文读取超时，请再试一次。':error.message),button('重新打开','room-action',()=>this.readArticle(slug)),button('回到'+this.names[this.room],'room-text-action',()=>this.open(this.room)));this.content.replaceChildren(empty);}
@@ -152,13 +161,16 @@ export class IslandRooms {
  const intro=el('section','collection-intro');intro.append(button('← 回到书屋','room-text-action',()=>this.open('library')),el('p','room-eyebrow',{tag:'TAG / 标签',topic:'TOPIC / 专题',series:'SERIES / 连续阅读'}[item.type]),el('h1','',item.name));if(item.description)intro.append(el('p','collection-description',item.description));this.content.append(intro);const records=item.type==='series'?seriesRecords(this.callbacks.posts(),id):this.callbacks.posts().filter(p=>(p.organization?.tags||[]).includes(id)||(p.organization?.topics||[]).includes(id));const list=el('div','directory-records');intro.append(el('p','',records.length+' 条公开记录'+(item.type==='series'?' · 按阅读顺序排列':'')));for(const [index,p] of records.entries()){const b=button('','directory-record',()=>this.open(this.room,p.slug,id));b.dataset.article=p.slug;b.append(el('span','directory-number',item.type==='series'?String(index+1).padStart(2,'0'):p.date),el('div'));b.lastChild.append(el('h2','',p.title),el('p','',p.summary),el('small','',(p.kind==='project'?'项目':p.kind==='note'?'笔记':'博客')+' · '+p.date));list.append(b);}this.content.append(list);}
  renderArticleOrganization(p,paper){const d=p.organizationDetails;if(!d)return;const bar=el('nav','article-organization');bar.setAttribute('aria-label','内容归属');for(const item of [...d.tags,...d.topics,...(d.series?[d.series]:[])])bar.append(button(({tag:'#',topic:'专题 · ',series:'系列 · '}[item.type])+item.name,'directory-chip',()=>this.openCollection(item.id)));if(d.project)bar.append(button('项目 · '+d.project.title,'directory-chip',()=>this.open('projects',d.project.slug)));if(bar.children.length)paper.append(bar);}
  renderRelatedRecords(p,paper){const all=this.callbacks.posts(),d=p.organizationDetails,sections=[];if(d?.series)sections.push({title:'系列 · '+d.series.name,records:seriesRecords(all,d.series.id)});if(p.kind==='project')sections.push({title:'这个项目的记录',records:all.filter(item=>item.organization?.projectSlug===p.slug)});else if(d?.project)sections.push({title:'同一项目的记录',records:all.filter(item=>item.organization?.projectSlug===d.project.slug&&item.slug!==p.slug)});
- for(const {title,records} of sections){if(!records.length)continue;const section=el('section','related-records');section.append(el('h2','',title));for(const [index,item] of records.entries()){if(item.slug===p.slug){const current=el('p','related-current',String(index+1).padStart(2,'0')+' · '+item.title+'（正在阅读）');current.setAttribute('aria-current','page');section.append(current);}else{const b=button(item.title,'related-record',()=>this.open(item.kind==='project'?'projects':this.room,item.slug));b.dataset.article=item.slug;b.append(el('span','',item.date+' →'));section.append(b);}}paper.append(section);}
+ const shown=new Set(sections.flatMap(section=>section.records.map(item=>item.slug))),related=relatedRecords(p,all,all.length).filter(item=>!shown.has(item.slug)).slice(0,3);if(related.length)sections.push({title:'沿着这些线索，继续读',records:related});
+ for(const {title,records} of sections){if(!records.length)continue;const section=el('section','related-records');section.append(el('h2','',title));for(const [index,item] of records.entries()){if(item.slug===p.slug){const current=el('p','related-current',String(index+1).padStart(2,'0')+' · '+item.title+'（正在阅读）');current.setAttribute('aria-current','page');section.append(current);}else{const b=button(item.title,'related-record',()=>this.open(recordRoom(item,this.room),item.slug));b.dataset.article=item.slug;b.append(el('span','',item.date+' →'));section.append(b);}}paper.append(section);}
  }
  setFont(size){this.font=Math.max(16,Math.min(22,size));this.spread?.style.setProperty('--reading-size',this.font+'px');try{localStorage.setItem('ly-island-reader-font',JSON.stringify(this.font));}catch{}this.saveProgress();}
  saveProgress(){
   if(!this.slug||!this.dialog.open||!this.content.querySelector('.reader-paper'))return;
   const max=this.scroll.scrollHeight-this.scroll.clientHeight;const ratio=max>5?Math.max(0,Math.min(1,this.scroll.scrollTop/max)):1;
-  this.positions[this.slug]={ratio,updated:Date.now()};const label=this.content.querySelector('.reader-progress-label'),fill=this.content.querySelector('.reading-fill');if(label)label.textContent=Math.round(ratio*100)+'%';if(fill)fill.style.width=ratio*100+'%';
-  clearTimeout(this.storeTimer);this.storeTimer=setTimeout(()=>{try{const entries=Object.entries(this.positions).sort((a,b)=>b[1].updated-a[1].updated).slice(0,40);localStorage.setItem('ly-island-reading-v1',JSON.stringify(Object.fromEntries(entries)));}catch{}},150);
+  this.positions[this.slug]={ratio,updated:Date.now(),room:this.room};const label=this.content.querySelector('.reader-progress-label'),fill=this.content.querySelector('.reading-fill');if(label)label.textContent=Math.round(ratio*100)+'%';if(fill)fill.style.width=ratio*100+'%';
+  clearTimeout(this.storeTimer);this.storeTimer=setTimeout(()=>this.flushProgress(),150);
  }
+ flushProgress(){clearTimeout(this.storeTimer);this.positions=readingPositions(this.positions);try{localStorage.setItem('ly-island-reading-v1',JSON.stringify(this.positions));}catch{}this.callbacks.readingChanged?.();}
+ clearReadingHistory(){clearTimeout(this.storeTimer);this.positions={};try{localStorage.removeItem('ly-island-reading-v1');}catch{}this.callbacks.readingChanged?.();}
 }

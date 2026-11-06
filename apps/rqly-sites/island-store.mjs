@@ -1,4 +1,5 @@
 import {validateOrganization} from './public/rqly/organization-core.mjs';
+import {roomRecords,validRecordSlug} from './public/rqly/island-content.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {randomBytes,createHash} from 'node:crypto';
@@ -19,7 +20,7 @@ export function validateIsland(value){
  const title=text(value.title,60,'岛名'),description=text(value.description,180,'岛屿介绍');
  if(!['initial','grown'].includes(value.phase)||!['afternoon','dusk'].includes(value.lighting))fail('岛屿阶段或光照无效。');
  const buildings={},layouts={};
- for(const id of BUILDINGS){const b=value.buildings?.[id];if(!b)fail('缺少建筑配置。');buildings[id]={name:text(b.name,16,'建筑名称'),description:text(b.description,180,'建筑介绍')};}
+ for(const id of BUILDINGS){const b=value.buildings?.[id];if(!b)fail('缺少建筑配置。');const featuredSlugs=b.featuredSlugs??[];if(!Array.isArray(featuredSlugs)||featuredSlugs.length>2||featuredSlugs.some(slug=>!validRecordSlug(slug))||new Set(featuredSlugs).size!==featuredSlugs.length)fail('每个空间可选择最多两条不同的精选内容。');buildings[id]={name:text(b.name,16,'建筑名称'),description:text(b.description,180,'建筑介绍'),featuredSlugs:[...featuredSlugs]};}
  for(const phase of ['initial','grown']){
   layouts[phase]={};
   for(const id of BUILDINGS){
@@ -54,13 +55,20 @@ export function createIslandStore(dataDir){
  const initialize=()=>{if(!fs.existsSync(filename))atomic(defaultIsland());read();};
  const save=(input,baseRevision,{enforceGrowth=false,posts=[]}={})=>{
   const current=read();if(baseRevision!==current.revision)fail('岛屿已在其他页面更新。请重新载入后再保存。',409);
-  const validated=validateIsland(input);if(enforceGrowth&&input.phase==='grown'&&!current.growth.unlocked&&!growthStats(posts,validated).eligible)fail('真实积累尚未达到扩岛目标，请先发布内容或调整成长目标。',409);validated.growth.unlocked=current.growth.unlocked||validated.phase==='grown';
+  const validated=validateIsland(input);
+  for(const id of BUILDINGS){const eligible=new Set(roomRecords(posts,id).map(post=>post.slug)),previous=new Set(current.buildings[id].featuredSlugs);if(validated.buildings[id].featuredSlugs.some(slug=>!eligible.has(slug)&&!previous.has(slug)))fail('精选只能选择本空间中已公开的内容。');}
+  if(enforceGrowth&&input.phase==='grown'&&!current.growth.unlocked&&!growthStats(posts,validated).eligible)fail('真实积累尚未达到扩岛目标，请先发布内容或调整成长目标。',409);validated.growth.unlocked=current.growth.unlocked||validated.phase==='grown';
   const next={...validated,revision:current.revision+1,updatedAt:new Date().toISOString()};
   const backups=path.join(dataDir,'backups');fs.mkdirSync(backups,{recursive:true});fs.copyFileSync(filename,path.join(backups,'island-'+new Date().toISOString().replace(/[:.]/g,'-')+'-'+randomBytes(3).toString('hex')+'.json'));atomic(next);
   const previous=fs.readdirSync(backups).filter(name=>/^island-[\dTZ.-]+-[a-f0-9]+\.json$/.test(name)).sort();for(const name of previous.slice(0,Math.max(0,previous.length-10)))fs.unlinkSync(path.join(backups,name));
   return next;
  };
  return {initialize,read,save};
+}
+export function publicIsland(island,posts){
+ const value=structuredClone(island);
+ for(const id of BUILDINGS){const visible=new Set(roomRecords(posts,id).map(post=>post.slug));value.buildings[id].featuredSlugs=(value.buildings[id].featuredSlugs||[]).filter(slug=>visible.has(slug));}
+ return value;
 }
 export const recordRevision=post=>createHash('sha256').update(JSON.stringify(post)).digest('hex');
 export const adminRecord=post=>({...post,kind:post.kind||'blog',revision:recordRevision(post)});

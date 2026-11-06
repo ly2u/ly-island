@@ -1,4 +1,5 @@
 const $=id=>document.getElementById(id);
+let islandContent=null;import('/island-content.mjs?v=discovery-v1').then(core=>{islandContent=core;refreshFeaturedChoices();}).catch(()=>status('精选目录暂未载入，请刷新页面。',true,'island-status'));
 let searchCore=null,listLimit=30;import('/search-core.mjs?v=organization-v1').then(core=>{searchCore=core;renderList();}).catch(()=>status('全文搜索暂时未载入，请刷新页面。',true));
 let organizationCatalog={revision:0,items:[]},organizationEdit=null,organizationCore=null;
 import('/organization-core.mjs?v=organization-v1').then(core=>{organizationCore=core;renderList();}).catch(()=>{});
@@ -102,7 +103,7 @@ function renderList(){
  renderAutoDrafts();updateDashboard();
 }
 
-async function load(){try{const [content,drafts,directory]=await Promise.all([request('/api/admin/posts'),request('/api/admin/editor-drafts?includeContent=1'),request('/api/admin/organization')]);posts=content.posts;editorDrafts=drafts.drafts;organizationCatalog=directory.catalog;refreshOrganizationControls();renderOrganizationList();renderList();if(island)request('/api/admin/island').then(data=>{islandStats=data.stats;fillGrowth();}).catch(()=>{});status('',false,'dashboard-status');}catch(error){status(error.message,true);status(error.message,true,'dashboard-status');}}
+async function load(){try{const [content,drafts,directory]=await Promise.all([request('/api/admin/posts'),request('/api/admin/editor-drafts?includeContent=1'),request('/api/admin/organization')]);posts=content.posts;editorDrafts=drafts.drafts;organizationCatalog=directory.catalog;refreshOrganizationControls();renderOrganizationList();renderList();refreshFeaturedChoices();if(island)request('/api/admin/island').then(data=>{islandStats=data.stats;fillGrowth();}).catch(()=>{});status('',false,'dashboard-status');}catch(error){status(error.message,true);status(error.message,true,'dashboard-status');}}
 for(const b of document.querySelectorAll('.new-content button'))b.addEventListener('click',()=>{if(canSwitch()){fill({},b.dataset.kind);$('title').focus();}});
 for(const id of ['content-search','content-kind-filter','content-status-filter','content-topic-filter','content-order','content-organization-filter'])$(id).addEventListener(id==='content-search'?'input':'change',()=>{listLimit=30;renderList();});
 $('clear-content-search').addEventListener('click',()=>{$('content-search').value='';listLimit=30;renderList();$('content-search').focus();});
@@ -224,15 +225,32 @@ async function ensureScene(){
 }
 $('admin-scene-arrange').addEventListener('click',()=>{sceneArranging=!sceneArranging;scene?.setArrange(sceneArranging);$('admin-scene-arrange').setAttribute('aria-pressed',String(sceneArranging));$('admin-scene-arrange').textContent=sceneArranging?'拖动布置':'旋转预览';});
 $('admin-reset-view').addEventListener('click',()=>scene?.resetView());$('admin-reset-layout').addEventListener('click',()=>{if(scene&&confirm('恢复这个阶段的默认建筑、信箱和树木位置？保存后才会对访客展示。'))scene.resetLayout();});
+function refreshFeaturedChoices(){
+ if(!island)return;
+ for(const pane of document.querySelectorAll('[data-featured-room]')){
+  const id=pane.dataset.featuredRoom,current=[...pane.querySelectorAll('select')];
+  const selected=current.length?current.map(select=>select.value):island.buildings[id].featuredSlugs||[];
+  const records=islandContent?.roomRecords(posts,id)||[],available=new Set(records.map(post=>post.slug));pane.replaceChildren();
+  pane.append(text('p','选择最多两条已公开的内容，作为这个空间的精选。留空时自动展示最近记录。','admin-featured-hint'));
+  for(let i=0;i<2;i++){
+   const label=text('label','精选 '+(i+1)),select=document.createElement('select');select.id='featured-'+id+'-'+i;
+   const auto=text('option','不指定（两项留空则自动选择）');auto.value='';select.append(auto);select.disabled=!islandContent;
+   for(const post of records){const option=text('option',post.title+' · '+kindNames[post.kind||'blog']);option.value=post.slug;select.append(option);}
+   if(selected[i]&&!available.has(selected[i])){const missing=text('option','原精选已下线或移到其他空间（不向访客展示）');missing.value=selected[i];select.append(missing);}
+   select.value=selected[i]||'';label.append(select);pane.append(label);
+  }
+ }
+}
 function fillIsland(value){
  island=value;islandDirty=false;fillGrowth();fillDecorations();$('island-title').value=value.title;$('island-description').value=value.description;$('island-phase').value=value.phase;$('island-lighting').value=value.lighting;$('building-settings').replaceChildren();
- for(const [id,b] of Object.entries(value.buildings)){const group=document.createElement('section');group.className='building-settings-group';group.append(text('h3',({library:'书屋',projects:'展馆',workshop:'工坊'}[id])+' · 名称与介绍'));for(const [field,label] of [['name','建筑名称'],['description','建筑介绍']]){const l=text('label',label);const input=document.createElement(field==='name'?'input':'textarea');input.id='building-'+id+'-'+field;input.value=b[field];input.maxLength=field==='name'?16:180;input.required=true;l.append(input);group.append(l);}$('building-settings').append(group);}
+ for(const [id,b] of Object.entries(value.buildings)){const group=document.createElement('section');group.className='building-settings-group';group.append(text('h3',({library:'书屋',projects:'展馆',workshop:'工坊'}[id])+' · 名称与介绍'));for(const [field,label] of [['name','建筑名称'],['description','建筑介绍']]){const l=text('label',label);const input=document.createElement(field==='name'?'input':'textarea');input.id='building-'+id+'-'+field;input.value=b[field];input.maxLength=field==='name'?16:180;input.required=true;l.append(input);group.append(l);}const featured=document.createElement('div');featured.className='building-featured';featured.dataset.featuredRoom=id;group.append(featured);$('building-settings').append(group);}
+ refreshFeaturedChoices();
  islandDirty=false;status('',false,'island-status');scene?.updateIsland(value);scene?.setArrange(sceneArranging);updateDashboard();ensureScene();
 }
 async function loadIsland(){const epoch=islandEditEpoch;try{const data=await request('/api/admin/island');rules=data.rules;islandStats=data.stats;if(island&&epoch!==islandEditEpoch){fillGrowth();return;}fillIsland(data.island);}catch(error){status(error.message,true,'island-status');}}
 $('island-form').addEventListener('input',()=>{islandEditEpoch++;islandDirty=true;status('有未保存的修改',false,'island-status');});
 for(const id of ['island-phase','island-lighting'])$(id).addEventListener('change',()=>{if(!island)return;island.phase=$('island-phase').value;island.lighting=$('island-lighting').value;scene?.updateIsland(island);scene?.setArrange(sceneArranging);islandDirty=true;status('有未保存的修改',false,'island-status');});
-$('island-form').addEventListener('submit',async event=>{event.preventDefault();if(!island)return;const value=structuredClone(island);value.growth.threshold=Number($('growth-threshold').value);value.title=$('island-title').value;value.description=$('island-description').value;value.phase=$('island-phase').value;value.lighting=$('island-lighting').value;for(const id of Object.keys(value.buildings))for(const field of ['name','description'])value.buildings[id][field]=$('building-'+id+'-'+field).value;const controls=[...$('island-form').querySelectorAll('button,input,textarea,select')];controls.forEach(e=>e.disabled=true);scene?.setArrange(false);$('admin-scene-arrange').disabled=true;$('admin-reset-layout').disabled=true;status('正在保存…',false,'island-status');try{const data=await request('/api/admin/island',{method:'PUT',body:JSON.stringify({baseRevision:island.revision,island:value})});fillIsland(data.island);await loadIsland();status('已保存，访客现在会看到新的岛。',false,'island-status');}catch(error){status(error.message,true,'island-status');}finally{controls.forEach(e=>e.disabled=false);scene?.setArrange(sceneArranging);$('admin-scene-arrange').disabled=false;$('admin-reset-layout').disabled=false;}});
+$('island-form').addEventListener('submit',async event=>{event.preventDefault();if(!island)return;const value=structuredClone(island);value.growth.threshold=Number($('growth-threshold').value);value.title=$('island-title').value;value.description=$('island-description').value;value.phase=$('island-phase').value;value.lighting=$('island-lighting').value;for(const id of Object.keys(value.buildings)){for(const field of ['name','description'])value.buildings[id][field]=$('building-'+id+'-'+field).value;value.buildings[id].featuredSlugs=[...document.querySelectorAll('[data-featured-room="'+id+'"] select')].map(select=>select.value).filter(Boolean);if(new Set(value.buildings[id].featuredSlugs).size!==value.buildings[id].featuredSlugs.length){status('同一空间的两条精选请选不同内容。',true,'island-status');return;}}const controls=[...$('island-form').querySelectorAll('button,input,textarea,select')];controls.forEach(e=>e.disabled=true);scene?.setArrange(false);$('admin-scene-arrange').disabled=true;$('admin-reset-layout').disabled=true;status('正在保存…',false,'island-status');try{const data=await request('/api/admin/island',{method:'PUT',body:JSON.stringify({baseRevision:island.revision,island:value})});fillIsland(data.island);await loadIsland();status('已保存，访客现在会看到新的岛。',false,'island-status');}catch(error){status(error.message,true,'island-status');}finally{controls.forEach(e=>e.disabled=false);scene?.setArrange(sceneArranging);$('admin-scene-arrange').disabled=false;$('admin-reset-layout').disabled=false;}});
 $('reload-island').addEventListener('click',()=>{if(!islandDirty||confirm('重新载入会放弃当前未保存的岛屿设置。继续吗？'))loadIsland();});
 window.addEventListener('beforeunload',event=>{if(dirty||islandDirty){event.preventDefault();event.returnValue='';}});
 
