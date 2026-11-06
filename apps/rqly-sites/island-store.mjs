@@ -1,11 +1,12 @@
 import {validateOrganization} from './public/rqly/organization-core.mjs';
 import {roomRecords,validRecordSlug} from './public/rqly/island-content.mjs';
+import {growthStats} from './public/rqly/growth-core.mjs';
+export {growthStats};
 import fs from 'node:fs';
 import path from 'node:path';
 import {randomBytes,createHash} from 'node:crypto';
 
 export const DECORATION_SLOTS={west:{label:'西岸',point:[-3.5,0]},northwest:{label:'西北角',point:[-2.8,-2.7]},northeast:{label:'东北角',point:[2.3,-2.7]},east:{label:'东岸',point:[3.8,1.4]},southwest:{label:'西南角',point:[-2.7,2.8]},south:{label:'湖边',point:[1.6,2.9]}};
-export function growthStats(posts,island){const published=posts.filter(p=>p.published===true&&!p.trashedAt),notes=published.filter(p=>p.kind==='note').length,blogs=published.filter(p=>!p.kind||p.kind==='blog').length,projects=published.filter(p=>p.kind==='project').length,completed=published.filter(p=>p.kind==='project'&&p.project?.status==='done').length;const score=notes+blogs*3+projects*5+completed*10,threshold=island.growth?.threshold??30;return {notes,blogs,projects,completed,score,threshold,remaining:Math.max(0,threshold-score),eligible:score>=threshold,unlocked:island.growth?.unlocked||island.phase==='grown',stage:island.phase==='grown'?2:1};}
 export const BUILDINGS=['library','projects','workshop'];
 export const DEFAULT_LAYOUTS={initial:{library:[-2.05,1.25],projects:[2.55,1.2],workshop:[-.1,-2.15]},grown:{library:[-2.5,1.55],projects:[9,.35],workshop:[.2,-2.3]}};
 export const SCENERY_RULES={initial:{radius:5.8,ellipse:.83},grown:{radius:6.8,ellipse:.83,satellite:{center:[9,.5],radius:[2.2,2.1]}}};
