@@ -1,12 +1,13 @@
 import './style.css';
 import './owner.css';
 import {IslandRooms} from './rooms.js';
+import {IslandDiscovery} from './discovery.js';
 
 
 const $=id=>document.getElementById(id);
 const definitions={library:{name:'书屋'},projects:{name:'工程展馆'},workshop:{name:'工坊'},about:{name:'岛主'},postoffice:{name:'信箱'}};
 let scene=null,grown=false,dusk=false,arranging=false,posts=[],postsLoaded=false,messageTimer,roomOpen=false,ambientPaused=false,island=null,rules=null,owner=null;
-let readingMode=false,sceneAttempt=0,modePaused=false,postsFailed=false;
+let readingMode=false,sceneAttempt=0,modePaused=false,postsFailed=false,discovery=null;
 let savedView=null;try{savedView=localStorage.getItem('ly-island-view');}catch{}
 const preferReading=savedView==='reading'||(!savedView&&navigator.connection?.saveData);
 const editRequested=new URLSearchParams(location.search).get('edit')==='1';
@@ -16,7 +17,9 @@ function message(text){$('status-message').textContent=text;clearTimeout(message
 function highlight(id){for(const [key,b] of Object.entries(buttons))b.setAttribute('aria-pressed',String(key===id));}
 const rooms=new IslandRooms({
  posts:()=>posts,loaded:()=>postsLoaded,failed:()=>postsFailed,retry:()=>loadPublicPosts(),island:()=>island,message,
+ readingChanged:()=>discovery?.refreshResume(),
  selection:id=>{
+  discovery?.hideHint();
   highlight(id);scene?.select(id==='search'?null:id,false);
   if(id&&!roomOpen){ambientPaused=scene?.paused??false;scene?.setPaused(true);}
   if(!id&&roomOpen)scene?.setPaused(ambientPaused);
@@ -24,10 +27,11 @@ const rooms=new IslandRooms({
   roomOpen=Boolean(id);
  }
 });
+discovery=new IslandDiscovery({posts:()=>posts,loaded:()=>postsLoaded,failed:()=>postsFailed,island:()=>island,positions:()=>rooms.positions,clearReading:()=>rooms.clearReadingHistory()});
 for(const [id,d] of Object.entries(definitions)){
  const b=document.createElement('button');b.className='building-label';b.dataset.building=id;b.setAttribute('aria-label','探索'+d.name);b.setAttribute('aria-pressed','false');
  const dot=document.createElement('span');dot.setAttribute('aria-hidden','true');const text=document.createElement('span');text.textContent=d.name;const arrow=document.createElement('span');arrow.className='label-arrow';arrow.textContent='↗';arrow.setAttribute('aria-hidden','true');b.append(dot,text,arrow);
- b.addEventListener('click',()=>{if(arranging){scene?.select(id==='search'?null:id,false);highlight(id);}else rooms.open(id);});$('labels').append(b);buttons[id]=b;
+ b.addEventListener('click',()=>{if(arranging){scene?.select(id==='search'?null:id,false);highlight(id);}else rooms.open(id);});$('labels').append(b);buttons[id]=b;discovery.bindButton(id,b);
 }
 function updateGrowth(){
  const notes=posts.filter(p=>p.kind==='note').length,blogs=posts.filter(p=>!p.kind||p.kind==='blog').length,projects=posts.filter(p=>p.kind==='project').length,completed=posts.filter(p=>p.kind==='project'&&p.project?.status==='done').length,score=notes+blogs*3+projects*5+completed*10,threshold=island?.growth?.threshold??30;
@@ -38,6 +42,7 @@ function updateGrowth(){
  const recent=posts[0];$('latest-update').hidden=!recent;if(recent){$('latest-update').textContent='最近留下 · '+recent.title;$('latest-update').href='#room='+(recent.kind==='project'?'projects':'library')+'&article='+recent.slug;}
 }
 function setReadingMode(value,reason='暂时放下漂浮，留一点时间给文字。',remember=false){
+ discovery?.hideHint();
  readingMode=value;document.body.classList.toggle('reading-mode',value);$('fallback').hidden=!value;$('loading').hidden=true;$('labels').hidden=value;
  $('fallback-reason').textContent=reason;$('view-toggle').textContent=value?'3D 小岛':'阅读模式';$('view-toggle').setAttribute('aria-pressed',String(value));
  if(scene){scene.setVisible(!value);if(value){modePaused=scene.paused;scene.setPaused(true);}else{scene.setPaused(roomOpen||modePaused);scene.resize();}}
@@ -53,7 +58,7 @@ function applyIsland(value){
  $('island-description').textContent=value.description;$('island-description').title=value.description;document.body.classList.toggle('dusk',dusk);
  $('light-toggle').setAttribute('aria-pressed',String(dusk));$('light-toggle').querySelector('span').textContent=dusk?'暮色':'午后';
  scene?.updateIsland(value);if(scene){scene.canvas.dataset.revision=String(value.revision);scene.setArrange(arranging);}
- updateGrowth();rooms.refresh();
+ updateGrowth();rooms.refresh();discovery?.refresh();
 }
 async function boot(){
  if(editRequested){location.replace('/admin?view=island');return;}
@@ -70,9 +75,10 @@ async function startScene(){
  try{
   const {IslandScene}=await import('./scene.js');if(attempt!==sceneAttempt||readingMode)return;
   scene=new IslandScene($('world'),{
+   hover:id=>{if(!arranging)discovery.showHint(id);},
    select:id=>{if(arranging)highlight(id);else if(id)rooms.open(id);},message,unavailable,
    scenery:(phase,value)=>{if(owner){island.scenery??={};island.scenery[phase]=value;owner.changed();}},layout:(phase,layout)=>{if(owner){island.layouts[phase]=layout;owner.changed();}},
-   labels:positions=>{for(const [id,p] of Object.entries(positions)){const b=buttons[id];b.style.left=p.x+'px';b.style.top=p.y+'px';b.hidden=!p.visible;}$('loading').hidden=true;}
+   labels:positions=>{for(const [id,p] of Object.entries(positions)){const b=buttons[id];b.style.left=p.x+'px';b.style.top=p.y+'px';b.hidden=!p.visible;}discovery.placeHint(positions);$('loading').hidden=true;}
   },island,rules);
   if(scene.paused){$('motion-toggle').setAttribute('aria-pressed','true');$('motion-toggle').setAttribute('aria-label','继续漂浮');}
   if(roomOpen){ambientPaused=scene.paused;scene.setPaused(true);scene.focusBuilding(rooms.room);}
@@ -106,6 +112,6 @@ for(const a of document.querySelectorAll('[data-room-link]')){
 async function loadPublicPosts(){
  postsFailed=false;rooms.refresh();
  try{const response=await fetch('/api/posts',{signal:AbortSignal.timeout(8000)});if(!response.ok)throw new Error('public posts unavailable');const data=await response.json();if(!Array.isArray(data.posts))throw new Error('invalid posts');posts=data.posts.filter(p=>p&&typeof p.slug==='string'&&typeof p.title==='string'&&typeof p.date==='string'&&p.published===true);postsLoaded=true;}catch{posts=[];postsLoaded=false;postsFailed=true;}
- updateGrowth();rooms.refresh();
+ updateGrowth();rooms.refresh();discovery.refresh();
 }
 loadPublicPosts();
