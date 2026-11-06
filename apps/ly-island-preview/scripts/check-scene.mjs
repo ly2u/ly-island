@@ -3,6 +3,7 @@ import {test} from 'node:test';
 import * as THREE from 'three';
 import {batchStaticMeshes,createRenderQuality} from '../src/scene-performance.js';
 import {SceneFocus,readingFrame} from '../src/scene-focus.js';
+import {IslandScene} from '../src/scene.js';
 
 const bounds=root=>new THREE.Box3().setFromObject(root);
 const close=(a,b)=>assert.ok(a.distanceTo(b)<1e-5,`${a.toArray()} != ${b.toArray()}`);
@@ -89,4 +90,10 @@ test('responsive framing and reduced-motion transitions finish immediately witho
  focus.viewport(1600,900,{x:-.12,y:.015});focus.focus([3,1,2],readingFrame(1600),{immediate:true});
  const target=new THREE.Vector3(3,1,2).project(camera);assert.ok(Math.abs((target.x+1)*800-268)<.001);
  focus.restore({immediate:true});assert.equal(focus.step(99999),false);
+});
+
+test('preview view capture and return keep the original orbit after preview rotation',()=>{
+ const {camera,controls,focus}=cameraFixture();const scene={camera,controls,focus,focusId:null,dirty:false};
+ const before=IslandScene.prototype.captureView.call(scene);camera.position.set(-5,8,20);controls.target.set(8,1,0);camera.zoom=1.7;controls.update();
+ IslandScene.prototype.restoreView.call(scene,before);close(camera.position,new THREE.Vector3(...before.position));close(controls.target,new THREE.Vector3(...before.target));assert.equal(camera.zoom,before.zoom);assert.equal(focus.transition,null);assert.equal(scene.dirty,true);
 });

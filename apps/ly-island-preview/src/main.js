@@ -2,15 +2,18 @@ import './style.css';
 import './owner.css';
 import {IslandRooms} from './rooms.js';
 import {IslandDiscovery} from './discovery.js';
+import {GrowthPanel} from './growth.js';
+import {growthStats} from '../../rqly-sites/public/rqly/growth-core.mjs';
 
 
 const $=id=>document.getElementById(id);
 const definitions={library:{name:'书屋'},projects:{name:'工程展馆'},workshop:{name:'工坊'},about:{name:'岛主'},postoffice:{name:'信箱'}};
 let scene=null,grown=false,dusk=false,arranging=false,posts=[],postsLoaded=false,messageTimer,roomOpen=false,ambientPaused=false,island=null,rules=null,owner=null;
-let readingMode=false,sceneAttempt=0,modePaused=false,postsFailed=false,discovery=null;
+let readingMode=false,sceneAttempt=0,modePaused=false,postsFailed=false,discovery=null,growthPanel=null,growthPreviewState=null,growthPreviewPending=false;
 let savedView=null;try{savedView=localStorage.getItem('ly-island-view');}catch{}
 const preferReading=savedView==='reading'||(!savedView&&navigator.connection?.saveData);
 const editRequested=new URLSearchParams(location.search).get('edit')==='1';
+const growthPreviewRequested=new URLSearchParams(location.search).get('preview')==='growth';
 const buttons={};
 $('labels').hidden=true;
 function message(text){$('status-message').textContent=text;clearTimeout(messageTimer);messageTimer=setTimeout(()=>{$('status-message').textContent='';},2800);}
@@ -28,20 +31,22 @@ const rooms=new IslandRooms({
  }
 });
 discovery=new IslandDiscovery({posts:()=>posts,loaded:()=>postsLoaded,failed:()=>postsFailed,island:()=>island,positions:()=>rooms.positions,clearReading:()=>rooms.clearReadingHistory()});
+growthPanel=new GrowthPanel({posts:()=>posts,island:()=>island,loaded:()=>postsLoaded,failed:()=>postsFailed,preview:previewGrowth,stopPreview:()=>stopGrowthPreview()});
 for(const [id,d] of Object.entries(definitions)){
  const b=document.createElement('button');b.className='building-label';b.dataset.building=id;b.setAttribute('aria-label','探索'+d.name);b.setAttribute('aria-pressed','false');
  const dot=document.createElement('span');dot.setAttribute('aria-hidden','true');const text=document.createElement('span');text.textContent=d.name;const arrow=document.createElement('span');arrow.className='label-arrow';arrow.textContent='↗';arrow.setAttribute('aria-hidden','true');b.append(dot,text,arrow);
  b.addEventListener('click',()=>{if(arranging){scene?.select(id==='search'?null:id,false);highlight(id);}else rooms.open(id);});$('labels').append(b);buttons[id]=b;discovery.bindButton(id,b);
 }
 function updateGrowth(){
- const notes=posts.filter(p=>p.kind==='note').length,blogs=posts.filter(p=>!p.kind||p.kind==='blog').length,projects=posts.filter(p=>p.kind==='project').length,completed=posts.filter(p=>p.kind==='project'&&p.project?.status==='done').length,score=notes+blogs*3+projects*5+completed*10,threshold=island?.growth?.threshold??30;
+ const {notes,blogs,projects,score,threshold}=growthStats(posts,island||{});
  $('island-label').textContent=island?.title||'一座开始生长的小岛';$('island-level').textContent=grown?'LV. 02':'LV. 01';$('island-state').textContent=grown?'繁盛小岛':'萌芽小岛';
  $('growth-description').textContent=postsLoaded?'已有 '+(notes+blogs)+' 篇记录 · '+projects+' 个项目':'公开记录暂时未读取';$('growth-number').textContent=postsLoaded?score+' / '+threshold:'—';$('progress-fill').style.width=Math.min(100,score/threshold*100)+'%';
  $('growth-hint').textContent=grown?'书屋加层 · 展馆扩岛 · 桥梁连接':island?.growth?.unlocked?'扩岛已解锁 · 当前选择萌芽外观':score>=threshold?'积累已达标 · 等待主人确认扩岛':'再积累 '+Math.max(0,threshold-score)+' 点，小岛就能扩展';$('growth-toggle').textContent='成长足迹 ↗';$('demo-note').hidden=true;
- $('growth-detail').textContent='公开笔记 '+notes+' × 1，博客 '+blogs+' × 3，项目 '+projects+' × 5，已完成项目 '+completed+' × 10。共 '+score+' 点，扩岛目标 '+threshold+' 点。'+(grown?'主人已经确认扩岛，之后撤回内容也不会拆掉已解锁的建筑。':'达到目标后，由主人确认并保存新的岛屿外观。');
+ growthPanel?.update();
  const recent=posts[0];$('latest-update').hidden=!recent;if(recent){$('latest-update').textContent='最近留下 · '+recent.title;$('latest-update').href='#room='+(recent.kind==='project'?'projects':'library')+'&article='+recent.slug;}
 }
 function setReadingMode(value,reason='暂时放下漂浮，留一点时间给文字。',remember=false){
+ if(value&&growthPreviewState)stopGrowthPreview({restoreMode:false});
  discovery?.hideHint();
  readingMode=value;document.body.classList.toggle('reading-mode',value);$('fallback').hidden=!value;$('loading').hidden=true;$('labels').hidden=value;
  $('fallback-reason').textContent=reason;$('view-toggle').textContent=value?'3D 小岛':'阅读模式';$('view-toggle').setAttribute('aria-pressed',String(value));
@@ -52,6 +57,7 @@ function unavailable(){
  sceneAttempt++;setReadingMode(true,'小岛暂时没有浮起来，书屋、工程档案和工坊仍可以正常打开。');
 }
 function applyIsland(value){
+ if(growthPreviewState)stopGrowthPreview({restoreMode:false});
  island=structuredClone(value);grown=value.phase==='grown';dusk=value.lighting==='dusk';
  for(const [id,b] of Object.entries(buttons))b.children[1].textContent=value.buildings[id]?.name||definitions[id].name;
  for(const label of document.querySelectorAll('[data-building-name]'))label.textContent=value.buildings[label.dataset.buildingName]?.name||definitions[label.dataset.buildingName].name;
@@ -65,8 +71,29 @@ async function boot(){
  try{const r=await fetch('/api/island',{signal:AbortSignal.timeout(6000)});if(!r.ok)throw new Error();const data=await r.json();island=data.island;rules=data.rules;}catch{message('岛屿设置暂时未读取，正在显示默认小岛。');}
  if(island)applyIsland(island);
  if(preferReading)setReadingMode(true,navigator.connection?.saveData?'先用阅读模式，减少场景加载。随时可以回到 3D 小岛。':undefined);
- else if(!readingMode)startScene();
+ if(growthPreviewRequested){const previewed=await previewGrowth();if(!previewed&&!preferReading&&!readingMode&&!scene)startScene();}
+ else if(!preferReading&&!readingMode)startScene();
 }
+function clearGrowthQuery(){const url=new URL(location.href);if(url.searchParams.get('preview')==='growth'){url.searchParams.delete('preview');history.replaceState(history.state,'',url.pathname+url.search+url.hash);}}
+async function previewGrowth({signal}={}){
+ if(growthPreviewPending||growthPreviewState||!island)return false;
+ if(grown){clearGrowthQuery();message('当前已经是扩展小岛。');return false;}
+ growthPreviewPending=true;const originReading=readingMode;
+ try{
+  await startScene();
+  if(signal?.aborted){if(originReading)setReadingMode(true);return false;}
+  if(!scene||readingMode||scene.contextLost){clearGrowthQuery();return false;}
+  // The scene uses its saved per-phase layouts; the island data object is untouched.
+  if(roomOpen)rooms.close();
+  growthPreviewState={view:scene.captureView(),reading:originReading};discovery.hideHint();scene.setArrange(false);scene.select(null,false);scene.setGrowth(true);scene.resetView();growthPanel.setPreview(true);message('扩岛预览已打开，实际外观没有改变。');return true;
+ }finally{growthPreviewPending=false;}
+}
+function stopGrowthPreview({restoreMode=true}={}){
+ const previous=growthPreviewState;if(!previous)return;growthPreviewState=null;clearGrowthQuery();
+ scene?.setGrowth(grown);if(scene)scene.restoreView(previous.view);growthPanel.setPreview(false);
+ if(restoreMode&&previous.reading)setReadingMode(true);
+}
+window.addEventListener('keydown',event=>{if(event.key==='Escape'&&growthPreviewState&&!roomOpen&&!growthPanel.dialog.open){stopGrowthPreview();event.preventDefault();}});
 async function startScene(){
  if(scene?.contextLost){location.reload();return;}
  if(scene){setReadingMode(false);return;}
@@ -88,7 +115,7 @@ async function startScene(){
 }
 boot();
 fetch('/api/auth/session').then(r=>r.json()).then(data=>{if(data.authenticated){$('account-entry').href='/admin';$('account-entry').textContent='管理平台';}}).catch(()=>{});
-$('growth-toggle').addEventListener('click',()=>$('growth-dialog').showModal());$('close-growth').addEventListener('click',()=>$('growth-dialog').close());$('latest-update').addEventListener('click',event=>{event.preventDefault();const p=posts[0];if(p)rooms.open(p.kind==='project'?'projects':'library',p.slug);});
+$('growth-toggle').addEventListener('click',()=>{discovery.hideHint();growthPanel.open();});$('latest-update').addEventListener('click',event=>{event.preventDefault();const p=posts[0];if(p)rooms.open(p.kind==='project'?'projects':'library',p.slug);});
 $('reset-view').addEventListener('click',()=>{scene?.resetView();message('已回到岛屿全景');});
 $('arrange-toggle').addEventListener('click',()=>{
  if(!scene)return;arranging=!arranging;scene.setArrange(arranging);$('arrange-toggle').setAttribute('aria-pressed',String(arranging));$('arrange-hint').hidden=!arranging;

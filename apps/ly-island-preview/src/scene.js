@@ -411,6 +411,8 @@ export class IslandScene {
   this.dirty=true;
  }
  resetView(){this.focus.restore({immediate:true});this.focusId=null;this.camera.position.set(15,12,18);this.camera.zoom=1;this.controls.target.set((this.grown?2:-.1)*LAND_SPREAD,-.3,0);this.camera.updateProjectionMatrix();this.controls.update();this.dirty=true;}
+ captureView(){this.focus.restore({immediate:true});this.focusId=null;const damping=this.controls.enableDamping;this.controls.enableDamping=false;this.controls.update();this.controls.enableDamping=damping;return {position:this.camera.position.toArray(),target:this.controls.target.toArray(),zoom:this.camera.zoom};}
+ restoreView(view){this.focus.restore({immediate:true});this.focusId=null;const damping=this.controls.enableDamping;this.controls.enableDamping=false;this.controls.update();this.camera.position.fromArray(view.position);this.controls.target.fromArray(view.target);this.camera.zoom=view.zoom;this.camera.updateProjectionMatrix();this.controls.update();this.controls.enableDamping=damping;this.dirty=true;}
  pick(event) {
   const bounds=this.canvas.getBoundingClientRect();this.pointer.set((event.clientX-bounds.left)/bounds.width*2-1,-(event.clientY-bounds.top)/bounds.height*2+1);this.ray.setFromCamera(this.pointer,this.camera);
   for(const hit of this.ray.intersectObjects([...this.buildings.values(),...(this.arranging?this.sceneryObjects.values():!this.callbacks.centered?this.landmarks.values():[])],true)){let o=hit.object;while(o&&!o.userData.building&&!o.userData.editable)o=o.parent;if(o)return o.userData.editable||o.userData.building;}return null;
