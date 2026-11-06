@@ -36,6 +36,7 @@ jobs:
           cache: npm
           cache-dependency-path: apps/ly-island-preview/package-lock.json
       - run: npm ci
+      - run: npm run test:scene
       - run: npm run build
   release:
     runs-on: ubuntu-latest

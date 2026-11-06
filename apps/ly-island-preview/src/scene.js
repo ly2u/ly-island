@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {routePath} from './paths.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import {batchStaticMeshes,createRenderQuality} from './scene-performance.js';
 
 const color = {
   grass:0xa9bba0,grass2:0xb5c7a8,earth:0xb5ac95,rock:0xaaa692,
@@ -259,8 +260,11 @@ export class IslandScene {
   this.canvas=canvas;this.callbacks=callbacks;this.decorations=island?.decorations??[];this.decorationSlots=rules?.decorationSlots??{};this.layouts=island?.layouts??null;this.scenery=structuredClone(island?.scenery??{initial:{postoffice:null,trees:{}},grown:{postoffice:null,trees:{}}});this.layoutRules=rules;this.grown=false;this.arranging=false;this.paused=matchMedia('(prefers-reduced-motion: reduce)').matches;
   this.active=null;this.selectionRing=null;this.landmarks=new Map();this.sceneryObjects=new Map();this.paths=null;this.pathsDirty=false;this.buildings=new Map();this.heightMap=new Map();this.ray=new THREE.Raycaster();this.pointer=new THREE.Vector2();
   this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,powerPreference:'low-power'});
-  this.renderer.setPixelRatio(Math.min(devicePixelRatio,innerWidth<760?1.4:1.75));
+  this.quality=createRenderQuality({dpr:devicePixelRatio,mobile:canvas.clientWidth<760,saveData:navigator.connection?.saveData===true});
+  this.renderer.setPixelRatio(this.quality.ratio(canvas.clientWidth,canvas.clientHeight));
   this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFShadowMap;
+  this.renderer.shadowMap.autoUpdate=false;this.shadowDirty=true;this.shadowWorldY=Infinity;
+  this.renderMetrics={frames:0,shadowUpdates:0};this.wasAnimating=false;
   this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.12;
   this.scene=new THREE.Scene();this.scene.fog=new THREE.Fog(0xe9eee9,45,95);
   this.camera=new THREE.OrthographicCamera(-10,10,10,-10,.1,130);this.camera.position.set(15,12,18);
@@ -326,7 +330,12 @@ export class IslandScene {
    const g=new THREE.Group();g.position.set(cx*LAND_SPREAD,cy,cz*LAND_SPREAD);this.world.add(g);this.clouds.push(g);
    for(let i=0;i<5;i++){const o=mesh(g,new THREE.IcosahedronGeometry(size*(.55+(i%3)*.15),1),0xf5f6eb,(i-2)*size*.65,Math.sin(i*1.9)*.13,Math.cos(i)*.15,{transparent:true,opacity:.57,depthWrite:false});o.scale.set(1.6,.65,1);o.castShadow=false;o.receiveShadow=false;}
   }
-  this.dirty=true;this.select(this.active,false);
+  // Group within each editable object, never across objects whose transforms
+  // may change independently. Paths and transparent drifting clouds stay separate.
+  const roots=new Set([...this.buildings.values(),...this.landmarks.values(),...this.sceneryObjects.values(),this.paths,...this.clouds]);
+  for(const root of roots)if(root)batchStaticMeshes(root);
+  batchStaticMeshes(this.world,{exclude:roots});
+  this.shadowDirty=true;this.dirty=true;this.select(this.active,false);
  }
  editable(id){return this.buildings.get(id)||this.sceneryObjects.get(id);}
  canMove(id,x,z){
@@ -348,6 +357,7 @@ export class IslandScene {
   connect('postoffice',this.landmarks.get('postoffice'),[0,.42],.42);
   if(this.grown){const p=routePath(hub,spread([4.95,.5]),{inside,blocked});draw(p,.44);}
   this.canvas.dataset.pathEndpoints=JSON.stringify(ends);
+  batchStaticMeshes(this.paths);this.shadowDirty=true;
  }
  inBounds(id,x,z) {
   if(!Number.isFinite(x)||!Number.isFinite(z))return false;
@@ -377,14 +387,14 @@ export class IslandScene {
   for(const m of windows)m.emissiveIntensity=dusk?.9:.08;this.dirty=true;
  }
  setPaused(value){this.paused=value;if(value){this.controls.enableDamping=false;this.controls.update();this.controls.enableDamping=true;}this.dirty=true;}
- setVisible(value){this.suspended=!value;this.controls.enabled=value;this.dirty=true;}
+ setVisible(value){this.suspended=!value;this.controls.enabled=value;this.wasAnimating=false;this.quality.reset();this.dirty=true;}
  resize(reset=false) {
   const width=this.canvas.clientWidth,height=this.canvas.clientHeight,mobile=width<760;if(!width||!height)return;
   const vertical=this.callbacks.centered?(this.grown?26:20)/(width/height):mobile?(this.grown?26:19.5)/(width/height):this.grown?24:19.5;
   this.camera.left=-vertical*width/height/2;this.camera.right=vertical*width/height/2;this.camera.top=vertical/2;this.camera.bottom=-vertical/2;
   this.camera.setViewOffset(width,height,this.callbacks.centered?0:mobile?0:-width*.12,this.callbacks.centered?0:mobile?-height*.07:height*.015,width,height);
   if(reset){this.camera.zoom=1;this.controls.target.set((this.grown?2:-.1)*LAND_SPREAD,-.3,0);}
-  this.camera.updateProjectionMatrix();this.renderer.setSize(width,height,false);this.dirty=true;
+  this.camera.updateProjectionMatrix();this.renderer.setPixelRatio(this.quality.ratio(width,height));this.renderer.setSize(width,height,false);this.dirty=true;
  }
  resetView(){this.camera.position.set(15,12,18);this.camera.zoom=1;this.controls.target.set((this.grown?2:-.1)*LAND_SPREAD,-.3,0);this.camera.updateProjectionMatrix();this.controls.update();this.dirty=true;}
  pick(event) {
@@ -420,12 +430,21 @@ export class IslandScene {
  animate(now) {
   if(this.contextLost)return;
   requestAnimationFrame(this.animate);
-  if(document.hidden||this.suspended||now-this.lastRender<1000/30)return;
+  if(document.hidden||this.suspended){this.wasAnimating=false;this.quality.reset();return;}
+  if(now-this.lastRender<1000/30)return;
   const controlsChanged=this.controls.update();
   if(!this.paused){const t=(now-this.start)/1000;this.world.position.y=Math.sin(t*.48)*.10;for(let i=0;i<this.clouds.length;i++)this.clouds[i].position.x+=Math.sin(t*.15+i)*.0006;this.dirty=true;}
-  if(!this.dirty&&!controlsChanged)return;
+  if(!this.dirty&&!controlsChanged){this.wasAnimating=false;this.quality.reset();return;}
+  const animating=!this.paused||controlsChanged;
+  if(animating&&this.wasAnimating&&this.quality.sample(now-this.lastRender))this.resize();
+  if(!animating)this.quality.reset();this.wasAnimating=animating;
   this.lastRender=now;this.scene.updateMatrixWorld(true);this.camera.updateMatrixWorld(true);
-  if(this.pathsDirty)this.rebuildPaths();this.renderer.render(this.scene,this.camera);this.dirty=false;
+  if(this.pathsDirty)this.rebuildPaths();
+  // All casters float together. Refresh after layout edits, or after less
+  // than one shadow texel of vertical drift, rather than redrawing every frame.
+  const shadowStep=34/this.sun.shadow.mapSize.y/2;
+  if(this.shadowDirty||Math.abs(this.world.position.y-this.shadowWorldY)>=shadowStep){this.renderer.shadowMap.needsUpdate=true;this.shadowWorldY=this.world.position.y;this.shadowDirty=false;this.renderMetrics.shadowUpdates++;}
+  this.renderer.render(this.scene,this.camera);this.renderMetrics.frames++;this.dirty=false;
   const bounds=this.canvas.getBoundingClientRect();
   const positions={};for(const [id,g] of [...this.buildings,...(!this.callbacks.centered?this.landmarks:[...this.landmarks].filter(([id])=>id==='postoffice'))]){
    const pos=g.localToWorld(new THREE.Vector3(0,this.heightMap.get(id)+.35,0)).project(this.camera);
@@ -435,4 +454,5 @@ export class IslandScene {
   const keeper=this.landmarks.get('about');if(keeper){const hit=keeper.localToWorld(new THREE.Vector3(0,.54,.04)).project(this.camera);this.canvas.dataset.aboutHitPoint=JSON.stringify({x:(hit.x+1)/2*bounds.width,y:(1-hit.y)/2*bounds.height});}this.callbacks.labels(positions);
   this.canvas.dataset.layout=JSON.stringify(this.getLayout());this.canvas.dataset.ready='true';this.canvas.dataset.growth=this.grown?'grown':'initial';this.canvas.dataset.frames=String((Number(this.canvas.dataset.frames)||0)+1);
  }
+ performanceStats(){return {...this.renderMetrics,calls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,pixelRatio:this.renderer.getPixelRatio(),qualityLevel:this.quality.level};}
 }
