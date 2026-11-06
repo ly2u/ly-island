@@ -30,6 +30,9 @@ recover() {
     fi
   fi
   if [[ -e $partial ]]; then rm -f -- "$partial"; fi
+  if [[ $rc != 0 && -f scripts/site-status.py ]]; then
+    python3 scripts/site-status.py --root "$PWD" --data-dir /srv/ly-data/sites failure --exit-code "$rc" || true
+  fi
   exit "$rc"
 }
 trap recover EXIT
@@ -70,6 +73,7 @@ if [[ -n "$sites_container" ]]; then
 fi
 # 发布目录（scripts/release.py）：每个发布的源码导出、岛屿产物和记录，用于恢复和回滚。
 release_paths=()
+if [[ -d /opt/ly-stack/status ]]; then release_paths+=(opt/ly-stack/status); fi
 if [[ -d /opt/ly-stack/releases ]]; then
   release_paths+=(opt/ly-stack/releases)
 fi
@@ -108,6 +112,9 @@ mv -- "$partial" "$archive"
 sha256sum "$archive" > "$archive.sha256"
 chmod 0600 "$archive" "$archive.sha256"
 printf '备份和临时恢复检查通过：%s\n' "$archive"
+if [[ -f scripts/site-status.py ]]; then
+  python3 scripts/site-status.py --root "$PWD" --data-dir /srv/ly-data/sites success --archive "$archive" || echo '维护摘要更新未完成，备份文件已保留。' >&2
+fi
 # 只清理由本脚本命名的已完成备份，保留最近 14 份。
 python3 - <<'PY'
 from pathlib import Path

@@ -23,7 +23,7 @@ $$
 
 后台继续按编辑位置跟随：点击表格行定位到对应预览行，点击公式源码定位到对应公式块。不完整或不支持的公式显示原文，不会使整篇预览失败。
 
-使用 markdown-it、`@mdit/plugin-tex`、KaTeX 和 sanitize-html，版本锁在 package-lock.json。KaTeX 在服务端生成原生 MathML，不向外部 CDN 请求脚本或字体。隔离浏览器验收使用 Chromium；尚未实测 Safari/Firefox。单公式 4000 字符、单正文最多 100 次公式渲染与 30000 个公式字符，宏展开与尺寸另有限制，超限显示原文。
+使用 markdown-it、`@mdit/plugin-tex`、KaTeX 和 sanitize-html，版本锁在 package-lock.json。KaTeX 在服务端生成原生 MathML，不向外部 CDN 请求脚本或字体。隔离浏览器在 Chromium、Firefox 与 WebKit 检查原生 MathML；真实手机和 Safari 应用尚未实测。单公式 4000 字符、单正文最多 100 次公式渲染与 30000 个公式字符，宏展开与尺寸另有限制，超限显示原文。
 
 服务端与岛内浏览器共用 `article-policy.mjs` 白名单：正文不支持原始 HTML、远程图片或危险链接；公式不允许 HTML 扩展、远程资源或可执行链接。MathML 不接受嵌入 HTML/SVG/annotation-xml 或事件属性。上传图片仍沿用私密草稿与公开引用规则。
 
@@ -38,3 +38,5 @@ $$
 运行 `node scripts/check-research-writing.mjs`，以及已有预览定位、图片隐私、输入安全、内容及发布检查。新渲染器发布前还逐篇比较线上公开文章的正文文本、链接与图片属性，比较输入/结果只保存在服务器私密验证目录。
 
 本次实现决策 0007 的标准正文渲染与分享部分。后续已补齐「Markdown + 图片 + 目录」ZIP、预览后导入为草稿与每日本地备份，见 [内容导出与导入](CONTENT-PORTABILITY.md)。
+
+独立阅读页、岛内与完整私密预览已统一排版，见 [日常写作、阅读与维护](PRODUCT-POLISH.md)。

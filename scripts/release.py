@@ -60,7 +60,7 @@ ID_PATTERN = re.compile(r'^v[0-9][0-9A-Za-z._-]{0,40}-[0-9a-f]{12}$')
 # 与运行时相关、版本不一致时禁止发布的文件
 RUNTIME_CONFIG = ['compose.yaml', 'Caddyfile']
 # 由人工安装的运维文件；不一致时只提示
-OPS_FILES = ['scripts/backup.sh', 'scripts/verify-backup.py', 'scripts/verify-portable-content.py', 'scripts/record-island-source.py',
+OPS_FILES = ['scripts/site-status.py', 'scripts/backup.sh', 'scripts/verify-backup.py', 'scripts/verify-portable-content.py', 'scripts/record-island-source.py',
              'systemd/ly-stack-backup.service', 'systemd/ly-stack-backup.timer', 'systemd/ly-ai.service']
 # 岛屿目录中随源码同步的文件；dist/ 单独处理，node_modules 等不动
 ISLAND_SOURCE_FILES = ['package.json', 'package-lock.json', 'vite.config.js', 'index.html', 'README.md']
@@ -731,10 +731,20 @@ def command_deploy(release_id, skip_backup):
             })
             append_history({'event': 'deployed', 'release': release_id, 'commit': record['commit'],
                             'image': record['image']['id']})
+        refresh_site_status()
         prune_releases()
         say('\n发布完成：%s（提交 %s，镜像 %s）' % (release_id, record['commit'][:12], record['image']['id'][:19]))
         say('如需撤销：python3 %s rollback' % Path(sys.argv[0]))
         return 0
+
+
+def refresh_site_status():
+    script = ROOT / 'scripts' / 'site-status.py'
+    if script.is_file():
+        result = subprocess.run([sys.executable, str(script), '--root', str(ROOT), '--data-dir', str(DATA_DIR), 'refresh'],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if result.returncode:
+            say('维护摘要暂未更新；发布记录仍在 releases/current.json。')
 
 
 def command_rollback():
@@ -770,6 +780,7 @@ def command_rollback():
             write_json(RELEASES / 'current.json', {'releaseId': None, 'imageId': previous['imageId'],
                                                     'islandIndexSha256': previous.get('islandIndexSha256')})
         append_history({'event': 'manual-rollback', 'release': record['id'], 'to': previous.get('releaseId')})
+        refresh_site_status()
         say('撤销完成，健康检查通过。')
         return 0
 
