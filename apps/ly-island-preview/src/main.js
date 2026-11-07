@@ -22,7 +22,6 @@ const rooms=new IslandRooms({
  posts:()=>posts,loaded:()=>postsLoaded,failed:()=>postsFailed,retry:()=>loadPublicPosts(),island:()=>island,message,
  readingChanged:()=>discovery?.refreshResume(),
  selection:id=>{
-  discovery?.hideHint();
   highlight(id);scene?.select(id==='search'?null:id,false);
   if(id&&!roomOpen){ambientPaused=scene?.paused??false;scene?.setPaused(true);}
   if(!id&&roomOpen)scene?.setPaused(ambientPaused);
@@ -35,7 +34,7 @@ growthPanel=new GrowthPanel({posts:()=>posts,island:()=>island,loaded:()=>postsL
 for(const [id,d] of Object.entries(definitions)){
  const b=document.createElement('button');b.className='building-label';b.dataset.building=id;b.setAttribute('aria-label','探索'+d.name);b.setAttribute('aria-pressed','false');
  const dot=document.createElement('span');dot.setAttribute('aria-hidden','true');const text=document.createElement('span');text.textContent=d.name;const arrow=document.createElement('span');arrow.className='label-arrow';arrow.textContent='↗';arrow.setAttribute('aria-hidden','true');b.append(dot,text,arrow);
- b.addEventListener('click',()=>{if(arranging){scene?.select(id==='search'?null:id,false);highlight(id);}else rooms.open(id);});$('labels').append(b);buttons[id]=b;discovery.bindButton(id,b);
+ b.addEventListener('click',()=>{if(arranging){scene?.select(id==='search'?null:id,false);highlight(id);}else rooms.open(id);});$('labels').append(b);buttons[id]=b;
 }
 function updateGrowth(){
  const {notes,blogs,projects,score,threshold}=growthStats(posts,island||{});
@@ -47,7 +46,6 @@ function updateGrowth(){
 }
 function setReadingMode(value,reason='暂时放下漂浮，留一点时间给文字。',remember=false){
  if(value&&growthPreviewState)stopGrowthPreview({restoreMode:false});
- discovery?.hideHint();
  readingMode=value;document.body.classList.toggle('reading-mode',value);$('fallback').hidden=!value;$('loading').hidden=true;$('labels').hidden=value;
  $('fallback-reason').textContent=reason;$('view-toggle').textContent=value?'3D 小岛':'阅读模式';$('view-toggle').setAttribute('aria-pressed',String(value));
  if(scene){scene.setVisible(!value);if(value){modePaused=scene.paused;scene.setPaused(true);}else{scene.setPaused(roomOpen||modePaused);scene.resize();}}
@@ -85,7 +83,7 @@ async function previewGrowth({signal}={}){
   if(!scene||readingMode||scene.contextLost){clearGrowthQuery();return false;}
   // The scene uses its saved per-phase layouts; the island data object is untouched.
   if(roomOpen)rooms.close();
-  growthPreviewState={view:scene.captureView(),reading:originReading};discovery.hideHint();scene.setArrange(false);scene.select(null,false);scene.setGrowth(true);scene.resetView();growthPanel.setPreview(true);message('扩岛预览已打开，实际外观没有改变。');return true;
+  growthPreviewState={view:scene.captureView(),reading:originReading};scene.setArrange(false);scene.select(null,false);scene.setGrowth(true);scene.resetView();growthPanel.setPreview(true);message('扩岛预览已打开，实际外观没有改变。');return true;
  }finally{growthPreviewPending=false;}
 }
 function stopGrowthPreview({restoreMode=true}={}){
@@ -102,10 +100,9 @@ async function startScene(){
  try{
   const {IslandScene}=await import('./scene.js');if(attempt!==sceneAttempt||readingMode)return;
   scene=new IslandScene($('world'),{
-   hover:id=>{if(!arranging)discovery.showHint(id);},
    select:id=>{if(arranging)highlight(id);else if(id)rooms.open(id);},message,unavailable,
    scenery:(phase,value)=>{if(owner){island.scenery??={};island.scenery[phase]=value;owner.changed();}},layout:(phase,layout)=>{if(owner){island.layouts[phase]=layout;owner.changed();}},
-   labels:positions=>{for(const [id,p] of Object.entries(positions)){const b=buttons[id];b.style.left=p.x+'px';b.style.top=p.y+'px';b.hidden=!p.visible;}discovery.placeHint(positions);$('loading').hidden=true;}
+   labels:positions=>{for(const [id,p] of Object.entries(positions)){const b=buttons[id];b.style.left=p.x+'px';b.style.top=p.y+'px';b.hidden=!p.visible;}$('loading').hidden=true;}
   },island,rules);
   if(scene.paused){$('motion-toggle').setAttribute('aria-pressed','true');$('motion-toggle').setAttribute('aria-label','继续漂浮');}
   if(roomOpen){ambientPaused=scene.paused;scene.setPaused(true);scene.focusBuilding(rooms.room);}
@@ -115,7 +112,7 @@ async function startScene(){
 }
 boot();
 fetch('/api/auth/session').then(r=>r.json()).then(data=>{if(data.authenticated){$('account-entry').href='/admin';$('account-entry').textContent='管理平台';}}).catch(()=>{});
-$('growth-toggle').addEventListener('click',()=>{discovery.hideHint();growthPanel.open();});$('latest-update').addEventListener('click',event=>{event.preventDefault();const p=posts[0];if(p)rooms.open(p.kind==='project'?'projects':'library',p.slug);});
+$('growth-toggle').addEventListener('click',()=>{growthPanel.open();});$('latest-update').addEventListener('click',event=>{event.preventDefault();const p=posts[0];if(p)rooms.open(p.kind==='project'?'projects':'library',p.slug);});
 $('reset-view').addEventListener('click',()=>{scene?.resetView();message('已回到岛屿全景');});
 $('arrange-toggle').addEventListener('click',()=>{
  if(!scene)return;arranging=!arranging;scene.setArrange(arranging);$('arrange-toggle').setAttribute('aria-pressed',String(arranging));$('arrange-hint').hidden=!arranging;
