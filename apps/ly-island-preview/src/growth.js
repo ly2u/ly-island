@@ -1,3 +1,4 @@
+import {articleLink} from '../../rqly-sites/public/rqly/navigation.mjs';
 import {growthStats,growthBreakdown,growthRecords} from '../../rqly-sites/public/rqly/growth-core.mjs';
 import {readingHref} from '../../rqly-sites/public/rqly/island-content.mjs';
 import './growth.css';
@@ -30,6 +31,6 @@ export class GrowthPanel {
    catch{if(!request.signal.aborted)this.status.textContent='场景暂时无法预览，请稍后再试。';}
    finally{this.busy=false;const button=this.previewButton,grown=this.callbacks.island()?.phase==='grown';button.disabled=!this.callbacks.island()||grown;button.textContent=grown?'当前已是扩展小岛':'在 3D 岛上预览扩岛';}
   });actions.append(preview,el('small','','预览会加载 3D 场景；退出后回到原来的视角和阅读模式。'));this.status=el('p','growth-note');this.status.setAttribute('role','status');this.content.append(actions,this.status);
-  const trail=growthRecords(posts);if(ready&&trail.length){const section=el('section','growth-records');section.append(el('h3','','最近留下的公开记录'));const list=el('ol');for(const record of trail){const item=el('li'),link=el('a','',record.title);link.href=readingHref(record);link.addEventListener('click',()=>this.dialog.close());item.append(el('time','',record.date),link,el('small','',record.points+' 点'));list.append(item);}section.append(list,el('p','growth-note','按当前公开内容整理；草稿与回收站内容不会显示在这里。'));this.content.append(section);}
+  const trail=growthRecords(posts);if(ready&&trail.length){const section=el('section','growth-records');section.append(el('h3','','最近留下的公开记录'));const list=el('ol');for(const record of trail){const item=el('li'),link=articleLink(record.title,'',record.slug,()=>{this.dialog.close();location.hash=readingHref(record);});item.append(el('time','',record.date),link,el('small','',record.points+' 点'));list.append(item);}section.append(list,el('p','growth-note','按当前公开内容整理；草稿与回收站内容不会显示在这里。'));this.content.append(section);}
  }
 }

@@ -3,6 +3,7 @@ import './owner.css';
 import {IslandRooms} from './rooms.js';
 import {IslandDiscovery} from './discovery.js';
 import {GrowthPanel} from './growth.js';
+import {inPlaceClick} from '../../rqly-sites/public/rqly/navigation.mjs';
 import {initialVisit,interactionHint} from './visit-policy.mjs';
 import {growthStats} from '../../rqly-sites/public/rqly/growth-core.mjs';
 
@@ -141,7 +142,7 @@ $('view-toggle').addEventListener('click',()=>{
 $('retry-scene').addEventListener('click',()=>{try{localStorage.setItem('ly-island-view','3d');}catch{}startScene();});
 $('loading-reading').addEventListener('click',()=>{sceneAttempt++;setReadingMode(true,'先浏览轻量导览，需要时再打开 3D 小岛。',true);});
 for(const a of document.querySelectorAll('[data-room-link]')){
- const room=a.dataset.roomLink;a.setAttribute('href','#room='+room);a.addEventListener('click',event=>{event.preventDefault();rooms.open(room);});
+ const room=a.dataset.roomLink;a.addEventListener('click',event=>{if(!inPlaceClick(event))return;event.preventDefault();rooms.open(room);});
 }
 async function loadPublicPosts(){
  postsFailed=false;rooms.refresh();

@@ -1,3 +1,4 @@
+import {inPlaceClick} from './navigation.mjs';
 import {readingPositions,validRecordSlug} from './island-content.mjs';
 const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback;}catch{return fallback;}};
 export function setupReader(root,{onBack,onFont,onRecord,onCollection,manageProgress=false,scrollElement=window,initialFont}={}){
@@ -8,7 +9,7 @@ export function setupReader(root,{onBack,onFont,onRecord,onCollection,manageProg
   h.id='reading-section-'+i;const b=document.createElement('button');b.type='button';b.className='toc-item'+(h.tagName==='H3'?' subheading':'');b.textContent=h.textContent;b.addEventListener('click',()=>h.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'}),{signal});toc.append(b);
  }if(!toc.children.length){const p=document.createElement('p');p.textContent='从这里开始阅读。';toc.append(p);}
  root.addEventListener('click',event=>{
-  const target=event.target.closest('button,a');if(!target||!root.contains(target))return;
+  const target=event.target.closest('button,a');if(!target||!root.contains(target))return;if(target.tagName==='A'&&!inPlaceClick(event))return;
   if(target.hasAttribute('data-reader-font')){event.preventDefault();setFont(font+Number(target.dataset.readerFont));}
   if(target.hasAttribute('data-reader-back')||target.hasAttribute('data-reader-end')){if(onBack){event.preventDefault();onBack();}}
   if(target.dataset.readerCollection&&onCollection){event.preventDefault();onCollection(target.dataset.readerCollection);}

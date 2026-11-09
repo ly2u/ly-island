@@ -17,6 +17,7 @@ rqly.com 的当前网站源码快照：公众以三维浮空岛访问书屋、�
 | `docs/DEPLOYMENT.md` | 本地复现、部署边界和 CivilFlow 获取方式 |
 | `docs/FIRST-VISIT.md` | 首屏身份、空内容引导、手机与 WebGL 轻量兜底、加载与隐私 |
 | `docs/PRODUCT-POLISH.md` | 简洁速记、共用阅读、布置历史、维护摘要与浏览器复现 |
+| `docs/SEO.md` | 可抓取链接、文章/面包屑语义、站点地图与收录验证边界 |
 | `docs/RESEARCH-WRITING.md` | 表格、公式、预览定位与文章分享 |
 | `docs/EMAIL-DNS.md` | 尚未发信时的 DNS 防冒用填写方式与日后认证步骤 |
 | `docs/ADMIN-MFA.md` | 可自行开启的管理员两步验证、恢复码、备份与恢复 |
