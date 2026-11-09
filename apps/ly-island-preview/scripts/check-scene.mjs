@@ -97,3 +97,32 @@ test('preview view capture and return keep the original orbit after preview rota
  const before=IslandScene.prototype.captureView.call(scene);camera.position.set(-5,8,20);controls.target.set(8,1,0);camera.zoom=1.7;controls.update();
  IslandScene.prototype.restoreView.call(scene,before);close(camera.position,new THREE.Vector3(...before.position));close(controls.target,new THREE.Vector3(...before.target));assert.equal(camera.zoom,before.zoom);assert.equal(focus.transition,null);assert.equal(scene.dirty,true);
 });
+
+import {initialVisit,interactionHint} from '../src/visit-policy.mjs';
+test('explicit view choice wins; unknown or limited hardware never forces every phone into reading mode',()=>{
+ assert.equal(initialVisit({savedView:'3d',saveData:true,coarse:true,memory:1,cores:1}).reading,false);
+ assert.equal(initialVisit({savedView:'reading'}).reading,true);
+ assert.equal(initialVisit({saveData:true}).reading,true);
+ assert.equal(initialVisit({coarse:true,memory:2}).reading,true);
+ assert.equal(initialVisit({coarse:true,cores:2}).reading,true);
+ for(const hardware of [{},{memory:8,cores:8},{memory:NaN,cores:undefined},{memory:0,cores:-1}])assert.equal(initialVisit({coarse:true,...hardware}).reading,false);
+ assert.equal(initialVisit({coarse:false,memory:1,cores:1}).reading,false);
+ assert.equal(initialVisit({savedView:'unexpected'}).reading,false);
+});
+test('touch instructions describe real gestures and retain the separate layout-edit instruction',()=>{
+ assert.match(interactionHint(true),/单指旋转.*双指缩放.*轻点/);
+ assert.doesNotMatch(interactionHint(true),/滚轮/);
+ assert.match(interactionHint(false),/滚轮缩放/);
+ assert.match(interactionHint(true,true),/拖动建筑/);
+ assert.doesNotMatch(interactionHint(true,true),/轻点建筑探索/);
+});
+
+test('two-finger gestures and another pointer release do not activate buildings; a normal tap still does',()=>{
+ const handlers={},selected=[];const scene={canvas:{style:{},addEventListener:(type,fn)=>handlers[type]=fn},arranging:false,controls:{enabled:true},pick:()=> 'library',select:id=>selected.push(id)};
+ IslandScene.prototype.bindPointers.call(scene);
+ const event=(id,x=100,primary=true)=>({pointerId:id,pointerType:'touch',isPrimary:primary,clientX:x,clientY:100});
+ handlers.pointerdown(event(1,90));handlers.pointerdown(event(2,100,false));handlers.pointerup(event(2,100,false));handlers.pointerup(event(1,90));assert.deepEqual(selected,[]);
+ handlers.pointerdown(event(3));handlers.pointerup(event(4));assert.deepEqual(selected,[]);
+ handlers.pointerdown(event(5));handlers.pointerup(event(5));assert.deepEqual(selected,['library']);
+ handlers.pointerdown(event(6));handlers.pointerup(event(6,130));assert.deepEqual(selected,['library']);
+});

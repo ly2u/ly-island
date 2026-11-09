@@ -3,7 +3,7 @@ import {renderReader,bookDrawing,bridgeDrawing,flowDrawing} from '../../rqly-sit
 import {HTML_TAGS,MATH_TAGS,ARTICLE_CLASSES,MATH_ATTRIBUTES,validMathAttribute,validArticleLink} from '../../rqly-sites/public/rqly/article-policy.mjs';
 import '../../rqly-sites/public/rqly/writing.css';
 import {seriesRecords} from '../../rqly-sites/public/rqly/organization-core.mjs';
-import {recommendedRecords,readingPositions,relatedRecords,recordRoom} from '../../rqly-sites/public/rqly/island-content.mjs';
+import {recommendedRecords,readingPositions,relatedRecords,recordRoom,roomRecords} from '../../rqly-sites/public/rqly/island-content.mjs';
 import './organization.css';
 import './rooms.css';
 import {renderSearch,highlightArticleMatches} from './search.js';
@@ -104,7 +104,7 @@ export class IslandRooms {
   if(this.callbacks.failed?.()){const notice=el('div','collection-error');notice.setAttribute('role','status');notice.append(el('p','','公开记录暂时没有取到，请稍后再试。'),button('重新读取记录','room-action',()=>this.callbacks.retry?.()));this.content.append(notice);}
   const intro=el('section','collection-intro');intro.append(el('p','room-eyebrow',this.room==='library'?'一本一本，慢慢积累':this.room==='projects'?'工程档案 / FIELD NOTES':'工作台 / IN PROGRESS'));
   intro.append(el('h1','',this.room==='library'?'写下的日子，\n都在这里。':this.room==='projects'?'让一项工程，\n留下可以追溯的过程。':'把想法，\n做成用得上的东西。'));
-  intro.append(el('p','collection-description',this.callbacks.island?.()?.buildings?.[this.room]?.description||(this.room==='library'?'挑一本，翻开看看。读完之后，小岛还在窗外。':this.room==='projects'?'这里先收录已有工程手记，项目档案会随着实践逐步补齐。':'桌上放着正在使用的工具，也留着每次尝试的手记。')));this.content.append(intro);if(this.room!=='workshop')this.renderRecommendations();if(this.room==='library')this.renderDirectoryIndex();renderSearch(this,this.room);const filterCards=()=>{};
+  intro.append(el('p','collection-description',this.callbacks.island?.()?.buildings?.[this.room]?.description||(this.room==='library'?'挑一本，翻开看看。读完之后，小岛还在窗外。':this.room==='projects'?'这里先收录已有工程手记，项目档案会随着实践逐步补齐。':'桌上放着正在使用的工具，也留着每次尝试的手记。')));this.content.append(intro);const vacant=this.callbacks.loaded()&&!this.callbacks.failed?.()&&roomRecords(posts,this.room).length===0;if(vacant){this.content.append(this.emptyGuide());if(this.room!=='workshop')return;}if(this.room!=='workshop')this.renderRecommendations();if(this.room==='library')this.renderDirectoryIndex();if(!vacant)renderSearch(this,this.room);const filterCards=()=>{};
   if(this.room==='library'){
    const bar=el('div','shelf-bar');bar.append(el('span','',this.callbacks.loaded()?posts.filter(p=>p.kind!=='project').length+' 本记录 · 按最近更新排列':'正在整理书架…'));const filters=el('div','shelf-filters');let active='',kind='';const type=el('select','shelf-kind-select');type.setAttribute('aria-label','筛选笔记或博客');for(const [value,label] of [['','笔记和博客'],['note','笔记'],['blog','博客']]){const option=el('option','',label);option.value=value;type.append(option);}type.addEventListener('change',()=>{kind=type.value;draw();});
    const shelf=el('div','book-shelf');const draw=()=>{shelf.replaceChildren();for(const [i,p] of posts.filter(p=>p.kind!=='project'&&(!kind||(p.kind||'blog')===kind)&&(!active||p.topic===active)).entries())shelf.append(this.bookCard(p,i));filterCards();if(!shelf.children.length)shelf.append(this.empty(this.callbacks.loaded()?'这一层书架还空着。':'正在读取公开记录…'));};
@@ -119,6 +119,11 @@ export class IslandRooms {
     const t=el('article','tool-station');t.append(el('span','room-eyebrow',tool.label),illustration(tool.svg,'tool-drawing'),el('h2','',tool.name),el('p','',tool.detail),el('span','tool-tag',tool.tag));const a=el('a','tool-open','打开工具 ↗');a.href=tool.url;a.target='_blank';a.rel='noopener noreferrer';t.append(a);bench.append(t);
    }this.content.append(bench);this.renderRecommendations();const log=el('section','workshop-log');log.append(el('h2','','研发手记'));for(const p of posts.filter(p=>p.kind!=='project'&&p.topic==='探索')){const b=button(p.title,'workshop-entry',()=>this.open(this.room,p.slug));b.dataset.search=(p.title+' '+p.summary).toLowerCase();b.append(el('span','',p.date+' →'));log.append(b);}this.content.append(log);
   }
+ }
+ emptyGuide(){
+  const section=el('section','collection-guide');section.setAttribute('aria-label','这个空间的下一步');
+  section.append(el('h2','',this.room==='library'?'书架还在慢慢整理':this.room==='projects'?'工程档案，等待下一次公开记录':'工具先放在这里，手记慢慢补上'),el('p','',this.room==='library'?'这里暂时没有公开的笔记或博客。可以先认识岛主，或到工坊看看正在使用的工具。':this.room==='projects'?'这里暂时没有公开的项目或工程手记。先逛逛书屋，或认识留下记录的人。':'这里暂时没有公开手记，下方的 CivilFlow 与七嘴工具入口仍可使用。'));
+  const actions=el('div','collection-guide-actions');actions.append(button('认识岛主 →','',()=>this.open('about')),button(this.room==='library'?'去工坊看看 →':'走进书屋 →','',()=>this.open(this.room==='library'?'workshop':'library')));section.append(actions);return section;
  }
  searchCollection(){this.content.replaceChildren();this.scroll.scrollTop=0;const intro=el('section','collection-intro search-heading');intro.append(el('p','room-eyebrow','SEARCH / 小岛里的记录'),el('h1','','从一个词，找回一段记录。'),el('p','collection-description','搜索公开的笔记、博客与项目。标题、摘要、正文和项目资料都能找到；多个关键词用空格分开。'));this.content.append(intro);this.renderDirectoryIndex();renderSearch(this);}
  empty(text){return el('p','room-empty',text);}

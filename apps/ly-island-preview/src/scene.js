@@ -258,7 +258,7 @@ function workshop(g,grown) {
 
 export class IslandScene {
  constructor(canvas, callbacks, island=null, rules=null) {
-  this.canvas=canvas;this.callbacks=callbacks;this.decorations=island?.decorations??[];this.decorationSlots=rules?.decorationSlots??{};this.layouts=island?.layouts??null;this.scenery=structuredClone(island?.scenery??{initial:{postoffice:null,trees:{}},grown:{postoffice:null,trees:{}}});this.layoutRules=rules;this.grown=false;this.arranging=false;this.paused=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  this.canvas=canvas;this.callbacks=callbacks;this.decorations=island?.decorations??[];this.decorationSlots=rules?.decorationSlots??{};this.layouts=island?.layouts??null;this.scenery=structuredClone(island?.scenery??{initial:{postoffice:null,trees:{}},grown:{postoffice:null,trees:{}}});this.layoutRules=rules;this.grown=false;this.arranging=false;this.paused=matchMedia('(prefers-reduced-motion: reduce)').matches||matchMedia('(pointer:coarse)').matches;
   this.active=null;this.selectionRing=null;this.landmarks=new Map();this.sceneryObjects=new Map();this.paths=null;this.pathsDirty=false;this.buildings=new Map();this.heightMap=new Map();this.ray=new THREE.Raycaster();this.pointer=new THREE.Vector2();
   this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,powerPreference:'low-power'});
   this.quality=createRenderQuality({dpr:devicePixelRatio,mobile:canvas.clientWidth<760,saveData:navigator.connection?.saveData===true});
@@ -419,6 +419,7 @@ export class IslandScene {
  }
  bindPointers() {
   this.canvas.addEventListener('pointerdown',event=>{
+   if(event.isPrimary===false){this.down=null;return;}
    this.down={x:event.clientX,y:event.clientY,id:event.pointerId};if(this.arranging){const id=this.pick(event);if(id){
     const hit=new THREE.Vector3(),plane=new THREE.Plane(new THREE.Vector3(0,1,0),-(this.world.position.y+.1));
     this.dragOffset=this.ray.ray.intersectPlane(plane,hit)?this.world.worldToLocal(hit).sub(this.editable(id).position):new THREE.Vector3();
@@ -426,6 +427,7 @@ export class IslandScene {
    }}
   });
   this.canvas.addEventListener('pointermove',event=>{
+   if(event.isPrimary===false)return;
    if(this.drag){
     this.pick(event);const plane=new THREE.Plane(new THREE.Vector3(0,1,0),-(this.world.position.y+.1));const hit=new THREE.Vector3();
     if(this.ray.ray.intersectPlane(plane,hit)){
@@ -436,11 +438,12 @@ export class IslandScene {
    if(event.pointerType==='mouse'){const id=this.pick(event);this.canvas.style.cursor=id?(this.arranging?'grab':'pointer'):'default';this.callbacks.hover?.(id);}
   });
   const end=event=>{
+   if(event.isPrimary===false){this.down=null;return;}
    if(this.drag){const id=this.drag;this.drag=null;this.controls.enabled=true;this.canvas.style.cursor=this.arranging?'grab':'default';this.rebuildPaths();if(this.dragChanged){if(this.buildings.has(id))this.saveLayout();else this.saveScenery(id);}}
-   else if(this.down&&Math.hypot(event.clientX-this.down.x,event.clientY-this.down.y)<7){const id=this.pick(event);if(id)this.select(id);}
+   else if(this.down&&this.down.id===event.pointerId&&Math.hypot(event.clientX-this.down.x,event.clientY-this.down.y)<7){const id=this.pick(event);if(id)this.select(id);}
    this.down=null;
   };
-  this.canvas.addEventListener('pointerup',end);this.canvas.addEventListener('pointercancel',()=>{if(this.drag){const id=this.drag;this.drag=null;this.rebuildPaths();if(this.dragChanged){if(this.buildings.has(id))this.saveLayout();else this.saveScenery(id);}}this.down=null;this.controls.enabled=true;});
+  this.canvas.addEventListener('pointerup',end);this.canvas.addEventListener('pointercancel',event=>{if(event.isPrimary===false)return;if(this.drag){const id=this.drag;this.drag=null;this.rebuildPaths();if(this.dragChanged){if(this.buildings.has(id))this.saveLayout();else this.saveScenery(id);}}this.down=null;this.controls.enabled=true;});
   this.canvas.addEventListener('pointerleave',()=>this.callbacks.hover?.(null));
   this.canvas.addEventListener('keydown',event=>{if(event.key==='Escape')this.select(null);if(event.key==='Home'){event.preventDefault();this.resetView();}});
  }

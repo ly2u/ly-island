@@ -3,6 +3,7 @@ import './owner.css';
 import {IslandRooms} from './rooms.js';
 import {IslandDiscovery} from './discovery.js';
 import {GrowthPanel} from './growth.js';
+import {initialVisit,interactionHint} from './visit-policy.mjs';
 import {growthStats} from '../../rqly-sites/public/rqly/growth-core.mjs';
 
 
@@ -11,7 +12,12 @@ const definitions={library:{name:'书屋'},projects:{name:'工程展馆'},worksh
 let scene=null,grown=false,dusk=false,arranging=false,posts=[],postsLoaded=false,messageTimer,roomOpen=false,ambientPaused=false,island=null,rules=null,owner=null;
 let readingMode=false,sceneAttempt=0,modePaused=false,postsFailed=false,discovery=null,growthPanel=null,growthPreviewState=null,growthPreviewPending=false;
 let savedView=null;try{savedView=localStorage.getItem('ly-island-view');}catch{}
-const preferReading=savedView==='reading'||(!savedView&&navigator.connection?.saveData);
+const coarseInput=matchMedia('(pointer:coarse)').matches;
+const visit=initialVisit({savedView,saveData:navigator.connection?.saveData===true,coarse:coarseInput,memory:navigator.deviceMemory,cores:navigator.hardwareConcurrency});
+const preferReading=visit.reading;
+$('interaction-hint').textContent=interactionHint(coarseInput);
+function loadingStage(stage){const stages=['settings','resources','frame'],at=stages.indexOf(stage);$('loading-stage').textContent={settings:'正在读取小岛设置…',resources:'正在准备场景资源…',frame:'正在绘制第一帧…'}[stage];for(const node of document.querySelectorAll('[data-load-step]')){const index=stages.indexOf(node.dataset.loadStep);node.dataset.done=String(index<at);if(index===at)node.setAttribute('aria-current','step');else node.removeAttribute('aria-current');}}
+function updateMotionButton(){if(!scene)return;$('motion-toggle').setAttribute('aria-pressed',String(scene.paused));$('motion-toggle').setAttribute('aria-label',scene.paused?'继续漂浮':'暂停漂浮');$('motion-toggle').querySelector('svg').innerHTML=scene.paused?'<path d="m8 5 10 7-10 7Z"/>':'<path d="M9 5v14M15 5v14"/>';}
 const editRequested=new URLSearchParams(location.search).get('edit')==='1';
 const growthPreviewRequested=new URLSearchParams(location.search).get('preview')==='growth';
 const buttons={};
@@ -47,7 +53,7 @@ function updateGrowth(){
 function setReadingMode(value,reason='暂时放下漂浮，留一点时间给文字。',remember=false){
  if(value&&growthPreviewState)stopGrowthPreview({restoreMode:false});
  readingMode=value;document.body.classList.toggle('reading-mode',value);$('fallback').hidden=!value;$('loading').hidden=true;$('labels').hidden=value;
- $('fallback-reason').textContent=reason;$('view-toggle').textContent=value?'3D 小岛':'阅读模式';$('view-toggle').setAttribute('aria-pressed',String(value));
+ $('fallback-reason').textContent=reason;$('view-toggle').textContent=value?'3D 小岛':'轻量导览';$('view-toggle').setAttribute('aria-pressed',String(value));
  if(scene){scene.setVisible(!value);if(value){modePaused=scene.paused;scene.setPaused(true);}else{scene.setPaused(roomOpen||modePaused);scene.resize();}}
  if(remember)try{localStorage.setItem('ly-island-view',value?'reading':'3d');}catch{}
 }
@@ -57,7 +63,8 @@ function unavailable(){
 function applyIsland(value){
  if(growthPreviewState)stopGrowthPreview({restoreMode:false});
  island=structuredClone(value);grown=value.phase==='grown';dusk=value.lighting==='dusk';
- for(const [id,b] of Object.entries(buttons))b.children[1].textContent=value.buildings[id]?.name||definitions[id].name;
+ for(const [id,b] of Object.entries(buttons)){const name=value.buildings[id]?.name||definitions[id].name;b.children[1].textContent=name;b.setAttribute('aria-label','探索'+name);}
+ for(const link of document.querySelectorAll('[data-guide-room]')){const name=value.buildings[link.dataset.guideRoom]?.name||definitions[link.dataset.guideRoom].name;link.setAttribute('aria-label','走进'+name);link.querySelector('title').textContent=name;link.querySelector('text').textContent=[...name].slice(0,6).join('');}
  for(const label of document.querySelectorAll('[data-building-name]'))label.textContent=value.buildings[label.dataset.buildingName]?.name||definitions[label.dataset.buildingName].name;
  $('island-description').textContent=value.description;$('island-description').title=value.description;document.body.classList.toggle('dusk',dusk);
  $('light-toggle').setAttribute('aria-pressed',String(dusk));$('light-toggle').querySelector('span').textContent=dusk?'暮色':'午后';
@@ -66,9 +73,10 @@ function applyIsland(value){
 }
 async function boot(){
  if(editRequested){location.replace('/admin?view=island');return;}
+ if(preferReading)setReadingMode(true,visit.reason);
+ loadingStage('settings');
  try{const r=await fetch('/api/island',{signal:AbortSignal.timeout(6000)});if(!r.ok)throw new Error();const data=await r.json();island=data.island;rules=data.rules;}catch{message('岛屿设置暂时未读取，正在显示默认小岛。');}
  if(island)applyIsland(island);
- if(preferReading)setReadingMode(true,navigator.connection?.saveData?'先用阅读模式，减少场景加载。随时可以回到 3D 小岛。':undefined);
  if(growthPreviewRequested){const previewed=await previewGrowth();if(!previewed&&!preferReading&&!readingMode&&!scene)startScene();}
  else if(!preferReading&&!readingMode)startScene();
 }
@@ -94,21 +102,22 @@ function stopGrowthPreview({restoreMode=true}={}){
 window.addEventListener('keydown',event=>{if(event.key==='Escape'&&growthPreviewState&&!roomOpen&&!growthPanel.dialog.open){stopGrowthPreview();event.preventDefault();}});
 async function startScene(){
  if(scene?.contextLost){location.reload();return;}
- if(scene){setReadingMode(false);return;}
- const attempt=++sceneAttempt;readingMode=false;document.body.classList.remove('reading-mode');$('fallback').hidden=true;$('loading').hidden=false;$('view-toggle').textContent='阅读模式';$('view-toggle').setAttribute('aria-pressed','false');
- const timeout=setTimeout(()=>{if(attempt===sceneAttempt&&!scene)unavailable();},12000);
+ if(scene){if(readingMode)setReadingMode(false);return;}
+ const attempt=++sceneAttempt;readingMode=false;document.body.classList.remove('reading-mode');$('fallback').hidden=true;$('loading').hidden=false;$('view-toggle').textContent='轻量导览';loadingStage('resources');$('view-toggle').setAttribute('aria-pressed','false');
+ const timeout=setTimeout(()=>{if(attempt===sceneAttempt&&!readingMode)unavailable();},12000);
  try{
   const {IslandScene}=await import('./scene.js');if(attempt!==sceneAttempt||readingMode)return;
+  loadingStage('frame');
   scene=new IslandScene($('world'),{
    select:id=>{if(arranging)highlight(id);else if(id)rooms.open(id);},message,unavailable,
    scenery:(phase,value)=>{if(owner){island.scenery??={};island.scenery[phase]=value;owner.changed();}},layout:(phase,layout)=>{if(owner){island.layouts[phase]=layout;owner.changed();}},
-   labels:positions=>{for(const [id,p] of Object.entries(positions)){const b=buttons[id];b.style.left=p.x+'px';b.style.top=p.y+'px';b.hidden=!p.visible;}$('loading').hidden=true;}
+   labels:positions=>{clearTimeout(timeout);if(readingMode)return;for(const [id,p] of Object.entries(positions)){const b=buttons[id];b.style.left=p.x+'px';b.style.top=p.y+'px';b.hidden=!p.visible;}$('loading').hidden=true;}
   },island,rules);
-  if(scene.paused){$('motion-toggle').setAttribute('aria-pressed','true');$('motion-toggle').setAttribute('aria-label','继续漂浮');}
+  updateMotionButton();
   if(roomOpen){ambientPaused=scene.paused;scene.setPaused(true);scene.focusBuilding(rooms.room);}
   $('labels').hidden=false;if(island){scene.setLight(dusk);scene.canvas.dataset.revision=String(island.revision);}
  }catch{if(attempt===sceneAttempt)unavailable();}
- finally{clearTimeout(timeout);}
+ finally{if(attempt!==sceneAttempt||readingMode)clearTimeout(timeout);}
 }
 boot();
 fetch('/api/auth/session').then(r=>r.json()).then(data=>{if(data.authenticated){$('account-entry').href='/admin';$('account-entry').textContent='管理平台';}}).catch(()=>{});
@@ -116,22 +125,23 @@ $('growth-toggle').addEventListener('click',()=>{growthPanel.open();});$('latest
 $('reset-view').addEventListener('click',()=>{scene?.resetView();message('已回到岛屿全景');});
 $('arrange-toggle').addEventListener('click',()=>{
  if(!scene)return;arranging=!arranging;scene.setArrange(arranging);$('arrange-toggle').setAttribute('aria-pressed',String(arranging));$('arrange-hint').hidden=!arranging;
- $('interaction-hint').textContent=arranging?'拖动建筑布置 · 空白处拖动旋转':'拖动旋转 · 滚轮缩放 · 点击建筑探索';scene.select(null,false);highlight(null);message(arranging?'点住建筑，试试换个位置':'已退出布置模式');
+ $('interaction-hint').textContent=interactionHint(coarseInput,arranging);scene.select(null,false);highlight(null);message(arranging?'点住建筑，试试换个位置':'已退出布置模式');
 });
 $('reset-layout').addEventListener('click',()=>{scene?.resetLayout();message('已恢复这一阶段的默认布局');});
 $('light-toggle').addEventListener('click',()=>{
  if(!scene)return;dusk=!dusk;document.body.classList.toggle('dusk',dusk);scene.setLight(dusk);if(owner){island.lighting=dusk?'dusk':'afternoon';owner.changed();}$('light-toggle').setAttribute('aria-pressed',String(dusk));$('light-toggle').querySelector('span').textContent=dusk?'暮色':'午后';
 });
 $('motion-toggle').addEventListener('click',()=>{
- if(!scene)return;scene.setPaused(!scene.paused);$('motion-toggle').setAttribute('aria-pressed',String(scene.paused));$('motion-toggle').setAttribute('aria-label',scene.paused?'继续漂浮':'暂停漂浮');$('motion-toggle').querySelector('svg').innerHTML=scene.paused?'<path d="m8 5 10 7-10 7Z"/>':'<path d="M9 5v14M15 5v14"/>';
+ if(!scene)return;scene.setPaused(!scene.paused);updateMotionButton();
 });
 $('view-toggle').addEventListener('click',()=>{
  if(readingMode){try{localStorage.setItem('ly-island-view','3d');}catch{}startScene();}
  else{sceneAttempt++;setReadingMode(true,undefined,true);}
 });
 $('retry-scene').addEventListener('click',()=>{try{localStorage.setItem('ly-island-view','3d');}catch{}startScene();});
+$('loading-reading').addEventListener('click',()=>{sceneAttempt++;setReadingMode(true,'先浏览轻量导览，需要时再打开 3D 小岛。',true);});
 for(const a of document.querySelectorAll('[data-room-link]')){
- const room=a.dataset.roomLink;a.href='#room='+room;a.addEventListener('click',event=>{event.preventDefault();rooms.open(room);});
+ const room=a.dataset.roomLink;a.setAttribute('href','#room='+room);a.addEventListener('click',event=>{event.preventDefault();rooms.open(room);});
 }
 async function loadPublicPosts(){
  postsFailed=false;rooms.refresh();
