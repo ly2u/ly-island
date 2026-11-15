@@ -1,3 +1,5 @@
+import {highlightCode} from './code-highlighter.mjs';
+import {validCodeLanguage} from './public/rqly/code-policy.mjs';
 import MarkdownIt from 'markdown-it';
 import {tex} from '@mdit/plugin-tex';
 import katex from 'katex';
@@ -21,13 +23,13 @@ export function createMarkdownRenderer({imageMetadata=()=>null}={}){
   }
  });
  md.renderer.rules.image=(tokens,index)=>{const token=tokens[index],url=token.attrGet('src')||'',alt=token.content||'';if(!/^\/media\/[a-f0-9]{32}\.webp$/.test(url))return md.utils.escapeHtml(alt);const metadata=imageMetadata(url.slice(7));if(!metadata)return md.utils.escapeHtml(alt);return '<img class="content-image" src="'+url+'" alt="'+md.utils.escapeHtml(alt)+'" width="'+metadata.width+'" height="'+metadata.height+'" loading="lazy" decoding="async">';};
- md.renderer.rules.fence=md.renderer.rules.code_block=(tokens,index,options,env)=>'<pre'+attrs(tokens[index],env)+'><code>'+md.utils.escapeHtml(tokens[index].content.replace(/\n$/,''))+'</code></pre>\n';
+ md.renderer.rules.fence=md.renderer.rules.code_block=(tokens,index,options,env)=>{const token=tokens[index],result=highlightCode(token.content,token.info,env);return '<div class="code-block" data-code-language="'+result.language+'"><div class="code-block-heading"><span class="code-language">'+md.utils.escapeHtml(result.label)+'</span></div><pre tabindex="0"'+attrs(token,env)+'><code class="hljs">'+result.html+'</code></pre></div>\n';};
  const math=md.renderer.rules.math_block;md.renderer.rules.math_block=(tokens,index,options,env,renderer)=>'<div class="math-block"'+attrs(tokens[index],env)+'>'+math(tokens,index,options,env,renderer)+'</div>\n';
  md.renderer.rules.table_open=(tokens,index,options,env,renderer)=>'<div class="content-table" role="region" tabindex="0" aria-label="数据表格，可横向滚动">'+renderer.renderToken(tokens,index,options);
  md.renderer.rules.table_close=()=>'</table></div>\n';
  return (value,{sourceMap=false}={})=>sanitizeHtml(md.render(String(value).replace(/\r\n?/g,'\n'),{sourceMap}),{
-  allowedTags:[...HTML_TAGS,...MATH_TAGS],allowedAttributes:{'*':['data-source-start','data-source-end'],a:['href','target','rel'],img:['src','alt','width','height','loading','decoding','class'],div:['class','role','tabindex','aria-label'],span:['class','role','aria-label'],th:['class'],td:['class'],ol:['start'],...Object.fromEntries(MATH_TAGS.map(tag=>[tag,MATH_ATTRIBUTES]))},
+  allowedTags:[...HTML_TAGS,...MATH_TAGS],allowedAttributes:{'*':['data-source-start','data-source-end'],a:['href','target','rel'],img:['src','alt','width','height','loading','decoding','class'],div:['class','role','tabindex','aria-label','data-code-language'],pre:['tabindex'],code:['class'],span:['class','role','aria-label'],th:['class'],td:['class'],ol:['start'],...Object.fromEntries(MATH_TAGS.map(tag=>[tag,MATH_ATTRIBUTES]))},
   allowedClasses:{'*':ARTICLE_CLASSES},allowedSchemes:['http','https'],allowProtocolRelative:false,
-  transformTags:{'*':(tagName,attributes)=>{for(const [name,value] of Object.entries(attributes)){if(name.startsWith('data-source-')&&!/^\d{1,6}$/.test(value))delete attributes[name];if(MATH_TAGS.includes(tagName)&&!validMathAttribute(name,value))delete attributes[name];}return {tagName,attribs:attributes};}},
+  transformTags:{'*':(tagName,attributes)=>{for(const [name,value] of Object.entries(attributes)){if(name==='data-code-language'&&!validCodeLanguage(value))delete attributes[name];if(name==='tabindex'&&value!=='0')delete attributes[name];if(name.startsWith('data-source-')&&!/^\d{1,6}$/.test(value))delete attributes[name];if(MATH_TAGS.includes(tagName)&&!validMathAttribute(name,value))delete attributes[name];}return {tagName,attribs:attributes};}},
  });
 }

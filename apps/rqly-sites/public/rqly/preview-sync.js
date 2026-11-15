@@ -25,7 +25,7 @@
   const element=block.element;
   if(element.classList.contains('math-block'))return element.getBoundingClientRect();
   if(element.tagName==='TR'){const raw=lines[line]||'',before=raw.slice(0,column),cell=Math.max(0,(before.match(/(?<!\\)\|/g)||[]).length-(raw.trimStart().startsWith('|')?1:0));return(element.children[Math.min(cell,element.children.length-1)]||element).getBoundingClientRect();}
-  const start=block.start+(element.tagName==='PRE'&&/^```/.test(lines[block.start])?1:0);
+  const start=block.start+(element.tagName==='PRE'&&/^\s*(?:`{3,}|~{3,})/.test(lines[block.start])?1:0);
   const text=element.textContent,parts=text.split('\n'),row=Math.min(Math.max(line-start,0),parts.length-1),raw=lines[Math.min(Math.max(line,start),block.end)]||'';
   if(/^\s*!\[/.test(raw)&&element.querySelector('img')){const images=element.querySelectorAll('img'),prior=lines.slice(start,line).filter(v=>/^\s*!\[/.test(v)).length;return(images[Math.min(prior,images.length-1)]).getBoundingClientRect();}
   const prefix=element.tagName==='PRE'?0:(raw.match(/^(?:#{1,3}\s+|>\s?|\s*(?:[-*]\s+|\d+\.\s+))/)?.[0].length||0),plainColumn=Math.min(parts[row].length,Math.round(Math.max(0,column-prefix)/Math.max(1,raw.length-prefix)*parts[row].length));

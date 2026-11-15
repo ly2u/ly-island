@@ -13,7 +13,7 @@ export function readerOrganization(post){
 }
 export function readerOutline(html){
  const items=[];const body=html.replace(/<h([234])(?:\s[^>]*)?>([\s\S]*?)<\/h\1>/g,(_,level,inner)=>{const id='reading-section-'+items.length;items.push({id,level:Number(level),html:inner.replace(/<[^>]*>/g,'')});return '<h'+level+' id="'+id+'">'+inner+'</h'+level+'>';});
- return {body,toc:items.length?items.map(item=>'<a class="toc-item'+(item.level===3?' subheading':'')+'" href="#'+item.id+'">'+item.html+'</a>').join(''):'<p>从这里开始阅读。</p>'};
+ return {body,count:items.length,toc:items.length?items.map(item=>'<a class="toc-item'+(item.level===3?' subheading':'')+'" href="#'+item.id+'">'+item.html+'</a>').join(''):'<p>从这里开始阅读。</p>'};
 }
 // bodyHTML is sanitized server Markdown. The island supplies an empty body,
 // then installs its separately allowlisted fragment in the article-body slot.
@@ -28,7 +28,7 @@ export function renderReader(post,bodyHTML='',{room=recordRoom(post),preview=fal
  const art=section==='projects'?bridgeDrawing:section==='workshop'?flowDrawing:bookDrawing;
  const details=post.kind==='project'?'<div class="project-details"><span>'+({planning:'计划中',active:'进行中',done:'已完成'}[post.project?.status]||'进行中')+'</span>'+(post.project?.role?'<span>负责：'+esc(post.project.role)+'</span>':'')+(post.project?.period?'<span>时间：'+esc(post.project.period)+'</span>':'')+'</div>':'';
  const recommendations=related.filter(isPublicRecord).filter(p=>p.slug!==slug).slice(0,3);
- return '<div class="reader-surface" data-kind="'+esc(post.kind||'blog')+'" data-room="'+section+'" data-reader-slug="'+esc(slug)+'" data-reader-preview="'+preview+'">'+
+ return '<div class="reader-surface'+(outline.count>8?' has-long-toc':'')+'" data-kind="'+esc(post.kind||'blog')+'" data-room="'+section+'" data-reader-slug="'+esc(slug)+'" data-reader-preview="'+preview+'">'+
  breadcrumbs(post,seo)+'<div class="reader-controls">'+(preview?'<button type="button" class="reader-back" data-reader-back>← 回到编辑</button>':'<a class="reader-back" data-reader-back href="'+index+'">← 返回'+indexName+'</a>')+'<div class="reader-type-controls"><span>字号</span><button type="button" data-reader-font="-1" aria-label="减小字号">A−</button><button type="button" data-reader-font="1" aria-label="增大字号">A+</button></div></div>'+
  '<div class="reader-spread"><aside class="reader-margin"><p class="room-eyebrow">'+label+'</p><div class="margin-drawing">'+art+'</div><span class="reader-category">'+esc(categoryLabel(post))+'</span><h3 class="toc-title">这一页的线索</h3><nav class="reader-toc" aria-label="文章目录">'+outline.toc+'</nav>'+
  (preview?'<p class="reader-private-notice">私人预览 · 公开原文保持现状</p>':'<div class="reader-bookmark"><span>阅读书签</span><strong class="reader-progress-label">0%</strong><span class="reading-track"><span class="reading-fill"></span></span><small>读到的位置，会留在这个浏览器。</small></div><button type="button" class="reader-share" data-reader-share>复制这页链接 ↗</button>'+(link?'<a class="reader-permalink" href="'+esc(link)+'">打开独立文章页 ↗</a>':''))+'<p class="paper-signature">'+esc(author)+' / '+esc(signature)+'</p></aside>'+

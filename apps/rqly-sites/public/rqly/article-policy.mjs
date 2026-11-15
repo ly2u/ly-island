@@ -1,7 +1,8 @@
+import {CODE_CLASSES} from './code-policy.mjs';
 // Shared server/browser policy. MathML has no links, embedded HTML, SVG or event handlers.
 export const HTML_TAGS=['p','h2','h3','h4','h5','h6','ul','ol','li','blockquote','pre','code','strong','em','s','a','br','hr','table','thead','tbody','tr','th','td','div','span','img'];
 export const MATH_TAGS=['math','semantics','annotation','mrow','mi','mo','mn','ms','mtext','mspace','mfrac','msqrt','mroot','msub','msup','msubsup','munder','mover','munderover','mtable','mtr','mtd','menclose','mpadded','mphantom','mstyle','mmultiscripts','mprescripts','none'];
-export const ARTICLE_CLASSES=['content-image','content-table','math-block','math-error','katex','katex-mathml','align-left','align-center','align-right'];
+export const ARTICLE_CLASSES=[...CODE_CLASSES,'content-image','content-table','math-block','math-error','katex','katex-mathml','align-left','align-center','align-right'];
 export const MATH_ATTRIBUTES=['xmlns','display','encoding','mathvariant','stretchy','fence','separator','lspace','rspace','accent','accentunder','columnalign','rowalign','columnspacing','rowspacing','columnlines','rowlines','linethickness','scriptlevel','displaystyle','width','height','depth','voffset','lquote','rquote','notation','mathcolor','mathbackground','minsize','maxsize','equalrows','equalcolumns'];
 export function validMathAttribute(name,value){
  if(name==='xmlns')return value==='http://www.w3.org/1998/Math/MathML';
