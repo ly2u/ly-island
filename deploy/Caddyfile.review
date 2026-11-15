@@ -4,9 +4,16 @@
 }
 :80 {
     handle / {
-        root * /srv/island
-        rewrite * /index.html
-        file_server
+        reverse_proxy sites:8080 {
+            rewrite /island-home
+            header_up X-LY-Island-Home 1
+            @legacy_shell status 404
+            handle_response @legacy_shell {
+                root * /srv/island
+                rewrite * /index.html
+                file_server
+            }
+        }
     }
     handle_path /island/* {
         root * /srv/island

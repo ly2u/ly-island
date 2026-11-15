@@ -24,6 +24,7 @@ services:
     volumes:
       - /srv/ly-data/sites:/app/data
       - /run/ly-ai:/run/ly-ai:ro
+      - ./apps/ly-island-preview/dist:/app/island-shell:ro
     expose: ["8080"]
     read_only: true
     tmpfs: [/tmp]

@@ -68,7 +68,7 @@ test('reading focus keeps geometry stationary and restores the exact previous or
  const {camera,controls,focus}=cameraFixture(),before=focus.snapshot(),target=[-3,2,1];
  focus.focus(target,readingFrame(1280),{now:0});assert.equal(focus.step(210),true);assert.notEqual(camera.zoom,before.zoom);
  focus.step(420);close(controls.target,new THREE.Vector3(...target));assert.equal(camera.zoom,1.65);
- const projected=new THREE.Vector3(...target).project(camera);assert.ok(Math.abs((projected.x+1)*640-168)<.001,'subject stays in the visible shore');
+ const projected=new THREE.Vector3(...target).project(camera);assert.ok(Math.abs((projected.x+1)*640-1280/6)<.001,'subject stays in the visible shore');
  focus.restore({now:500});focus.step(920);assert.equal(focus.home,null);assert.equal(focus.step(950),false);
  close(camera.position,new THREE.Vector3(...before.position));close(controls.target,new THREE.Vector3(...before.target));assert.equal(camera.zoom,before.zoom);
  assert.deepEqual(focus.snapshot().offset,before.offset);
@@ -88,7 +88,7 @@ test('responsive framing and reduced-motion transitions finish immediately witho
  focus.viewport(390,844,{x:0,y:-.07});focus.restore({immediate:true,now:1});assert.equal(focus.transition,null);assert.equal(focus.home,null);
  assert.deepEqual(focus.snapshot().position,before.position);assert.equal(camera.view.fullWidth,390);assert.deepEqual(focus.snapshot().offset,{x:0,y:-.07});
  focus.viewport(1600,900,{x:-.12,y:.015});focus.focus([3,1,2],readingFrame(1600),{immediate:true});
- const target=new THREE.Vector3(3,1,2).project(camera);assert.ok(Math.abs((target.x+1)*800-268)<.001);
+ const target=new THREE.Vector3(3,1,2).project(camera);assert.ok(Math.abs((target.x+1)*800-1600/6)<.001);
  focus.restore({immediate:true});assert.equal(focus.step(99999),false);
 });
 

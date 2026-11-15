@@ -1,3 +1,4 @@
+import {defaultPresentation,validatePresentation} from './public/rqly/presentation-core.mjs';
 import {validateOrganization} from './public/rqly/organization-core.mjs';
 import {roomRecords,validRecordSlug} from './public/rqly/island-content.mjs';
 import {growthStats} from './public/rqly/growth-core.mjs';
@@ -13,7 +14,7 @@ export const SCENERY_RULES={initial:{radius:5.8,ellipse:.83},grown:{radius:6.8,e
 export const SCENERY_TREE_IDS={initial:Array.from({length:10},(_,i)=>'tree-'+i),grown:Array.from({length:14},(_,i)=>'tree-'+i)};
 export function sceneryInside(phase,point){const [x,z]=point,r=SCENERY_RULES[phase];return (x/r.radius)**2+(z/(r.radius*r.ellipse))**2<=1||(r.satellite&&((x-r.satellite.center[0])/r.satellite.radius[0])**2+((z-r.satellite.center[1])/r.satellite.radius[1])**2<=1);}
 export const LAYOUT_RULES={scenery:SCENERY_RULES,initial:{radius:4.65,ellipse:.79},grown:{radius:5.55,ellipse:.79,projects:{center:[9,.5],radius:[1,1.1]}},minDistance:2.15,defaults:DEFAULT_LAYOUTS};
-export function defaultIsland(){return {schemaVersion:1,revision:0,title:'LY 的浮空岛',description:'把日常的积累，建成自己的世界。',phase:'initial',lighting:'afternoon',buildings:{library:{name:'书屋',description:'挑一本记录，翻开看看。读完之后，小岛还在窗外。'},projects:{name:'工程展馆',description:'项目过程、工程手记与完成的成果，都留在这里。'},workshop:{name:'工坊',description:'桌上放着正在使用的工具，也留着每次尝试的手记。'}},layouts:structuredClone(DEFAULT_LAYOUTS),growth:{threshold:30,unlocked:false},scenery:{initial:{postoffice:null,trees:{}},grown:{postoffice:null,trees:{}}},decorations:[],updatedAt:null};}
+export function defaultIsland(){return {schemaVersion:1,revision:0,presentation:defaultPresentation(),title:'LY 的浮空岛',description:'把日常的积累，建成自己的世界。',phase:'initial',lighting:'afternoon',buildings:{library:{name:'书屋',description:'挑一本记录，翻开看看。读完之后，小岛还在窗外。'},projects:{name:'工程展馆',description:'项目过程、工程手记与完成的成果，都留在这里。'},workshop:{name:'工坊',description:'桌上放着正在使用的工具，也留着每次尝试的手记。'}},layouts:structuredClone(DEFAULT_LAYOUTS),growth:{threshold:30,unlocked:false},scenery:{initial:{postoffice:null,trees:{}},grown:{postoffice:null,trees:{}}},decorations:[],updatedAt:null};}
 function fail(message,status=400){throw Object.assign(new Error(message),{status});}
 function text(value,max,label,{optional=false}={}){if(typeof value!=='string'||value.length>max||(!optional&&!value.trim()))fail(label+'格式无效。');return value.trim();}
 export function validateIsland(value){
@@ -47,7 +48,7 @@ export function validateIsland(value){
   const positions=[...(postoffice?[postoffice]:[]),...Object.values(trees)];for(let i=0;i<positions.length;i++)for(let j=i+1;j<positions.length;j++)if(Math.hypot(positions[i][0]-positions[j][0],positions[i][1]-positions[j][1])<.5)fail('信箱和树木之间需要留出空间。');
   scenery[phase]={postoffice,trees};
  }
- return {schemaVersion:1,title,description,phase:value.phase,lighting:value.lighting,buildings,layouts,scenery,growth:{threshold,unlocked:value.growth?.unlocked===true||value.phase==='grown'},decorations:checked};
+ return {schemaVersion:1,presentation:validatePresentation(value.presentation),title,description,phase:value.phase,lighting:value.lighting,buildings,layouts,scenery,growth:{threshold,unlocked:value.growth?.unlocked===true||value.phase==='grown'},decorations:checked};
 }
 export function createIslandStore(dataDir){
  const filename=path.join(dataDir,'island.json');
@@ -67,7 +68,7 @@ export function createIslandStore(dataDir){
  return {initialize,read,save};
 }
 export function publicIsland(island,posts){
- const value=structuredClone(island);
+ const value=structuredClone(island);if(value.presentation)value.presentation.tools=value.presentation.tools.filter(t=>t.enabled);
  for(const id of BUILDINGS){const visible=new Set(roomRecords(posts,id).map(post=>post.slug));value.buildings[id].featuredSlugs=(value.buildings[id].featuredSlugs||[]).filter(slug=>visible.has(slug));}
  return value;
 }

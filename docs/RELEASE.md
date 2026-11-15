@@ -287,3 +287,10 @@ rm -rf $D/src && tar -xf $B/island-source.tar -C $D   # 同时恢复发布前的
 ## 可移植内容包的运维文件
 
 内容导出版本需配套安装 `scripts/backup.sh`、`scripts/verify-backup.py` 与 `scripts/verify-portable-content.py`。先保存旧脚本，核对差异，再从已合并标签复制；使用旧运行镜像的发布前备份仍兼容，发布后首次备份须生成 ZIP 并通过逐项恢复校验。后台导入遇到中断时，启动恢复记录位于 `DATA_DIR/content-import-transaction`，保留记录与旧文件并用支持本能力的版本启动；没有核实前不要删除记录或直接用旧代码读半完成数据。成功确认后的数据与旧版 JSON 格式兼容，版本回滚不撤销已确认的草稿导入。
+
+## 展示设置首页兼容
+
+首次安装包含展示设置的版本时，需要先按 [DISPLAY-SETTINGS.md](DISPLAY-SETTINGS.md)
+安装只读挂载与首页代理配置。之后仍按本文件 check/deploy；index 构建摘要校验改从
+`/island/index.html` 获取原始产物，并验证 `/` 的资源集合与产物一致。后台改文案无需发布，
+不会使源码/构建摘要校验误报。旧镜像回退时，Caddy 的 404 兜底保留静态首页。

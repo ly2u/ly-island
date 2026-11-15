@@ -15,14 +15,23 @@ rqly.com {
     @legacy_island path /island /island/
     redir @legacy_island /{?query} 308
     handle / {
-        root * /srv/island
-        rewrite * /index.html
         header Cache-Control "no-cache"
         header X-Content-Type-Options "nosniff"
         header X-Frame-Options "DENY"
         header Referrer-Policy "strict-origin-when-cross-origin"
         header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
-        file_server
+        reverse_proxy sites:8080 {
+            rewrite /island-home
+            header_up X-LY-Island-Home 1
+            header_up X-Real-IP {remote_host}
+            # Old images lack /island-home: keep rollback serving the static island.
+            @legacy_shell status 404
+            handle_response @legacy_shell {
+                root * /srv/island
+                rewrite * /index.html
+                file_server
+            }
+        }
     }
     handle /classic {
         header X-Robots-Tag "noindex, follow"

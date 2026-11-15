@@ -8,3 +8,5 @@
 .article-content .content-image{display:block;max-width:100%;height:auto;margin:24px auto;border-radius:9px;border:1px solid var(--line)}
 
 .article-header,.note-row,.note-card{overflow-wrap:anywhere}
+
+.note-row[data-kind=note]{border-left:3px solid #9aaa8c;padding-left:20px;background:#f7f8f1}.note-row[data-kind=note] h2{font-size:20px}.kind-nav{margin-top:8px}.about-tools{border-top:1px solid #dce1d5;margin-top:30px;padding-top:20px}
