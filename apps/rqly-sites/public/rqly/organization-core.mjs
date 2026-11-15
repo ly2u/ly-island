@@ -2,7 +2,7 @@ export const organizationTypes={tag:'标签',topic:'分类',series:'系列'};
 export function validateOrganization(value={}){
  const fail=()=>{throw new Error('内容归属格式无效。');};
  if(!value||typeof value!=='object'||Array.isArray(value))fail();
- const ids=key=>{const a=value[key]??[];if(!Array.isArray(a)||a.length>20||a.some(id=>typeof id!=='string'||!/^org-[a-f0-9]{16}$/.test(id))||new Set(a).size!==a.length)fail();return [...a];};
+ const ids=key=>{const a=value[key]??[];if(!Array.isArray(a)||a.length>20||a.some(id=>typeof id!=='string'||id.trim()!==id||!/^org-[a-f0-9]{16}$/.test(id))||new Set(a).size!==a.length)fail();return [...a];};
  const series=value.series??'',projectSlug=value.projectSlug??'',order=value.order??1;
  if(typeof series!=='string'||series&&!/^org-[a-f0-9]{16}$/.test(series)||typeof projectSlug!=='string'||projectSlug&&!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(projectSlug)||projectSlug.length>80||!Number.isSafeInteger(order)||order<1||order>10000)fail();
  return {tags:ids('tags'),topics:ids('topics'),series,order,projectSlug};
@@ -14,3 +14,13 @@ export function organizationDetails(post,catalog,posts){
 }
 export function decorateOrganization(post,catalog,posts){return {...post,organizationDetails:organizationDetails(post,catalog,posts)};}
 export function seriesRecords(posts,id){return posts.filter(p=>p.organization?.series===id).sort((a,b)=>(a.organization.order||1)-(b.organization.order||1)||a.date.localeCompare(b.date)||a.slug.localeCompare(b.slug));}
+
+// Stable aliases preserve the two historic book URLs after categories are renamed.
+export function validateBookAliases(catalog){
+ const value=catalog.legacyBooks;if(value===undefined)return {};
+ if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('旧分类链接格式无效。');
+ const result={};for(const [key,id]of Object.entries(value)){
+  if(!['engineering','exploration'].includes(key)||typeof id!=='string'||id.trim()!==id||!/^org-[a-f0-9]{16}$/.test(id)||!catalog.items.some(i=>i.id===id&&i.type==='topic'))throw new Error('旧分类链接格式无效。');
+  result[key]=id;
+ }return result;
+}

@@ -52,8 +52,11 @@ export function knowledgeBooks(posts){
  const books=new Map(),seen=new Set();
  for(const p of posts){if(!isPublicRecord(p)||!isArticle(p)||seen.has(p.slug))continue;seen.add(p.slug);
   const categories=(p.organizationDetails?.topics||[]).filter(i=>validBookId(i.id)&&i.id.startsWith('org-')&&typeof i.name==='string'&&i.name.trim());
-  const groups=categories.length?categories:[p.topic==='工程'?{id:'engineering',name:'工程',description:'工程知识与方法。'}:p.topic==='探索'?{id:'exploration',name:'探索',description:'工具、方法与学习资料。'}:{id:'general',name:'未分类',description:'尚未选择分类的文章，仍可正常阅读。'}];
-  for(const category of groups){if(!books.has(category.id))books.set(category.id,{id:category.id,title:category.name,description:category.description||'',notes:[]});const book=books.get(category.id);if(!book.notes.some(n=>n.slug===p.slug))book.notes.push(p);}
+  const groups=categories.length?categories:[{id:'general',name:'未分类',description:'尚未选择分类的文章，仍可正常阅读。'}];
+  for(const category of groups){if(!books.has(category.id))books.set(category.id,{id:category.id,title:category.name,description:category.description||'',aliases:(category.bookAliases||[]).filter(alias=>['engineering','exploration'].includes(alias)),notes:[]});const book=books.get(category.id);if(!book.notes.some(n=>n.slug===p.slug))book.notes.push(p);}
  }
  return [...books.values()].sort((a,b)=>a.id==='general'?1:b.id==='general'?-1:a.title.localeCompare(b.title,'zh-CN'));
 }
+
+export const findCategoryBook=(books,id)=>books.find(book=>book.id===id||book.aliases?.includes(id));
+export const categoryLabel=post=>(post.organizationDetails?.topics||[]).map(item=>item.name).filter(name=>typeof name==='string'&&name.trim()).join(' / ')||'未分类';
