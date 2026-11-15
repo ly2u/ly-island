@@ -1,12 +1,13 @@
 // Shared by the server, owner controls and public island; inputs are metadata.
-export const CONTENT_ROOMS=['library','projects','workshop'];
+export const CONTENT_ROOMS=['library','projects','workshop','blog'];
 export const validRecordSlug=value=>typeof value==='string'&&value.length<=80&&value.trim()===value&&/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
 export const isPublicRecord=post=>Boolean(post&&post.published===true&&!post.trashedAt&&validRecordSlug(post.slug));
 export function belongsToRoom(post,room){
  if(!isPublicRecord(post))return false;
- if(room==='library')return post.kind!=='project';
- if(room==='projects')return post.kind==='project'||post.topic==='工程';
- if(room==='workshop')return post.kind!=='project'&&post.topic==='探索';
+ if(room==='library')return post.kind==='note';
+ if(room==='blog')return !post.kind||post.kind==='blog';
+ if(room==='projects')return post.kind==='project'||post.kind==='note'&&post.topic==='工程';
+ if(room==='workshop')return post.kind==='note'&&post.topic==='探索';
  return room==='search';
 }
 export const roomRecords=(posts,room)=>posts.filter(post=>belongsToRoom(post,room));
@@ -17,7 +18,7 @@ export function recommendedRecords(posts,island,room){
 }
 export function recordRoom(post,preferred){
  if(belongsToRoom(post,preferred))return preferred;
- return post.kind==='project'?'projects':post.topic==='探索'?'workshop':'library';
+ return post.kind==='project'?'projects':post.kind==='note'?'library':'blog';
 }
 export function readingHref(post,preferred){return '#'+new URLSearchParams({room:recordRoom(post,preferred),article:post.slug});}
 
@@ -42,4 +43,16 @@ export function relatedRecords(post,posts,limit=3){
   score+=shared(a.topics,b.topics)*4+shared(a.tags,b.tags)*2+(post.topic===p.topic?1:0);
   return {post:p,score,index};
  }).filter(item=>item.score>0).sort((a,b)=>b.score-a.score||a.index-b.index).slice(0,limit).map(item=>item.post);
+}
+
+// A category is a book; the notes inside it keep their own stable article URLs.
+export const validBookId=id=>typeof id==='string'&&/^(?:org-[a-f0-9]{16}|general|engineering|exploration)$/.test(id)&&id.trim()===id;
+export function knowledgeBooks(posts){
+ const books=new Map(),seen=new Set();
+ for(const p of posts){if(!isPublicRecord(p)||p.kind!=='note'||seen.has(p.slug))continue;seen.add(p.slug);
+  const categories=(p.organizationDetails?.topics||[]).filter(i=>validBookId(i.id)&&i.id.startsWith('org-')&&typeof i.name==='string'&&i.name.trim());
+  const groups=categories.length?categories:[p.topic==='工程'?{id:'engineering',name:'工程笔记',description:'工程知识与方法。'}:p.topic==='探索'?{id:'exploration',name:'探索笔记',description:'工具、方法与学习资料。'}:{id:'general',name:'待分类',description:'暂未指定分类的笔记，先完整保留在这里。'}];
+  for(const category of groups){if(!books.has(category.id))books.set(category.id,{id:category.id,title:category.name,description:category.description||'',notes:[]});const book=books.get(category.id);if(!book.notes.some(n=>n.slug===p.slug))book.notes.push(p);}
+ }
+ return [...books.values()].sort((a,b)=>a.id==='general'?1:b.id==='general'?-1:a.title.localeCompare(b.title,'zh-CN'));
 }

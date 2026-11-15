@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#e9eee9">
 <title>LY 的浮空岛 · 桥梁工程与数字工具</title>
-<meta name="description" content="LY 的个人小岛：桥梁工程、日常记录与数字工具实践。走进书屋读笔记与博客，在工程展馆看项目。">
+<meta name="description" content="LY 的个人小岛：桥梁工程、日常记录与数字工具实践。在书屋查阅分类笔记，在岛主空间读博客，在工程展馆看项目。">
 <link rel="canonical" href="https://rqly.com/"><link rel="alternate" type="application/rss+xml" title="LY · 记录与求索" href="https://rqly.com/feed.xml">
 <meta property="og:title" content="LY 的浮空岛 · 桥梁工程与数字工具"><meta property="og:description" content="LY · 桥梁工程与数字工具实践。笔记是书屋，项目是展馆，新的尝试留在工坊。"><meta property="og:type" content="website"><meta property="og:url" content="https://rqly.com/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -14,7 +14,7 @@
   <div id="scene" aria-label="浮空岛三维场景"><canvas id="world" aria-label="可以旋转、缩放并点击建筑的浮空岛" tabindex="0"></canvas></div>
   <header class="topbar">
     <a class="identity" href="/" aria-label="LY 的浮空岛首页"><span class="identity-symbol"><span data-display="symbol">LY</span><span></span></span><span><span data-display="brand">记录与求索</span><small data-display="eyebrow">MY LITTLE WORLD</small></span></a>
-    <div class="top-actions"><a class="back-link island-search-entry" href="#room=search" data-room-link="search" aria-label="搜索全岛内容">搜索</a><button class="view-toggle" id="view-toggle" aria-pressed="false">轻量导览</button><a class="back-link" id="account-entry" href="/login">管理员登录</a><a class="back-link" href="/about" data-room-link="about">岛主</a></div>
+    <div class="top-actions"><a class="back-link island-search-entry" href="#room=search" data-room-link="search" aria-label="搜索全岛内容">搜索</a><button class="view-toggle" id="view-toggle" aria-pressed="false">轻量导览</button><a class="back-link" id="account-entry" href="/login">管理员登录</a><a class="back-link" href="/blog" data-room-link="blog">博客</a><a class="back-link" href="/about" data-room-link="about">岛主</a></div>
   </header>
   <section class="intro" id="intro">
     <p class="kicker"><span class="live-dot"></span><span data-display="title" id="island-label">一座开始生长的小岛</span></p>
@@ -39,7 +39,7 @@
   </div>
   <p class="interaction-hint" id="interaction-hint">拖动旋转 · 滚轮缩放 · 点击建筑探索</p>
   <p class="arrange-hint" id="arrange-hint" hidden>拖动建筑调整位置，保存后向所有访客展示。<button id="reset-layout">恢复布局</button></p>
-  <nav class="quick-nav" aria-label="快捷访问"><a href="/notes" data-room-link="library">书屋 · 笔记与博客</a><a href="/notes?topic=工程" data-room-link="projects">工程展馆 · 项目</a><a href="https://midas.rqly.com" data-room-link="workshop">工坊 · 工具与实践</a><a href="/about" data-room-link="about">岛主</a><a href="/island/#room=postoffice" data-room-link="postoffice">信箱</a><a href="/feed.xml">RSS 订阅</a></nav>
+  <nav class="quick-nav" aria-label="快捷访问"><a href="/notes" data-room-link="library">书屋 · 分类笔记</a><a href="/notes?topic=工程" data-room-link="projects">工程展馆 · 项目</a><a href="https://midas.rqly.com" data-room-link="workshop">工坊 · 工具与实践</a><a href="/blog" data-room-link="blog">博客</a><a href="/about" data-room-link="about">岛主</a><a href="/island/#room=postoffice" data-room-link="postoffice">信箱</a><a href="/feed.xml">RSS 订阅</a></nav>
   <div class="loading" id="loading"><span class="loading-island" aria-hidden="true">⌂</span><p id="loading-stage" role="status">正在读取小岛设置…</p><ol class="loading-steps" aria-label="场景准备阶段"><li data-load-step="settings" aria-current="step">配置</li><li data-load-step="resources">场景</li><li data-load-step="frame">画面</li></ol><button id="loading-reading" type="button">先看轻量导览 →</button><a href="/notes">直接阅读文字目录</a></div>
   <section class="fallback" id="fallback" aria-label="岛屿轻量导览" hidden>
     <p class="reading-kicker">ISLAND GUIDE / 轻量导览</p><h2>从这里，认识小岛</h2><p id="fallback-reason">暂时放下漂浮，留一点时间给文字。</p>
@@ -52,14 +52,14 @@
       <path d="m335 89 12-25 13 25h-9v10h-7V89ZM64 121l13-30 13 30h-10v11h-7v-11Z" fill="#98ab83"/>
     </svg><p class="guide-caption">轻点建筑，或使用下方入口 · 示意导览</p>
     <div class="reading-portals">
-      <a class="reading-portal" href="/notes" data-room-link="library"><span class="portal-icon" aria-hidden="true">▤</span><span><strong data-building-name="library">书屋</strong><small>笔记与博客，按自己的节奏翻阅</small></span><span aria-hidden="true">↗</span></a>
+      <a class="reading-portal" href="/notes" data-room-link="library"><span class="portal-icon" aria-hidden="true">▤</span><span><strong data-building-name="library">书屋</strong><small>按分类打开书，再查阅知识笔记</small></span><span aria-hidden="true">↗</span></a>
       <a class="reading-portal" href="/notes?topic=工程" data-room-link="projects"><span class="portal-icon" aria-hidden="true">⌁</span><span><strong data-building-name="projects">工程展馆</strong><small>从一项项目，读到过程与思考</small></span><span aria-hidden="true">↗</span></a>
       <a class="reading-portal" href="https://midas.rqly.com" data-room-link="workshop"><span class="portal-icon" aria-hidden="true">⚒</span><span><strong data-building-name="workshop">工坊</strong><small>CivilFlow、七嘴与新的尝试</small></span><span aria-hidden="true">↗</span></a>
       <a class="reading-portal" href="/about" data-room-link="about"><span class="portal-icon" aria-hidden="true">◉</span><span><strong>岛主</strong><small>认识这个小岛，和留下记录的人</small></span><span aria-hidden="true">↗</span></a>
       <a class="reading-portal" href="/island/#room=postoffice" data-room-link="postoffice"><span class="portal-icon" aria-hidden="true">✉</span><span><strong>信箱</strong><small>看看路过的人留下的纸条，给岛主写一封信</small></span><span aria-hidden="true">↗</span></a>
     </div><button id="retry-scene">打开 3D 小岛</button><a class="plain-records" href="/notes">查看文字目录 →</a><a class="plain-records" href="/privacy">隐私说明</a><p data-display="footer" class="guide-caption">把小的记录留下来，让认识慢慢生长。</p>
   </section>
-  <noscript><section class="no-script"><h2 data-display="title">欢迎来到 LY 的小世界</h2><p data-display="description">这里记录桥梁工程、日常思考与工具实践。</p><a href="/notes">阅读笔记与博客 →</a><a href="/notes?topic=工程">工程手记 →</a><span data-public-tools><a href="https://midas.rqly.com">CivilFlow →</a><a href="https://7zui.com">七嘴 →</a></span><a href="/about">认识岛主 →</a><a href="/privacy">隐私说明 →</a></section><style>#loading,#scene,.scene-controls,.growth-card,.intro,.quick-nav,#view-toggle{display:none!important}</style></noscript>
+  <noscript><section class="no-script"><h2 data-display="title">欢迎来到 LY 的小世界</h2><p data-display="description">这里记录桥梁工程、日常思考与工具实践。</p><a href="/notes">打开分类书架 →</a><a href="/notes?topic=工程">工程手记 →</a><span data-public-tools><a href="https://midas.rqly.com">CivilFlow →</a><a href="https://7zui.com">七嘴 →</a></span><a href="/blog">岛主博客 →</a><a href="/about">认识岛主 →</a><a href="/privacy">隐私说明 →</a></section><style>#loading,#scene,.scene-controls,.growth-card,.intro,.quick-nav,#view-toggle{display:none!important}</style></noscript>
   <p class="status-message" id="status-message" role="status" aria-live="polite"></p>
 </main>
 <dialog id="growth-dialog" class="growth-dialog" aria-labelledby="growth-title"><div><h2 id="growth-title">小岛的成长足迹</h2><button id="close-growth" type="button">关闭 ×</button></div><p>每一条记录和每一次实践，都留下一点积累。</p><p id="growth-detail"></p><p>草稿和回收站不计入积累；只有主人可以保存岛屿外观。</p></dialog>
