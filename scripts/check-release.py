@@ -198,7 +198,9 @@ def main():
                 elif self.path == '/api/posts':
                     status, body = (200, b'{"posts":[]}') if healthy else (502, b'')
                 elif self.path == '/':
-                    body = (island / 'dist' / 'index.html').read_bytes()
+                    # Public HTML now contains owner display values, while the raw shell
+                    # must still match the tagged build exactly.
+                    body = b'<!-- dynamic display values -->' + (island / 'dist' / 'index.html').read_bytes()
                     status = 500 if b'BROKEN' in body else 200
                 elif self.path.startswith('/island/'):
                     target = island / 'dist' / self.path[len('/island/'):]

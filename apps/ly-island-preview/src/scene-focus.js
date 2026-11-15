@@ -1,7 +1,7 @@
 // Only the camera moves. Buildings, paths and saved island coordinates stay put.
 export function readingFrame(width) {
  if(width<1100)return null;
- const paper=Math.min(1040,width-360),shore=width-paper-24;
+ const paper=width*2/3-24,shore=width-paper-24;
  return {x:(width-shore)/width/2,y:0,zoom:1.65};
 }
 const mix=(a,b,t)=>a+(b-a)*t;

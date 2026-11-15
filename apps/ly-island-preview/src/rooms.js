@@ -1,3 +1,4 @@
+import {defaultPresentation} from '../../rqly-sites/public/rqly/presentation-core.mjs';
 import {articleLink} from '../../rqly-sites/public/rqly/navigation.mjs';
 import {setupReader} from '../../rqly-sites/public/rqly/reader-client.mjs';
 import {renderReader,bookDrawing,bridgeDrawing,flowDrawing} from '../../rqly-sites/public/rqly/reader-view.mjs';
@@ -50,7 +51,8 @@ export function articleFragment(html){
 }
 function coverImage(post,cls){if(!/^\/media\/[a-f0-9]{32}\.webp$/.test(post.cover||''))return null;const image=el('img',cls);image.src=post.cover;image.alt=post.title+' 封面';image.loading='lazy';image.decoding='async';return image;}
 export class IslandRooms {
- get names(){return Object.fromEntries(Object.entries(names).map(([id,name])=>[id,this.callbacks.island?.()?.buildings?.[id]?.name||name]));}
+ get presentation(){return this.callbacks.island?.()?.presentation||defaultPresentation();}
+ get names(){return Object.fromEntries(Object.entries(names).map(([id,name])=>[id,this.callbacks.island?.()?.buildings?.[id]?.name||(id==='postoffice'?this.presentation.spaces.mailboxName:null)||name]));}
  constructor(callbacks){
   this.baseTitle=document.title;this.callbacks=callbacks;this.room=null;this.slug=null;this.token=0;this.pending=null;this.font=Math.max(16,Math.min(22,Number(readStored('ly-island-reader-font',18))||18));this.positions=readingPositions(readStored('ly-island-reading-v1',{}));
   this.dialog=el('dialog','island-room');this.dialog.id='room-dialog';this.dialog.setAttribute('aria-labelledby','room-name');
@@ -76,8 +78,8 @@ export class IslandRooms {
   this.saveProgress();this.token++;this.pending?.abort();this.room=room;this.slug=slug;this.collectionId=collection;document.title=this.names[room]+' · '+this.baseTitle;
   this.dialog.dataset.room=room;this.dialog.classList.toggle('has-article',Boolean(slug));document.body.classList.add('room-open');
   this.dialog.querySelector('#room-name').textContent=this.names[room];this.dialog.querySelector('#room-caption').textContent=captions[room];
-  this.dialog.querySelector('.room-footer-hint').textContent=room==='library'?'把写下的日子，放进书架':room==='projects'?'从过程、线索和证据，认识一项工程':room==='postoffice'?'把一句问候，寄到这个小岛':room==='about'?'做工程，也保持好奇':room==='search'?'从一个词，找回一段记录':'从一个具体问题，开始动手';
-  this.dialog.querySelector('.room-coordinate').textContent='ISLAND / '+({library:'01',projects:'02',workshop:'03',about:'LY',postoffice:'POST',search:'FIND'}[room]);
+  this.dialog.querySelector('.room-location').textContent=this.presentation.owner.name+' · '+this.presentation.home.brand;this.dialog.querySelector('.room-footer-hint').textContent=this.presentation.home.footer;
+  this.dialog.querySelector('.room-coordinate').textContent='ISLAND / '+({library:'01',projects:'02',workshop:'03',about:this.presentation.home.symbol,postoffice:'POST',search:'FIND'}[room]);
   for(const tab of this.dialog.querySelectorAll('.room-tab')){tab.textContent=this.names[tab.dataset.room];tab.setAttribute('aria-current',tab.dataset.room===room?'page':'false');}
   this.callbacks.selection(room);if(!this.dialog.open)this.dialog.showModal();
   if(room==='search'&&!slug)this.searchCollection();else if(room==='postoffice')this.readPostOffice();else if(room==='about')this.readAbout();else if(slug)this.readArticle(slug);else if(collection)this.renderDirectory(collection);else this.collection();
@@ -89,7 +91,7 @@ export class IslandRooms {
   const head=el('header');head.append(el('h2','',curated?'先从这几篇认识这里':'最近留在这里的记录'),el('span','',curated?'岛主精选 / PICKED FOR YOU':'最近更新 / LATEST'));section.append(head);
   const grid=el('div','recommended-grid');for(const post of recommendations){const card=articleLink('','recommended-record',post.slug,()=>this.open(this.room,post.slug));card.dataset.article=post.slug;card.append(el('span','',({note:'笔记',blog:'博客',project:'项目'}[post.kind||'blog'])+' · '+post.date),el('h3','',post.title),el('p','',post.summary),el('small','','翻开这条记录 →'));grid.append(card);}section.append(grid);this.content.append(section);
  }
- readPostOffice(){this.scroll.scrollTop=0;this.pending?.abort();this.pending=new AbortController();renderPostOffice(this.content,this.pending.signal);}
+ readPostOffice(){this.scroll.scrollTop=0;this.pending?.abort();this.pending=new AbortController();renderPostOffice(this.content,this.pending.signal,this.presentation.spaces);}
  async readAbout(){
   if(this.aboutData){this.renderAbout(this.aboutData);return;}const token=++this.token;this.pending?.abort();const controller=new AbortController();this.pending=controller;const timeout=setTimeout(()=>controller.abort(),8000);this.content.replaceChildren(el('p','room-empty','正在读岛主留下的介绍…'));
   try{const response=await fetch('/about',{signal:controller.signal});if(!response.ok)throw new Error('介绍暂时没有读取到。');const html=await response.text();const source=new DOMParser().parseFromString(html,'text/html');const content=source.querySelector('.about-content'),heading=source.querySelector('.page-title h1');if(!content||!heading)throw new Error('介绍暂时无法打开。');if(token!==this.token)return;this.aboutData={title:heading.textContent,html:content.innerHTML};this.renderAbout(this.aboutData);}
@@ -97,27 +99,31 @@ export class IslandRooms {
   finally{clearTimeout(timeout);}
  }
  renderAbout(data){
-  this.content.replaceChildren();this.scroll.scrollTop=0;const layout=el('div','keeper-layout');const identity=el('aside','keeper-identity');identity.append(el('p','room-eyebrow','THE ISLAND KEEPER'),illustration('<svg viewBox="0 0 240 270" fill="none" aria-hidden="true"><ellipse cx="120" cy="237" rx="86" ry="13" fill="#6b8066" opacity=".08"/><path d="M48 198h144v28H48z" fill="#d7d2bf"/><path d="M43 191h154v12H43z" fill="#ebe6d3"/><path d="m38 144 80-19 81 16v43l-81-12-80 14z" fill="#8b6852"/><path d="m43 135 75-19 76 18v42l-76-13-75 14z" fill="#f4eddb" stroke="#c8c3a7" stroke-width="2"/><path d="M118 117v46m-62-21 46-11m-46 22 46-10m-46 21 46-10m31-22 47 9m-47 2 47 9m-47 2 47 9" stroke="#b6b69a" stroke-width="2"/><path d="m128 154 44-75 10 6-44 75-12 8z" fill="#718875"/><path d="m172 79 6-9 10 6-6 9" fill="#d9c69e"/><path d="m128 154-2 14 12-8" fill="#d6b477"/><path d="m104 164-1 24 10-6 3 5v-22" fill="#a47f5d"/></svg>','keeper-portrait'),el('h2','','LY'),el('p','keeper-signature','记录与求索 / Record & Quest'),el('p','keeper-caption','在工程与日常之间，\n留下自己的线索。'));
-  const paper=el('article','keeper-paper');const head=el('header','keeper-heading');head.append(el('p','room-eyebrow','ABOUT / LY'),el('h1','',data.title));paper.append(head);const body=el('div','keeper-body');body.append(articleFragment(data.html));paper.append(body);const end=el('footer','keeper-end');end.append(el('span','','把小的记录留下来，让认识慢慢生长。'),button('走进书屋 →','room-text-action',()=>this.open('library')));paper.append(end);layout.append(identity,paper);this.content.append(layout);
+  this.content.replaceChildren();this.scroll.scrollTop=0;const layout=el('div','keeper-layout');const identity=el('aside','keeper-identity');identity.append(el('p','room-eyebrow','THE ISLAND KEEPER'),illustration('<svg viewBox="0 0 240 270" fill="none" aria-hidden="true"><ellipse cx="120" cy="237" rx="86" ry="13" fill="#6b8066" opacity=".08"/><path d="M48 198h144v28H48z" fill="#d7d2bf"/><path d="M43 191h154v12H43z" fill="#ebe6d3"/><path d="m38 144 80-19 81 16v43l-81-12-80 14z" fill="#8b6852"/><path d="m43 135 75-19 76 18v42l-76-13-75 14z" fill="#f4eddb" stroke="#c8c3a7" stroke-width="2"/><path d="M118 117v46m-62-21 46-11m-46 22 46-10m-46 21 46-10m31-22 47 9m-47 2 47 9m-47 2 47 9" stroke="#b6b69a" stroke-width="2"/><path d="m128 154 44-75 10 6-44 75-12 8z" fill="#718875"/><path d="m172 79 6-9 10 6-6 9" fill="#d9c69e"/><path d="m128 154-2 14 12-8" fill="#d6b477"/><path d="m104 164-1 24 10-6 3 5v-22" fill="#a47f5d"/></svg>','keeper-portrait'),el('h2','',this.presentation.owner.name),el('p','keeper-signature',this.presentation.owner.tagline),el('p','keeper-caption',this.presentation.owner.caption));
+  const paper=el('article','keeper-paper');const head=el('header','keeper-heading');head.append(el('p','room-eyebrow','ABOUT / '+this.presentation.owner.name),el('h1','',data.title));paper.append(head);const body=el('div','keeper-body');body.append(articleFragment(data.html));paper.append(body);const end=el('footer','keeper-end');end.append(el('span','',this.presentation.home.footer),button('走进书屋 →','room-text-action',()=>this.open('library')));paper.append(end);layout.append(identity,paper);this.content.append(layout);
  }
  collection(){
   this.content.replaceChildren();this.scroll.scrollTop=0;const posts=this.callbacks.posts();
   if(this.callbacks.failed?.()){const notice=el('div','collection-error');notice.setAttribute('role','status');notice.append(el('p','','公开记录暂时没有取到，请稍后再试。'),button('重新读取记录','room-action',()=>this.callbacks.retry?.()));this.content.append(notice);}
   const intro=el('section','collection-intro');intro.append(el('p','room-eyebrow',this.room==='library'?'一本一本，慢慢积累':this.room==='projects'?'工程档案 / FIELD NOTES':'工作台 / IN PROGRESS'));
-  intro.append(el('h1','',this.room==='library'?'写下的日子，\n都在这里。':this.room==='projects'?'让一项工程，\n留下可以追溯的过程。':'把想法，\n做成用得上的东西。'));
+  intro.append(el('h1','',this.presentation.spaces[this.room]));
   intro.append(el('p','collection-description',this.callbacks.island?.()?.buildings?.[this.room]?.description||(this.room==='library'?'挑一本，翻开看看。读完之后，小岛还在窗外。':this.room==='projects'?'这里先收录已有工程手记，项目档案会随着实践逐步补齐。':'桌上放着正在使用的工具，也留着每次尝试的手记。')));this.content.append(intro);const vacant=this.callbacks.loaded()&&!this.callbacks.failed?.()&&roomRecords(posts,this.room).length===0;if(vacant){this.content.append(this.emptyGuide());if(this.room!=='workshop')return;}if(this.room!=='workshop')this.renderRecommendations();if(this.room==='library')this.renderDirectoryIndex();if(!vacant)renderSearch(this,this.room);const filterCards=()=>{};
   if(this.room==='library'){
-   const bar=el('div','shelf-bar');bar.append(el('span','',this.callbacks.loaded()?posts.filter(p=>p.kind!=='project').length+' 本记录 · 按最近更新排列':'正在整理书架…'));const filters=el('div','shelf-filters');let active='',kind='';const type=el('select','shelf-kind-select');type.setAttribute('aria-label','筛选笔记或博客');for(const [value,label] of [['','笔记和博客'],['note','笔记'],['blog','博客']]){const option=el('option','',label);option.value=value;type.append(option);}type.addEventListener('change',()=>{kind=type.value;draw();});
-   const shelf=el('div','book-shelf');const draw=()=>{shelf.replaceChildren();for(const [i,p] of posts.filter(p=>p.kind!=='project'&&(!kind||(p.kind||'blog')===kind)&&(!active||p.topic===active)).entries())shelf.append(this.bookCard(p,i));filterCards();if(!shelf.children.length)shelf.append(this.empty(this.callbacks.loaded()?'这一层书架还空着。':'正在读取公开记录…'));};
-   for(const category of ['','记录','工程','探索']){const b=button(category||'全部','shelf-filter',()=>{active=category;for(const other of filters.children)other.setAttribute('aria-pressed',String(other===b));draw();});b.setAttribute('aria-pressed',String(!category));filters.append(b);}
-   bar.append(type,filters);this.content.append(bar,shelf);draw();
-   const end=el('div','shelf-end');end.append(illustration(bookDrawing,'shelf-book-mark'),el('span','','不急着写完，让记录慢慢长成一本书。'));this.content.append(end);
+   const records=posts.filter(p=>p.kind!=='project'),bar=el('div','shelf-bar'),filters=el('div','shelf-filters'),list=el('div','library-sections');let active='',kind=({notes:'note',blogs:'blog'}[this.presentation.reading.libraryView])||'';
+   const type=el('select','shelf-kind-select');type.setAttribute('aria-label','筛选笔记或博客');for(const [value,label]of [['','笔记与博客 · 分区展示'],['note','笔记 · 时间列表'],['blog','博客 · 书架']]){const option=el('option','',label);option.value=value;type.append(option);}type.value=kind;
+   const draw=()=>{list.replaceChildren();const visible=records.filter(p=>(!kind||(p.kind||'blog')===kind)&&(!active||p.topic===active)),notes=visible.filter(p=>p.kind==='note'),blogs=visible.filter(p=>p.kind!=='note');
+    if(!kind||kind==='note'){const section=el('section','library-notes');section.append(el('h2','library-section-title','随手笔记'),el('p','library-section-description','短句、摘录与尚在形成的想法 · '+notes.length+' 条'));const timeline=el('div','note-timeline');for(const p of notes){const card=articleLink('','note-entry',p.slug,()=>this.open(this.room,p.slug));card.dataset.article=p.slug;const date=el('time','note-date',p.date);date.dateTime=p.date;card.append(date,el('h3','',p.title),el('p','',p.summary),el('span','note-entry-meta',p.topic+' · 展开笔记 →'));timeline.append(card);}if(!notes.length)timeline.append(this.empty('还没有这一类公开笔记。'));section.append(timeline);list.append(section);}
+    if(!kind||kind==='blog'){const section=el('section','library-blogs');section.append(el('h2','library-section-title','成篇博客'),el('p','library-section-description','整理过的思考与完整文章 · '+blogs.length+' 篇'));const shelf=el('div','book-shelf');for(const [i,p]of blogs.entries())shelf.append(this.bookCard(p,i));if(!blogs.length)shelf.append(this.empty('博客书架还在慢慢整理。'));section.append(shelf);list.append(section);}
+   };
+   type.addEventListener('change',()=>{kind=type.value;draw();});for(const category of ['','记录','工程','探索']){const b=button(category||'全部','shelf-filter',()=>{active=category;for(const other of filters.children)other.setAttribute('aria-pressed',String(other===b));draw();});b.setAttribute('aria-pressed',String(!category));filters.append(b);}bar.append(type,filters);this.content.append(bar,list);draw();
+   const end=el('div','shelf-end');end.append(illustration(bookDrawing,'shelf-book-mark'),el('span','','随手的想法留在笔记里，整理好的文章放上书架。'));this.content.append(end);
   }else if(this.room==='projects'){
    const wall=el('div','exhibition-wall');const drawing=el('div','engineering-drawing');drawing.append(el('span','drawing-stamp','LY / STRUCTURE STUDY'),illustration(bridgeDrawing,'bridge-drawing'),el('p','drawing-caption','代码绘制的结构概念图 · 不对应实际工程'));const archive=el('div','project-archive');
    const projects=posts.filter(p=>p.kind==='project'),notes=posts.filter(p=>p.kind!=='project'&&p.topic==='工程');if(projects.length)archive.append(el('h2','archive-section-title','项目档案'));for(const [i,p] of projects.entries())archive.append(this.exhibitCard(p,i));if(notes.length)archive.append(el('h2','archive-section-title','工程手记'));for(const [i,p] of notes.entries())archive.append(this.exhibitCard(p,i));if(!archive.children.length)archive.append(this.empty('工程手记会从这里开始积累。'));wall.append(drawing,archive);this.content.append(wall);
   }else{
-   const bench=el('div','tool-bench');for(const tool of [{name:'CivilFlow',label:'01 / 建模工作台',detail:'把桥梁参数连成节点工作流，校验、编译，再导出 Civil JSON。',url:'https://midas.rqly.com',svg:flowDrawing,tag:'工作流 · 校验 · 导出'},{name:'七嘴',label:'02 / 文字工作台',detail:'给一份稿件换三个视角，找到值得修改的表达。',url:'https://7zui.com',svg:wordsDrawing,tag:'专业人员 · 听众 · 编辑'}]){
-    const t=el('article','tool-station');t.append(el('span','room-eyebrow',tool.label),illustration(tool.svg,'tool-drawing'),el('h2','',tool.name),el('p','',tool.detail),el('span','tool-tag',tool.tag));const a=el('a','tool-open','打开工具 ↗');a.href=tool.url;a.target='_blank';a.rel='noopener noreferrer';t.append(a);bench.append(t);
+   const bench=el('div','tool-bench');for(const [index,tool] of this.presentation.tools.filter(t=>t.enabled).entries()){
+    const label=String(index+1).padStart(2,'0')+' / 工具与实践',svg=index===0?flowDrawing:wordsDrawing;
+    const t=el('article','tool-station');t.append(el('span','room-eyebrow',label),illustration(svg,'tool-drawing'),el('h2','',tool.name),el('p','',tool.detail),el('span','tool-tag',tool.tag));const a=el('a','tool-open','打开工具 ↗');a.href=tool.url;a.target='_blank';a.rel='noopener noreferrer';t.append(a);bench.append(t);
    }this.content.append(bench);this.renderRecommendations();const log=el('section','workshop-log');log.append(el('h2','','研发手记'));for(const p of posts.filter(p=>p.kind!=='project'&&p.topic==='探索')){const b=articleLink(p.title,'workshop-entry',p.slug,()=>this.open(this.room,p.slug));b.dataset.search=(p.title+' '+p.summary).toLowerCase();b.append(el('span','',p.date+' →'));log.append(b);}this.content.append(log);
   }
  }
@@ -147,7 +153,7 @@ export class IslandRooms {
   finally{clearTimeout(timeout);}
  }
  renderArticle(p,html){
-  this.readerTools?.dispose();document.title=p.title+' · '+this.baseTitle;this.content.innerHTML=renderReader(p,'',{room:this.room});
+  this.readerTools?.dispose();document.title=p.title+' · '+this.baseTitle;this.content.innerHTML=renderReader(p,'',{room:this.room,author:this.presentation.owner.name,signature:this.presentation.home.brand});
   const surface=this.content.querySelector('.reader-surface'),body=surface.querySelector('.article-body');body.append(articleFragment(html));this.spread=surface.querySelector('.reader-spread');
   const firstMatch=highlightArticleMatches(body,this.searchStates?.get(this.room==='search'?'':this.room)?.q||'');
   this.readerTools=setupReader(surface,{initialFont:this.font,onFont:size=>{this.font=size;},onBack:()=>this.open(this.room,null,this.collectionId),onCollection:id=>this.openCollection(id),onRecord:(slug,room)=>this.open(room||this.room,slug)});

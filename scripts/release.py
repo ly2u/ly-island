@@ -231,7 +231,7 @@ ASSET_REFERENCE = re.compile(r'(?:src|href)="(/island/[^"?#]+)"')
 def check_island(expected_top):
     """expected_top：岛屿 dist 顶层文件 {文件名: sha256}。逐个确认线上实际返回的内容，再确认首页引用的资源都能访问。"""
     for name, digest in sorted(expected_top.items()):
-        path = '/' if name == 'index.html' else '/island/' + name
+        path = '/island/' + name
 
         def content_matches(path=path, digest=digest):
             status, body = http_get(path)
@@ -239,7 +239,13 @@ def check_island(expected_top):
                 return False, 'HTTP %d' % status
             return hashlib.sha256(body).hexdigest() == digest, '内容与预期版本不一致'
         wait_for('https://%s%s 返回预期版本' % (SITE_HOST, path), content_matches)
-    _, body = http_get('/')
+    status, body = http_get('/')
+    if status != 200:
+        raise ReleaseError('首页渲染失败：HTTP %d' % status)
+    _, shell = http_get('/island/index.html')
+    expected_references = set(ASSET_REFERENCE.findall(shell.decode('utf-8', 'replace')))
+    if set(ASSET_REFERENCE.findall(body.decode('utf-8', 'replace'))) != expected_references:
+        raise ReleaseError('首页没有引用预期的岛屿资源')
     references = sorted(set(ASSET_REFERENCE.findall(body.decode('utf-8', 'replace'))))
     for reference in references:
         def asset_ok(reference=reference):

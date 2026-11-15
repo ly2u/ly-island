@@ -13,19 +13,19 @@
 <main id="app">
   <div id="scene" aria-label="浮空岛三维场景"><canvas id="world" aria-label="可以旋转、缩放并点击建筑的浮空岛" tabindex="0"></canvas></div>
   <header class="topbar">
-    <a class="identity" href="/" aria-label="LY 的浮空岛首页"><span class="identity-symbol">LY<span></span></span><span>记录与求索<small>MY LITTLE WORLD</small></span></a>
-    <div class="top-actions"><a class="back-link island-search-entry" href="#room=search" data-room-link="search" aria-label="搜索全岛内容">搜索</a><button class="view-toggle" id="view-toggle" aria-pressed="false">轻量导览</button><a class="back-link" id="account-entry" href="/login">管理员登录</a><a class="back-link" href="/about" data-room-link="about">关于 LY</a></div>
+    <a class="identity" href="/" aria-label="LY 的浮空岛首页"><span class="identity-symbol"><span data-display="symbol">LY</span><span></span></span><span><span data-display="brand">记录与求索</span><small data-display="eyebrow">MY LITTLE WORLD</small></span></a>
+    <div class="top-actions"><a class="back-link island-search-entry" href="#room=search" data-room-link="search" aria-label="搜索全岛内容">搜索</a><button class="view-toggle" id="view-toggle" aria-pressed="false">轻量导览</button><a class="back-link" id="account-entry" href="/login">管理员登录</a><a class="back-link" href="/about" data-room-link="about">岛主</a></div>
   </header>
   <section class="intro" id="intro">
-    <p class="kicker"><span class="live-dot"></span><span id="island-label">一座开始生长的小岛</span></p>
-    <p class="intro-identity"><a href="/about" data-room-link="about">LY · 桥梁工程与数字工具实践 ↗</a></p>
-    <h1>把日常的积累，<br>建成自己的<span>世界。</span></h1>
-    <p class="intro-description" id="island-description">笔记是书屋，项目是展馆，<br>新的尝试，留在工坊。<br>每一点积累，都让这里多一点不同。</p>
+    <p class="kicker"><span class="live-dot"></span><span data-display="title" id="island-label">一座开始生长的小岛</span></p>
+    <p class="intro-identity"><a data-display="identity" href="/about" data-room-link="about">LY · 桥梁工程与数字工具实践 ↗</a></p>
+    <h1 data-display="headline">把日常的积累，<br>建成自己的<span>世界。</span></h1>
+    <p data-display="description" class="intro-description" id="island-description">笔记是书屋，项目是展馆，<br>新的尝试，留在工坊。<br>每一点积累，都让这里多一点不同。</p>
     <div class="island-meta"><span id="island-level">LV. 01</span><span class="meta-line"></span><span id="island-state">初始小岛</span></div>
   </section>
   <div id="labels" aria-label="岛上的建筑"></div>
   <section class="growth-card" aria-label="岛屿成长">
-    <div class="growth-heading"><span class="growth-icon" aria-hidden="true">✧</span><div><h2>让积累，看得见</h2><p id="growth-description">正在读取公开记录…</p></div><span id="growth-number">— / 5</span></div>
+    <div class="growth-heading"><span class="growth-icon" aria-hidden="true">✧</span><div><h2 data-display="growth">让积累，看得见</h2><p id="growth-description">正在读取公开记录…</p></div><span id="growth-number">— / 5</span></div>
     <div class="progress-track"><span id="progress-fill"></span></div>
     <div class="growth-actions"><span id="growth-hint">发布记录，书屋就能慢慢长大</span><button id="growth-toggle">看看长大后的岛 <span aria-hidden="true">↗</span></button></div>
     <a class="latest-update" id="latest-update" hidden></a><p class="demo-note" id="demo-note" hidden>成长效果演示 · 不会改变真实文章数量</p>
@@ -57,9 +57,9 @@
       <a class="reading-portal" href="https://midas.rqly.com" data-room-link="workshop"><span class="portal-icon" aria-hidden="true">⚒</span><span><strong data-building-name="workshop">工坊</strong><small>CivilFlow、七嘴与新的尝试</small></span><span aria-hidden="true">↗</span></a>
       <a class="reading-portal" href="/about" data-room-link="about"><span class="portal-icon" aria-hidden="true">◉</span><span><strong>岛主</strong><small>认识这个小岛，和留下记录的人</small></span><span aria-hidden="true">↗</span></a>
       <a class="reading-portal" href="/island/#room=postoffice" data-room-link="postoffice"><span class="portal-icon" aria-hidden="true">✉</span><span><strong>信箱</strong><small>看看路过的人留下的纸条，给岛主写一封信</small></span><span aria-hidden="true">↗</span></a>
-    </div><button id="retry-scene">打开 3D 小岛</button><a class="plain-records" href="/notes">查看文字目录 →</a><a class="plain-records" href="/privacy">隐私说明</a>
+    </div><button id="retry-scene">打开 3D 小岛</button><a class="plain-records" href="/notes">查看文字目录 →</a><a class="plain-records" href="/privacy">隐私说明</a><p data-display="footer" class="guide-caption">把小的记录留下来，让认识慢慢生长。</p>
   </section>
-  <noscript><section class="no-script"><h2>欢迎来到 LY 的小世界</h2><p>这里记录桥梁工程、日常思考与工具实践。</p><a href="/notes">阅读笔记与博客 →</a><a href="/notes?topic=工程">工程手记 →</a><a href="https://midas.rqly.com">CivilFlow →</a><a href="https://7zui.com">七嘴 →</a><a href="/about">关于 LY →</a><a href="/privacy">隐私说明 →</a></section><style>#loading,#scene,.scene-controls,.growth-card,.intro,.quick-nav,#view-toggle{display:none!important}</style></noscript>
+  <noscript><section class="no-script"><h2 data-display="title">欢迎来到 LY 的小世界</h2><p data-display="description">这里记录桥梁工程、日常思考与工具实践。</p><a href="/notes">阅读笔记与博客 →</a><a href="/notes?topic=工程">工程手记 →</a><span data-public-tools><a href="https://midas.rqly.com">CivilFlow →</a><a href="https://7zui.com">七嘴 →</a></span><a href="/about">认识岛主 →</a><a href="/privacy">隐私说明 →</a></section><style>#loading,#scene,.scene-controls,.growth-card,.intro,.quick-nav,#view-toggle{display:none!important}</style></noscript>
   <p class="status-message" id="status-message" role="status" aria-live="polite"></p>
 </main>
 <dialog id="growth-dialog" class="growth-dialog" aria-labelledby="growth-title"><div><h2 id="growth-title">小岛的成长足迹</h2><button id="close-growth" type="button">关闭 ×</button></div><p>每一条记录和每一次实践，都留下一点积累。</p><p id="growth-detail"></p><p>草稿和回收站不计入积累；只有主人可以保存岛屿外观。</p></dialog>
