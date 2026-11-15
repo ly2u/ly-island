@@ -96,7 +96,7 @@ function setWriter(value){
  const url=new URL(location.href);if(writerOpen){url.searchParams.set('write','1');activateDraft();}else url.searchParams.delete('write');history.replaceState({},'',url.pathname+url.search+url.hash);
  if(writerOpen){requestAnimationFrame(()=>{applyWritingView();schedulePreview();});}
 }
-$('writer-back').addEventListener('click',async()=>{if(busy)return;try{if(dirty)await autosaveDraft(true);setQuickCapture(false);setWriter(false);renderList();$('new-note').focus();}catch(error){status('暂未保存，请保持编辑页打开：'+error.message,true);}});
+$('writer-back').addEventListener('click',async()=>{if(busy)return;const target=draftContext;try{if(dirty)await autosaveDraft(true);if(draftContext!==target)return;setQuickCapture(false);setWriter(false);renderList();$('new-note').focus();}catch(error){status('暂未保存，请保持编辑页打开：'+error.message,true);}});
 function updateKind(){
  const project=$('kind').value==='project';$('notebook-help').hidden=project;
  $('editor-kind-help').textContent=project?'记录背景、职责、过程与成果。':'写作自动暂存；选择分类后，文章会收进对应的书。';
@@ -216,10 +216,12 @@ try{const saved=localStorage.getItem('ly-writing-view-v1');if(['edit','split','p
 for(const button of document.querySelectorAll('[data-writing-view]'))button.addEventListener('click',()=>{
  writingView=button.dataset.writingView;try{localStorage.setItem('ly-writing-view-v1',writingView);}catch{}applyWritingView();schedulePreview();
 });
-if(window.ResizeObserver)new ResizeObserver(applyWritingView).observe($('writing-workspace'));
-else window.addEventListener('resize',applyWritingView);
+let writingResizeFrame=0;
+function resizeWritingView(){if(writingResizeFrame)return;writingResizeFrame=requestAnimationFrame(()=>{writingResizeFrame=0;applyWritingView();});}
+if(window.ResizeObserver)new ResizeObserver(resizeWritingView).observe($('writing-workspace'));
+else window.addEventListener('resize',resizeWritingView);
 window.addEventListener('online',()=>schedulePreview());
-window.addEventListener('pagehide',()=>{clearTimeout(previewTimer);previewController?.abort();});
+window.addEventListener('pagehide',()=>{cancelAnimationFrame(writingResizeFrame);writingResizeFrame=0;clearTimeout(previewTimer);previewController?.abort();});
 let fullReaderTools=null;
 $('preview-post').addEventListener('click',async()=>{try{const record=currentPost(false),metadata={...record};delete metadata.body;const data=await request('/api/admin/preview',{method:'POST',body:JSON.stringify({body:record.body,cover:record.cover,title:record.title,record:metadata,full:true})});fullReaderTools?.dispose();$('preview-body').innerHTML=data.html;const {setupReader}=await import('/reader-client.mjs?v=articles-v1');fullReaderTools=setupReader($('preview-body').querySelector('.reader-surface'),{onBack:()=>$('preview-dialog').close(),scrollElement:$('preview-dialog')});$('preview-dialog').showModal();}catch(error){status(error.message,true);}});
 $('close-preview').addEventListener('click',()=>$('preview-dialog').close());
@@ -371,10 +373,10 @@ async function previewPresentation(){const target=$('display-about-preview'),bod
 $('new-article-category').addEventListener('click',()=>{$('article-category-form').reset();status('',false,'article-category-status');$('article-category-dialog').showModal();$('article-category-name').focus();});
 $('cancel-article-category').addEventListener('click',()=>$('article-category-dialog').close());
 $('article-category-form').addEventListener('submit',async event=>{
- event.preventDefault();const button=$('create-article-category');if(button.disabled)return;button.disabled=true;
+ event.preventDefault();const button=$('create-article-category');if(button.disabled)return;button.disabled=true;const target=draftContext;
  try{
   const data=await request('/api/admin/organization',{method:'PUT',body:JSON.stringify({baseRevision:organizationCatalog.revision,action:'create',item:{type:'topic',name:$('article-category-name').value,description:$('article-category-description').value,archived:false}})});
   const previous=new Set(organizationCatalog.items.map(i=>i.id));const created=data.catalog.items.find(i=>!previous.has(i.id)&&i.type==='topic');if(!created)throw new Error('分类已保存，请刷新分类目录核对。');
-  const selected=currentOrganization();selected.topics=[...new Set([...selected.topics,created.id])];organizationCatalog=data.catalog;fillOrganization(selected);refreshOrganizationControls();renderOrganizationList();changed();$('article-category-dialog').close();status('已创建并选中分类，正文与草稿已保留。');
+  organizationCatalog=data.catalog;const sameDraft=draftContext===target&&!editing?.trashedAt;if(sameDraft){const selected=currentOrganization();selected.topics=[...new Set([...selected.topics,created.id])];fillOrganization(selected);changed();}refreshOrganizationControls();renderOrganizationList();$('article-category-dialog').close();status(sameDraft?'已创建并选中分类，正文与草稿已保留。':'分类已创建。当前已切换文章，请按需选择。');
  }catch(error){if(error.status===409){try{organizationCatalog=(await request('/api/admin/organization')).catalog;refreshOrganizationControls();}catch{}}status(error.message,true,'article-category-status');}finally{button.disabled=false;}
 });
