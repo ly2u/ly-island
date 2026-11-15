@@ -7,7 +7,13 @@ const notes=[note('first',[category]),note('second',[category,other]),note('thir
 let books=knowledgeBooks(posts);assert.equal(books.length,4);assert.equal(books.find(b=>b.id===category.id).notes.length,2);assert.equal(books.find(b=>b.id===other.id).notes.length,2);assert.equal(books.find(b=>b.id==='general').notes[0].slug,'unfiled');assert(!JSON.stringify(books).includes(secret.name));assert(!books.some(b=>b.notes.some(p=>p.slug===blog.slug)));assert.equal(knowledgeBooks([...posts,notes[0]]).find(b=>b.id===category.id).notes.length,2);groups++;
 assert.equal(roomRecords(posts,'library').length,5);assert.equal(roomRecords(posts,'blog').length,1);assert.equal(roomRecords([{...blog,kind:undefined}],'blog').length,1);assert.equal(recordRoom(blog,'library'),'blog');assert.equal(recordRoom(notes[0],'blog'),'library');assert.equal(recordRoom(project),'projects');assert.equal(recordRoom({...notes[0],topic:'探索'}),'library');assert.equal(roomRecords([{...blog,topic:'工程'}],'projects').length,0);groups++;
 for(const bad of ['org-1111111111111111\n','../private','__proto__','general\n','x'.repeat(100),'javascript:alert(1)'])assert.equal(validBookId(bad),false);assert.equal(searchContent(posts.map(record=>({record})),{q:'共同关键词',scope:'blog'}).length,1);assert.equal(searchContent(posts.map(record=>({record})),{q:'共同关键词',scope:'library',status:'published'}).length,5);groups++;
-for(const value of ['all','notes','blogs'])assert.equal(validatePresentation({reading:{libraryView:value}}).reading.libraryView,value);for(const value of ['shelf','catalog'])assert.throws(()=>validatePresentation({reading:{libraryView:value}));groups++;
+for (const value of ['all', 'notes', 'blogs']) {
+ assert.equal(validatePresentation({reading: {libraryView: value}}).reading.libraryView, value);
+}
+for (const value of ['shelf', 'catalog']) {
+ assert.throws(() => validatePresentation({reading: {libraryView: value}}));
+}
+groups++;
 const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ly-knowledge-'));let server;
 try{Object.assign(process.env,{DATA_DIR:dir,NODE_ENV:'test'});const {handler,initializeData}=await import('../server.mjs');initializeData();fs.writeFileSync(path.join(dir,'posts.json'),JSON.stringify(posts));fs.writeFileSync(path.join(dir,'organization.json'),JSON.stringify({schemaVersion:1,revision:1,items:[category,other,secret]}));const before=fs.readFileSync(path.join(dir,'posts.json'));server=http.createServer(handler);await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
 const home=await(await fetch(base+'/notes')).text();assert(home.includes('结构 &lt;img'));assert(home.includes('/notes?book='+category.id));assert(!home.includes('知识笔记 first'));assert(!home.includes(blog.title));assert(!home.includes(secret.name));assert(!home.includes('<img src=x'));groups++;
