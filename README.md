@@ -86,3 +86,5 @@ CivilFlow V2 继续保存在独立私有仓库 [ly2u/midas_vueflow](https://gith
 内容维护：[完整 ZIP、导入预览与本地备份](docs/CONTENT-PORTABILITY.md)。
 
 站点日常维护入口：[VPS 展示设置、岛主介绍与笔记/博客](docs/DISPLAY-SETTINGS.md)。当前优先 VPS，Cloudflare framework 实验暂不部署。
+
+后台入口按工作台、内容、小岛与管理归组，见[后台栏目说明](docs/ADMIN-NAVIGATION.md)。
