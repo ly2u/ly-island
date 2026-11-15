@@ -1,2 +1,2 @@
-import {setupReader} from './reader-client.mjs?v=knowledge-v1';
+import {setupReader} from './reader-client.mjs?v=code-tools-v1';
 const root=document.querySelector('.reader-surface');if(root)setupReader(root,{manageProgress:true});

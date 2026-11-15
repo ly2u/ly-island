@@ -1,3 +1,5 @@
+let previewCodeTools=null;const codeToolsReady=import('/code-blocks.mjs?v=code-tools-v1').catch(()=>null);
+import('/code-policy.mjs?v=code-tools-v1').then(({CODE_LANGUAGES})=>{const select=document.getElementById('code-language');for(const language of CODE_LANGUAGES.filter(i=>i.id!=='text')){const option=document.createElement('option');option.value=language.id;option.textContent=language.label;select.append(option);}}).catch(()=>{});
 const $=id=>document.getElementById(id);
 let layoutCore=null,layoutHistory=null,savedLayout=null,layoutCompare=null,layoutBatch=false;import('/layout-history.mjs?v=polish-v1').then(core=>{layoutCore=core;if(island){layoutHistory=new core.LayoutHistory(core.sceneState(savedLayout||island));layoutHistory.record(core.sceneState(island));}updateLayoutButtons();}).catch(()=>{});
 let maintenance=null;import('/admin-status.mjs?v=polish-v1').then(core=>{maintenance=core.maintenancePanel({request});if(currentView==='maintenance')maintenance.refresh();}).catch(()=>{});
@@ -172,7 +174,8 @@ async function showMedia(purpose){mediaPurpose=purpose;
  catch(error){$('media-status').textContent=error.message;}
 }
 $('close-media').addEventListener('click',()=>$('media-dialog').close());
-const formats={table:()=>insert('\n\n| 参数 | 数值 | 单位 |\n| --- | ---: | --- |\n| 跨径 L | 30 | m |\n','\n',''),formula:()=>insert('\n\n$$\n','\n$$\n','M = \\frac{qL^2}{8}'),heading:()=>insert('\n\n## ','\n','小标题'),list:()=>insert('\n- ','\n','一条要点'),quote:()=>insert('\n\n> ','\n','想留下的一句话'),code:()=>insert('\n\n```\n','\n```\n',''),link:()=>insert('[','](https://example.com)','链接文字')};
+$('code-language').addEventListener('input',event=>event.stopPropagation());
+const formats={table:()=>insert('\n\n| 参数 | 数值 | 单位 |\n| --- | ---: | --- |\n| 跨径 L | 30 | m |\n','\n',''),formula:()=>insert('\n\n$$\n','\n$$\n','M = \\frac{qL^2}{8}'),heading:()=>insert('\n\n## ','\n','小标题'),list:()=>insert('\n- ','\n','一条要点'),quote:()=>insert('\n\n> ','\n','想留下的一句话'),code:()=>insert('\n\n```'+$('code-language').value+'\n','\n```\n',''),link:()=>insert('[','](https://example.com)','链接文字')};
 for(const b of document.querySelectorAll('[data-format]'))b.addEventListener('click',()=>formats[b.dataset.format]());
 $('project-outline').addEventListener('click',()=>insert('\n\n## 项目背景\n\n\n## 我做了什么\n\n\n## 阶段成果\n\n\n## 经验与反思\n\n'));
 function updatePreviewMeta(){
@@ -180,7 +183,7 @@ function updatePreviewMeta(){
 }
 function schedulePreview(reset=false){
  clearTimeout(previewTimer);previewController?.abort();const epoch=++previewEpoch;updatePreviewMeta();
- if(reset){$('live-preview-body').dispatchEvent(new Event('preview-reset'));previewRendered=null;$('live-preview-body').replaceChildren(text('p','写下内容，排版会在这里出现。','preview-empty'));}
+ if(reset){$('live-preview-body').dispatchEvent(new Event('preview-reset'));previewRendered=null;previewCodeTools?.dispose();previewCodeTools=null;$('live-preview-body').replaceChildren(text('p','写下内容，排版会在这里出现。','preview-empty'));}
  $('live-preview-error').hidden=true;$('live-preview-status').textContent='等待更新';
  if($('writing-workspace').dataset.layout==='edit'||$('content-workspace').hidden)return;
  previewTimer=setTimeout(()=>refreshPreview(epoch),220);
@@ -193,9 +196,9 @@ async function refreshPreview(epoch){
  const timeout=setTimeout(()=>controller.abort('timeout'),15000);$('live-preview-status').textContent='正在更新…';
  try{
   const data=await request('/api/admin/preview',{method:'POST',body:snapshot,signal:controller.signal});
-  if(epoch!==previewEpoch||controller.signal.aborted)return;
-  $('live-preview-body').innerHTML=data.html||'<p class="preview-empty">写下内容，排版会在这里出现。</p>';
-  previewRendered=snapshot;$('live-preview-status').textContent='已同步';$('live-preview-body').dispatchEvent(new CustomEvent('preview-rendered',{detail:{body:JSON.parse(snapshot).body}}));
+  const codeModule=await codeToolsReady;if(epoch!==previewEpoch||controller.signal.aborted)return;
+  previewCodeTools?.dispose();$('live-preview-body').innerHTML=data.html||'<p class="preview-empty">写下内容，排版会在这里出现。</p>';
+  previewCodeTools=codeModule?.setupCodeBlocks($('live-preview-body'));previewRendered=snapshot;$('live-preview-status').textContent='已同步';$('live-preview-body').dispatchEvent(new CustomEvent('preview-rendered',{detail:{body:JSON.parse(snapshot).body}}));
  }catch(error){
   if(epoch!==previewEpoch||(controller.signal.aborted&&controller.signal.reason!=='timeout'))return;
   $('live-preview-status').textContent='尚未同步';
@@ -221,9 +224,9 @@ function resizeWritingView(){if(writingResizeFrame)return;writingResizeFrame=req
 if(window.ResizeObserver)new ResizeObserver(resizeWritingView).observe($('writing-workspace'));
 else window.addEventListener('resize',resizeWritingView);
 window.addEventListener('online',()=>schedulePreview());
-window.addEventListener('pagehide',()=>{cancelAnimationFrame(writingResizeFrame);writingResizeFrame=0;clearTimeout(previewTimer);previewController?.abort();});
+window.addEventListener('pagehide',event=>{if(!event.persisted)previewCodeTools?.dispose();cancelAnimationFrame(writingResizeFrame);writingResizeFrame=0;clearTimeout(previewTimer);previewController?.abort();});
 let fullReaderTools=null;
-$('preview-post').addEventListener('click',async()=>{try{const record=currentPost(false),metadata={...record};delete metadata.body;const data=await request('/api/admin/preview',{method:'POST',body:JSON.stringify({body:record.body,cover:record.cover,title:record.title,record:metadata,full:true})});fullReaderTools?.dispose();$('preview-body').innerHTML=data.html;const {setupReader}=await import('/reader-client.mjs?v=articles-v1');fullReaderTools=setupReader($('preview-body').querySelector('.reader-surface'),{onBack:()=>$('preview-dialog').close(),scrollElement:$('preview-dialog')});$('preview-dialog').showModal();}catch(error){status(error.message,true);}});
+$('preview-post').addEventListener('click',async()=>{try{const record=currentPost(false),metadata={...record};delete metadata.body;const data=await request('/api/admin/preview',{method:'POST',body:JSON.stringify({body:record.body,cover:record.cover,title:record.title,record:metadata,full:true})});fullReaderTools?.dispose();$('preview-body').innerHTML=data.html;const {setupReader}=await import('/reader-client.mjs?v=code-tools-v1');fullReaderTools=setupReader($('preview-body').querySelector('.reader-surface'),{onBack:()=>$('preview-dialog').close(),scrollElement:$('preview-dialog')});$('preview-dialog').showModal();}catch(error){status(error.message,true);}});
 $('close-preview').addEventListener('click',()=>$('preview-dialog').close());
 $('export-post').addEventListener('click',()=>{const post=currentPost(Boolean(editing?.published)),metadata={title:post.title,kind:post.kind,date:post.date,topic:post.topic,summary:post.summary,cover:post.cover,project:post.project,organization:post.organization};const value='---\n'+Object.entries(metadata).map(([k,v])=>k+': '+JSON.stringify(v)).join('\n')+'\n---\n\n'+post.body+'\n';const url=URL.createObjectURL(new Blob([value],{type:'text/markdown;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=(post.title.replace(/[\\/:*?"<>|]/g,'').slice(0,60)||'一条记录')+'.md';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 const CONTENT_VIEWS=['content','articles','projects','drafts','trash'];

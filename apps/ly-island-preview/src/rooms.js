@@ -1,3 +1,4 @@
+import {validCodeLanguage} from '../../rqly-sites/public/rqly/code-policy.mjs';
 import {defaultPresentation} from '../../rqly-sites/public/rqly/presentation-core.mjs';
 import {articleLink,inPlaceClick} from '../../rqly-sites/public/rqly/navigation.mjs';
 import {setupReader} from '../../rqly-sites/public/rqly/reader-client.mjs';
@@ -41,6 +42,8 @@ export function articleFragment(html){
   const out=mathTags.has(tag)?document.createElementNS('http://www.w3.org/1998/Math/MathML',tag):allowed.has(tag)?document.createElement(tag):fragment;
   if(mathTags.has(tag)){for(const name of MATH_ATTRIBUTES){const value=node.getAttribute(name);if(value!==null&&validMathAttribute(name,value))out.setAttribute(name,value);}}
   if(out.nodeType===Node.ELEMENT_NODE){const classes=(node.getAttribute('class')||'').split(/\s+/).filter(value=>ARTICLE_CLASSES.includes(value));if(classes.length)out.setAttribute('class',classes.join(' '));if(tag==='ol'&&/^\d{1,6}$/.test(node.getAttribute('start')||''))out.setAttribute('start',node.getAttribute('start'));if(tag==='div'&&classes.includes('content-table')){out.setAttribute('role','region');out.setAttribute('tabindex','0');out.setAttribute('aria-label','数据表格，可横向滚动');}}
+  if(tag==='pre'&&node.getAttribute('tabindex')==='0')out.setAttribute('tabindex','0');
+  if(tag==='div'&&out.nodeType===Node.ELEMENT_NODE&&out.classList.contains('code-block')&&validCodeLanguage(node.getAttribute('data-code-language')))out.setAttribute('data-code-language',node.getAttribute('data-code-language'));
   if(node.tagName==='A'){
    const href=node.getAttribute('href'),url=validArticleLink(href)?safeLink(href):null;
    if(url){out.href=url.href;if(url.origin!==location.origin){out.target='_blank';out.rel='noopener noreferrer';}}
@@ -155,7 +158,7 @@ export class IslandRooms {
   this.readerTools?.dispose();document.title=p.title+' · '+this.baseTitle;this.content.innerHTML=renderReader(p,'',{room:this.room,author:this.presentation.owner.name,signature:this.presentation.home.brand});if(this.room==='blog')this.content.prepend(this.ownerNavigation());
   const surface=this.content.querySelector('.reader-surface'),body=surface.querySelector('.article-body');body.append(articleFragment(html));this.spread=surface.querySelector('.reader-spread');
   const firstMatch=highlightArticleMatches(body,this.searchStates?.get(this.room==='search'?'':this.room==='library'&&this.bookId?'library:'+this.bookId:this.room)?.q||'');
-  this.readerTools=setupReader(surface,{initialFont:this.font,onFont:size=>{this.font=size;},onBack:()=>this.open(this.room,null,this.collectionId,this.bookId),onCollection:id=>this.openCollection(id),onRecord:(slug,room)=>this.open(room||this.room,slug)});
+  this.readerTools=setupReader(surface,{scrollElement:this.scroll,initialFont:this.font,onFont:size=>{this.font=size;},onBack:()=>this.open(this.room,null,this.collectionId,this.bookId),onCollection:id=>this.openCollection(id),onRecord:(slug,room)=>this.open(room||this.room,slug)});
   const records=this.room==='library'&&this.bookId?(findCategoryBook(knowledgeBooks(this.callbacks.posts()),this.bookId)?.notes||[]):p.organizationDetails?.series?seriesRecords(this.callbacks.posts(),p.organizationDetails.series.id):this.room==='search'?this.callbacks.posts():roomRecords(this.callbacks.posts(),this.room),at=records.findIndex(item=>item.slug===p.slug),neighbours=surface.querySelector('.reading-neighbours');
   for(const [item,label] of [[records[at-1],'← 上一篇'],[records[at+1],'下一篇 →']])if(item)neighbours.append(articleLink(label+' · '+item.title,'',item.slug,()=>this.open(this.room,item.slug)));
   this.renderRelatedRecords(p,surface.querySelector('[data-reader-related]'));
