@@ -4,7 +4,7 @@ import {defaultIsland,createIslandStore,validateIsland,publicIsland} from '../is
 import {roomRecords,recommendedRecords,readingPositions,resumableRecord,relatedRecords,recordRoom,readingHref,validRecordSlug} from '../public/rqly/island-content.mjs';
 
 let groups=0;
-const record=(slug,extra={})=>({slug,title:'公开 '+slug,summary:'合成验证记录',date:'2026-11-06',kind:'blog',topic:'记录',published:true,body:'## 线索\n合成正文',...extra});
+const record=(slug,extra={})=>({slug,title:'公开 '+slug,summary:'合成验证记录',date:'2026-11-06',kind:'note',topic:'记录',published:true,body:'## 线索\n合成正文',...extra});
 const posts=[record('recent'),record('older'),record('engineering',{topic:'工程'}),record('project',{kind:'project',topic:'工程',project:{status:'active'}}),record('explore',{topic:'探索'}),record('private',{published:false,title:'PRIVATE TITLE'}),record('trashed',{trashedAt:'2026-11-06T00:00:00Z'})];
 assert.equal(roomRecords(posts,'library').length,4);assert.equal(roomRecords(posts,'projects').length,2);assert.equal(roomRecords(posts,'workshop').length,1);groups++;
 for(const slug of ['ok\n','ok\r','-bad','bad-','bad--slug','javascript:alert(1)','../private','__proto__','x'.repeat(81),'中文'])assert.equal(validRecordSlug(slug),false,JSON.stringify(slug));groups++;

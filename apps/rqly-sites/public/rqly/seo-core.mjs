@@ -1,4 +1,4 @@
-import {isPublicRecord,validRecordSlug} from './island-content.mjs';
+import {isPublicRecord,validRecordSlug,knowledgeBooks} from './island-content.mjs';
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function contentDate(value){
  if(typeof value!=='string'||!/^\d{4}-\d\d-\d\d(?:T\d\d:\d\d:\d\d(?:\.\d{1,6})?(?:Z|[+-]\d\d:\d\d))?$/.test(value))return '';
@@ -10,16 +10,17 @@ export function contentDate(value){
 export function articleSEO(post,{url,updatedAt}={}){
  if(!isPublicRecord(post)||!validRecordSlug(post.slug))return null;
  try{const u=new URL(url);if(!['https:','http:'].includes(u.protocol)||u.username||u.password||u.search||u.hash||u.pathname!=='/notes/'+encodeURIComponent(post.slug))return null;
- const published=contentDate(post.date),modified=contentDate(updatedAt);return {url:u.href,origin:u.origin,type:post.kind==='blog'?'BlogPosting':'Article',published,modified:modified&&Date.parse(modified)<=Date.now()?modified:''};
+ const published=contentDate(post.date),modified=contentDate(updatedAt);return {url:u.href,origin:u.origin,type:!post.kind||post.kind==='blog'?'BlogPosting':'Article',published,modified:modified&&Date.parse(modified)<=Date.now()?modified:''};
  }catch{return null;}
 }
 export function breadcrumbs(post,seo){
  if(!seo)return '';
- const links=[['首页',seo.origin+'/'],['全部记录',seo.origin+'/notes'],[post.title,seo.url]];
+ const links=[['首页',seo.origin+'/'],[post.kind==='note'?'知识笔记':post.kind==='project'?'项目档案':'岛主博客',seo.origin+(post.kind==='note'?'/notes':post.kind==='project'?'/notes?kind=project':'/blog')],[post.title,seo.url]];
  return '<nav class="reader-breadcrumbs" aria-label="当前位置" itemscope itemtype="https://schema.org/BreadcrumbList"><ol>'+links.map(([name,url],i)=>'<li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem"><a itemprop="item" href="'+escape(url)+'"><span itemprop="name">'+escape(name)+'</span></a><meta itemprop="position" content="'+(i+1)+'"></li>').join('')+'</ol></nav>';
 }
 export function sitemapXML(origin,records,now=Date.now()){
- const root=new URL(origin).origin,seen=new Set(),pages=['/','/notes','/nantan','/about','/privacy'].map(path=>({url:root+path}));
+ const root=new URL(origin).origin,seen=new Set(),pages=['/','/notes','/blog','/nantan','/about','/privacy'].map(path=>({url:root+path}));
  for(const p of records){if(!isPublicRecord(p)||!validRecordSlug(p.slug)||seen.has(p.slug))continue;seen.add(p.slug);const date=contentDate(p.updatedAt)||contentDate(p.date);pages.push({url:root+'/notes/'+encodeURIComponent(p.slug),lastmod:date&&Date.parse(date)<=now?date:''});}
+ for(const book of knowledgeBooks(records))pages.push({url:root+'/notes?book='+encodeURIComponent(book.id)});
  return '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+pages.map(p=>'<url><loc>'+escape(p.url)+'</loc>'+(p.lastmod?'<lastmod>'+escape(p.lastmod)+'</lastmod>':'')+'</url>').join('')+'</urlset>';
 }

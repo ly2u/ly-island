@@ -1,5 +1,5 @@
 import {inPlaceClick} from './navigation.mjs';
-import {readingPositions,validRecordSlug} from './island-content.mjs';
+import {readingPositions,validRecordSlug} from './island-content.mjs?v=knowledge-v1';
 const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback;}catch{return fallback;}};
 export function setupReader(root,{onBack,onFont,onRecord,onCollection,manageProgress=false,scrollElement=window,initialFont}={}){
  const controller=new AbortController(),signal=controller.signal,spread=root.querySelector('.reader-spread'),body=root.querySelector('.article-body'),toc=root.querySelector('.reader-toc');

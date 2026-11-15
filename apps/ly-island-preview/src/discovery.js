@@ -1,4 +1,4 @@
-import {recommendedRecords,resumableRecord,readingHref} from '../../rqly-sites/public/rqly/island-content.mjs';
+import {recommendedRecords,resumableRecord,readingHref,knowledgeBooks} from '../../rqly-sites/public/rqly/island-content.mjs';
 import './discovery.css';
 
 const el=(tag,cls,text)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;};
@@ -14,7 +14,7 @@ export class IslandDiscovery {
   for(const link of document.querySelectorAll('.reading-portal[data-room-link]')){
    const id=link.dataset.roomLink;if(!['library','projects','workshop'].includes(id)||!this.callbacks.loaded())continue;
    const {records,recommendations}=recommendedRecords(this.callbacks.posts(),this.callbacks.island(),id);
-   const count=id==='projects'?records.filter(p=>p.kind==='project').length+' 个项目':records.length+' 篇记录';
+   const count=id==='library'?knowledgeBooks(this.callbacks.posts()).length+' 本分类书 · '+records.length+' 篇笔记':id==='projects'?records.filter(p=>p.kind==='project').length+' 个项目':records.length+' 篇记录';
    const suffix=recommendations[0]?.title||(id==='workshop'?'CivilFlow 与七嘴已在工作台':'等待下一条记录');
    link.querySelector('small').textContent=count+' · '+suffix;
   }
