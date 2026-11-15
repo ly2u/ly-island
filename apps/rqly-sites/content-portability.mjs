@@ -8,7 +8,7 @@ import yauzl from 'yauzl';
 import sharp from 'sharp';
 import {validateRecord} from './island-store.mjs';
 import {validateEditorContent} from './editor-drafts.mjs';
-import {organizationTypes} from './public/rqly/organization-core.mjs';
+import {organizationTypes,validateBookAliases} from './public/rqly/organization-core.mjs';
 import {WITHDRAWN_IMAGE_HASHES} from './withdrawn-images.mjs';
 
 const MB=1024*1024;
@@ -26,7 +26,7 @@ function space(dir,bytes){const s=fs.statfsSync(dir);if(s.bavail*s.bsize<bytes+6
 function regular(file){const s=fs.lstatSync(file);if(!s.isFile()||s.isSymbolicLink())fail('内容存档含无效文件。');return s;}
 function catalogCheck(value){
  if(!plain(value)||value.schemaVersion!==1||!Array.isArray(value.items)||value.items.length>300)fail('目录存档格式无效。');
- const ids=new Set(),names=new Set();for(const i of value.items){const key=i?.type+':'+String(i?.name).normalize('NFKC').toLowerCase();if(!plain(i)||!/^org-[a-f0-9]{16}$/.test(i.id)||ids.has(i.id)||!Object.hasOwn(organizationTypes,i.type)||typeof i.name!=='string'||!i.name.trim()||i.name.length>60||typeof i.description!=='string'||i.description.length>200||/[\u0000-\u001f\u007f]/.test(i.name+i.description)||typeof i.archived!=='boolean'||names.has(key))fail('目录存档格式无效。');ids.add(i.id);names.add(key);}return value;
+ const ids=new Set(),names=new Set();for(const i of value.items){const key=i?.type+':'+String(i?.name).normalize('NFKC').toLowerCase();if(!plain(i)||!/^org-[a-f0-9]{16}$/.test(i.id)||ids.has(i.id)||!Object.hasOwn(organizationTypes,i.type)||typeof i.name!=='string'||!i.name.trim()||i.name.length>60||typeof i.description!=='string'||i.description.length>200||/[\u0000-\u001f\u007f]/.test(i.name+i.description)||typeof i.archived!=='boolean'||names.has(key))fail('目录存档格式无效。');ids.add(i.id);names.add(key);}try{validateBookAliases(value);}catch{fail('旧分类链接格式无效。');}return value;
 }
 const localBody=body=>body.replace(/\/media\/([a-f0-9]{32}\.webp)/g,'../media/$1');
 function markdownFile(record){const {body,...meta}=record;return '---\n'+Object.entries({...meta,...(meta.cover?{cover:localBody(meta.cover)}:{})}).map(([key,value])=>key+': '+JSON.stringify(value)).join('\n')+'\n---\n\n'+localBody(body);}
@@ -112,7 +112,7 @@ export function recoverContentImport(dataDir){
  for(const entry of [...journal.files].reverse()){const target=path.join(dataDir,entry.name);if(entry.existed){const temp=target+'.recovery.tmp';fs.copyFileSync(path.join(dir,entry.backup),temp);fs.chmodSync(temp,0o600);syncFile(temp);fs.renameSync(temp,target);}else fs.rmSync(target,{force:true});if(fs.existsSync(path.dirname(target)))syncDir(path.dirname(target));}
  syncDir(dataDir);fs.rmSync(dir,{recursive:true,force:true});
 }
-function commitFiles(dataDir,changes,{fault=()=>{}}={}){
+export function commitFiles(dataDir,changes,{fault=()=>{}}={}){
  const dir=path.join(dataDir,transactionName);fs.mkdirSync(dir,{mode:0o700});const entries=[];
  try{
   for(const [i,change] of changes.entries()){if(!targetAllowed(change.name))fail('导入目标无效。');const target=path.join(dataDir,change.name),next=path.join(dir,'next-'+i),backup='before-'+i,existed=fs.existsSync(target);if(existed){regular(target);fs.copyFileSync(target,path.join(dir,backup));fs.chmodSync(path.join(dir,backup),0o600);syncFile(path.join(dir,backup));}if(change.file)fs.copyFileSync(change.file,next);else privateWrite(next,change.value);fs.chmodSync(next,0o600);syncFile(next);entries.push({name:change.name,existed,backup,next:hash(fs.readFileSync(next)),before:existed?hash(fs.readFileSync(target)):null,stage:'next-'+i});}
@@ -143,7 +143,9 @@ export function createContentPortability(dataDir,{readPosts,organizationStore,ed
   for(const entry of bundle.records.filter(r=>r.type==='editorDraft')){const content=validateEditorContent({...entry.content,slug:'',body:rewrite(entry.content.body),cover:entry.content.cover?rewrite(entry.content.cover):''});newDrafts.push({id:'new-import-'+randomBytes(10).toString('hex'),sourceSlug:null,sourceRevision:null,revision:1,updatedAt:new Date().toISOString(),content});rows.push({title:content.title||'未命名编辑草稿',kind:content.kind,from:entry.sourceSlug||'',to:'',action:'editorDraft'});}
   if(drafts.length+newDrafts.length>100)fail('导入后自动保存草稿超过 100 份，请先整理草稿箱。',409);
   let clearedProjects=0;const all=[...posts,...newPosts];for(const p of [...newPosts,...newDrafts.map(d=>d.content)])if(p.organization){const o=p.organization;for(const [ids,type] of [[o.tags,'tag'],[o.topics,'topic'],[o.series?[o.series]:[],'series']])for(const id of ids)if(!bundle.catalog.items.some(i=>i.id===id&&i.type===type))fail('内容引用的目录不在包内。');p.organization={...o,tags:o.tags.map(id=>orgIds.get(id)),topics:o.topics.map(id=>orgIds.get(id)),series:o.series?orgIds.get(o.series):'',projectSlug:o.projectSlug?mapping.get(o.projectSlug)||o.projectSlug:''};if(p.organization.projectSlug&&(p.kind==='project'||!all.some(v=>v.slug===p.organization.projectSlug&&v.kind==='project'&&!v.trashedAt))){p.organization.projectSlug='';clearedProjects++;}}
-  return {before,newPosts,newDrafts,newMedia,nextPosts:[...posts,...newPosts],nextDrafts:[...drafts,...newDrafts],nextCatalog:{schemaVersion:1,revision:catalog.revision+1,items},summary:{rows,posts:newPosts.length,editorDrafts:newDrafts.length,skipped:rows.filter(r=>r.action==='skip').length,media:newMedia.length,catalog:items.length-catalog.items.length,history:bundle.records.filter(r=>r.type==='history').length,clearedProjects}};
+  const legacyBooks={...validateBookAliases(catalog)};for(const [alias,id]of Object.entries(validateBookAliases(bundle.catalog)))if(!legacyBooks[alias])legacyBooks[alias]=orgIds.get(id);
+  const catalogChanged=items.length!==catalog.items.length||JSON.stringify(legacyBooks)!==JSON.stringify(catalog.legacyBooks||{});
+  return {before,newPosts,newDrafts,newMedia,catalogChanged,nextPosts:[...posts,...newPosts],nextDrafts:[...drafts,...newDrafts],nextCatalog:{...catalog,schemaVersion:1,revision:catalog.revision+1,items,...(Object.keys(legacyBooks).length?{legacyBooks}:{})},summary:{rows,posts:newPosts.length,editorDrafts:newDrafts.length,skipped:rows.filter(r=>r.action==='skip').length,media:newMedia.length,catalog:items.length-catalog.items.length,history:bundle.records.filter(r=>r.type==='history').length,clearedProjects}};
  }
  return {
   initialize,maintenance,
@@ -155,7 +157,7 @@ export function createContentPortability(dataDir,{readPosts,organizationStore,ed
   }catch(error){fs.rmSync(job,{recursive:true,force:true});throw error;}});},
   confirm(input,owner){maintenance();if(active)fail('正在处理内容包，请稍后再试。',429);const plan=plans.get(input?.token);if(!plan||plan.owner!==owner)fail('导入预览已失效，请重新选择内容包。',409);if(input.confirm!==true)fail('请先确认导入预览。');mediaStore.assertIdle();if(plan.before!==state())fail('内容、目录或图片已变化，请重新预览再导入。',409);
    const changes=[];for(const image of plan.newMedia){changes.push({name:'media/'+image.name,file:image.file},{name:'media/'+image.name+'.json',value:json({...image.info,filename:image.name,url:'/media/'+image.name})});}
-   if(plan.newPosts.length)changes.push({name:'posts.json',value:json(plan.nextPosts)});if(plan.newDrafts.length)changes.push({name:'editor-drafts.json',value:json({schemaVersion:1,drafts:plan.nextDrafts})});if(plan.summary.catalog)changes.push({name:'organization.json',value:json(plan.nextCatalog)});
+   if(plan.newPosts.length)changes.push({name:'posts.json',value:json(plan.nextPosts)});if(plan.newDrafts.length)changes.push({name:'editor-drafts.json',value:json({schemaVersion:1,drafts:plan.nextDrafts})});if(plan.catalogChanged)changes.push({name:'organization.json',value:json(plan.nextCatalog)});
    try{if(changes.length)commitFiles(dataDir,changes,{fault});return {...plan.summary,rows:undefined,published:false};}finally{plans.delete(input.token);fs.rmSync(plan.job,{recursive:true,force:true});}
   },
   cancel(token,owner){const plan=plans.get(token);if(plan?.owner===owner){fs.rmSync(plan.job,{recursive:true,force:true});plans.delete(token);}return {cancelled:true};},
