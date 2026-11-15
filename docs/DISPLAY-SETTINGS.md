@@ -80,3 +80,5 @@ Caddy 继续直接提供哈希资源。首页改为将只读挂载的构建 inde
 
 共享 Caddy 还包含现有 civilflow.rqly.com → civilflow-v3-static:8080。该入口仅同步
 已有配置基线，本轮不构建、重启或管理此独立服务，也不改旧 midas.rqly.com / SecWatch。
+
+后台导航与笔记/博客的写作定位见 [ADMIN-NAVIGATION.md](ADMIN-NAVIGATION.md)。
