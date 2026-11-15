@@ -92,3 +92,10 @@ sec.ly2u.com {
     encode zstd gzip
     reverse_proxy secwatch-web:8000
 }
+
+
+# 只新增该站点块；不要用此文件覆盖共享 Caddyfile。
+civilflow.rqly.com {
+    encode zstd gzip
+    reverse_proxy civilflow-v3-static:8080
+}
