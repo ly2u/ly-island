@@ -50,7 +50,7 @@ function updateGrowth(){
  $('growth-description').textContent=postsLoaded?'已有 '+(notes+blogs)+' 篇记录 · '+projects+' 个项目':'公开记录暂时未读取';$('growth-number').textContent=postsLoaded?score+' / '+threshold:'—';$('progress-fill').style.width=Math.min(100,score/threshold*100)+'%';
  $('growth-hint').textContent=grown?'书屋加层 · 展馆扩岛 · 桥梁连接':island?.growth?.unlocked?'扩岛已解锁 · 当前选择萌芽外观':score>=threshold?'积累已达标 · 等待主人确认扩岛':'再积累 '+Math.max(0,threshold-score)+' 点，小岛就能扩展';$('growth-toggle').textContent='成长足迹 ↗';$('demo-note').hidden=true;
  growthPanel?.update();
- const recent=posts[0];$('latest-update').hidden=!recent||island?.presentation?.visibility.latest===false;if(recent){$('latest-update').textContent='最近留下 · '+recent.title;$('latest-update').href='#room='+(recent.kind==='project'?'projects':recent.kind==='note'?'library':'blog')+'&article='+recent.slug;}
+ const recent=posts[0];$('latest-update').hidden=!recent||island?.presentation?.visibility.latest===false;if(recent){$('latest-update').textContent='最近留下 · '+recent.title;$('latest-update').href='#room='+(recent.kind==='project'?'projects':'library')+'&article='+recent.slug;}
 }
 function setReadingMode(value,reason='暂时放下漂浮，留一点时间给文字。',remember=false){
  if(value&&growthPreviewState)stopGrowthPreview({restoreMode:false});
@@ -76,7 +76,7 @@ function applyIsland(value){
 function applyPresentation(p){
  const brand=document.querySelector('.identity'),symbol=document.createElement('span');symbol.className='identity-symbol';symbol.textContent=p.home.symbol;symbol.append(document.createElement('span'));const title=document.createElement('span');title.textContent=p.home.brand;const small=document.createElement('small');small.textContent=p.home.eyebrow;title.append(small);brand.replaceChildren(symbol,title);brand.setAttribute('aria-label',island.title+'首页');
  document.querySelector('.intro h1').textContent=p.home.headline;const identity=document.querySelector('.intro-identity');identity.querySelector('a').textContent=p.home.identity+' ↗';identity.hidden=!p.visibility.identity;document.querySelector('.growth-card').hidden=!p.visibility.growth;document.querySelector('.growth-heading h2').textContent=p.spaces.growthTitle;document.querySelector('.quick-nav').hidden=!p.visibility.quickNav;
- for(const link of document.querySelectorAll('.quick-nav [data-room-link]'))link.textContent=island.buildings[link.dataset.roomLink]?.name||(link.dataset.roomLink==='postoffice'?p.spaces.mailboxName:link.dataset.roomLink==='blog'?'博客':'岛主');
+ for(const link of document.querySelectorAll('.quick-nav [data-room-link]'))link.textContent=island.buildings[link.dataset.roomLink]?.name||(link.dataset.roomLink==='postoffice'?p.spaces.mailboxName:link.dataset.roomLink==='blog'?'最近文章':'岛主');
  for(const node of document.querySelectorAll('.reading-portal')){const id=node.dataset.roomLink;if(id==='postoffice'){node.querySelector('strong').textContent=p.spaces.mailboxName;node.querySelector('small').textContent=p.spaces.mailboxIntro;}else if(island.buildings[id])node.querySelector('small').textContent=island.buildings[id].description;else if(id==='about')node.querySelector('small').textContent=p.owner.tagline;}
  const tool=p.tools.find(t=>t.enabled);for(const a of document.querySelectorAll('a[data-room-link=workshop]'))a.setAttribute('href',tool?.url||'/notes?topic=探索');
  const about=document.querySelector('.top-actions [data-room-link=about]');about.textContent='岛主';

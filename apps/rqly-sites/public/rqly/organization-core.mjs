@@ -1,4 +1,4 @@
-export const organizationTypes={tag:'标签',topic:'专题',series:'系列'};
+export const organizationTypes={tag:'标签',topic:'分类',series:'系列'};
 export function validateOrganization(value={}){
  const fail=()=>{throw new Error('内容归属格式无效。');};
  if(!value||typeof value!=='object'||Array.isArray(value))fail();
