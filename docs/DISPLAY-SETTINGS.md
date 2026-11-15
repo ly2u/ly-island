@@ -77,3 +77,6 @@ Caddy 继续直接提供哈希资源。首页改为将只读挂载的构建 inde
   隐藏工具、笔记/博客、桌面三分之二与左侧返回、手机宽度及保存前后布局不变。
 
 真实线上只读验收，不重设真实密码、不创建测试文章，不发 AI / Civil 请求。
+
+共享 Caddy 还包含现有 civilflow.rqly.com → civilflow-v3-static:8080。该入口仅同步
+已有配置基线，本轮不构建、重启或管理此独立服务，也不改旧 midas.rqly.com / SecWatch。
