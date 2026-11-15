@@ -15,7 +15,7 @@ export function articleSEO(post,{url,updatedAt}={}){
 }
 export function breadcrumbs(post,seo){
  if(!seo)return '';
- const links=[['首页',seo.origin+'/'],[post.kind==='note'?'知识笔记':post.kind==='project'?'项目档案':'岛主博客',seo.origin+(post.kind==='note'?'/notes':post.kind==='project'?'/notes?kind=project':'/blog')],[post.title,seo.url]];
+ const links=[['首页',seo.origin+'/'],[post.kind==='project'?'项目档案':'分类书架',seo.origin+(post.kind==='project'?'/notes?kind=project':'/notes')],[post.title,seo.url]];
  return '<nav class="reader-breadcrumbs" aria-label="当前位置" itemscope itemtype="https://schema.org/BreadcrumbList"><ol>'+links.map(([name,url],i)=>'<li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem"><a itemprop="item" href="'+escape(url)+'"><span itemprop="name">'+escape(name)+'</span></a><meta itemprop="position" content="'+(i+1)+'"></li>').join('')+'</ol></nav>';
 }
 export function sitemapXML(origin,records,now=Date.now()){

@@ -1,3 +1,4 @@
+import {isArticle} from './island-content.mjs';
 // Shared, deterministic full-text matching. No network, model or HTML execution.
 export const fold=value=>String(value??'').normalize('NFKC').toLowerCase();
 export const terms=query=>[...new Set(fold(query).trim().split(/\s+/).filter(Boolean))];
@@ -14,10 +15,10 @@ export function searchContent(entries,{q='',kind='',status='',topic='',scope='',
  const words=terms(q),results=[];
  for(const entry of entries){
   const p=entry.record,type=entry.type||'post',recordKind=p.kind||'blog',state=type==='editorDraft'?'editing':p.trashedAt?'trash':p.published?'published':'draft';
-  if(kind&&recordKind!==kind||topic&&p.topic!==topic)continue;
+  if(kind&&(kind==='article'?!isArticle(p):recordKind!==kind)||topic&&p.topic!==topic)continue;
   if(organization&&!((p.organization?.tags||[]).includes(organization)||(p.organization?.topics||[]).includes(organization)||p.organization?.series===organization))continue;
   if(status==='trash'?state!=='trash':state==='trash'||status==='published'&&state!=='published'||status==='draft'&&!['draft','editing'].includes(state))continue;
-  if(scope==='library'&&recordKind!=='note'||scope==='blog'&&recordKind!=='blog'||scope==='projects'&&recordKind!=='project'&&(recordKind!=='note'||p.topic!=='工程')||scope==='workshop'&&(recordKind!=='note'||p.topic!=='探索'))continue;
+  if(scope==='library'&&!isArticle(p)||scope==='blog'&&!isArticle(p)||scope==='projects'&&recordKind!=='project'&&(!isArticle(p)||p.topic!=='工程')||scope==='workshop'&&(!isArticle(p)||p.topic!=='探索'))continue;
   const title=plainText(p.title),summary=plainText(p.summary),body=plainText(words.length?p.body:String(p.body||'').slice(0,240)),fields={title,summary,body,topic:p.topic,organization:[...(p.organizationDetails?.tags||[]),...(p.organizationDetails?.topics||[]),p.organizationDetails?.series].filter(Boolean).map(i=>i.name).join(' '),project:[p.project?.role,p.project?.period,p.organizationDetails?.project?.title].filter(Boolean).join(' ')},folded=Object.fromEntries(Object.entries(fields).map(([name,value])=>[name,fold(value)])),joined=Object.values(folded).join('\n');
   if(!words.every(word=>joined.includes(word)))continue;
   const matched=Object.entries(folded).filter(([,value])=>words.some(word=>value.includes(word))).map(([name])=>name);
