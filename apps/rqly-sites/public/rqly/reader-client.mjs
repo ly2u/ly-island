@@ -29,7 +29,7 @@ function trackOutline(root,headings,toc,scrollElement,signal){
  };
  const queue=()=>{if(!signal.aborted&&!frame)frame=requestAnimationFrame(update);};
  for(const [index,button]of buttons.entries())button.addEventListener('click',()=>{
-  forced=index;forcedUntil=Date.now()+900;manualUntil=0;select(index);
+  forced=index;forcedUntil=Date.now()+900;manualUntil=0;select(index);if(details&&(matchMedia('(max-width:1024px)').matches||root.clientWidth<=760))details.open=false;
   headings[index].scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});queue();
  },{signal});
  for(const type of ['wheel','touchstart','pointerdown','keydown']){
