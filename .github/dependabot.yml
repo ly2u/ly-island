@@ -4,24 +4,45 @@ updates:
     directory: /apps/rqly-sites
     schedule:
       interval: weekly
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 2
+    groups:
+      sites-maintenance:
+        patterns: ["*"]
+        update-types: [minor, patch]
   - package-ecosystem: npm
     directory: /apps/ly-island-preview
     schedule:
       interval: weekly
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 2
+    groups:
+      island-maintenance:
+        patterns: ["*"]
+        update-types: [minor, patch]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 1
+    groups:
+      ci-actions:
+        patterns: ["*"]
   - package-ecosystem: docker
     directory: /apps/rqly-sites
     schedule:
       interval: weekly
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 1
+    # Node major upgrades are reviewed separately; production stays on Node 24.
+    ignore:
+      - dependency-name: library/node
+        update-types: ["version-update:semver-major"]
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: docker
     directory: /deploy
     schedule:
       interval: weekly
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 1
+    # Node major upgrades are reviewed separately; production stays on Node 24.
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
