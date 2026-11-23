@@ -32,6 +32,8 @@ export function validatePresentation(input){
  return result;
 }
 
+export function repeatsHeadline(island){const normalize=value=>String(value??'').replace(/\s+/gu,'');return Boolean(normalize(island.description))&&normalize(island.description)===normalize(island.presentation?.home.headline);}
+
 const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // Only fixed slots in our trusted, built shell are substituted. Owner text is
 // never a template, attribute name, script, stylesheet or arbitrary HTML.
@@ -45,6 +47,7 @@ export function renderIslandHome(shell,island,origin){
  for(const [key,selector]of [['growth','class="growth-card"'],['identity','class="intro-identity"'],['quickNav','class="quick-nav"']])if(!p.visibility[key])html=html.replace(selector,selector+' hidden');
  // The no-JS links use the same building names and enabled tool list as the island.
  for(const [id,b]of Object.entries(island.buildings))html=html.replace(new RegExp('(data-building-name="'+id+'">)[^<]*','g'),(_,start)=>start+esc(b.name));
+ if(repeatsHeadline(island))html=html.replace('class="intro-description"','class="intro-description" hidden');
  const tools=p.tools.filter(t=>t.enabled).map(t=>'<a href="'+esc(t.url)+'" rel="noopener noreferrer">'+esc(t.name)+' ↗</a>').join('');
  html=html.replace(/<span data-public-tools>[\s\S]*?<\/span>/,()=>'<span data-public-tools>'+tools+'</span>');
  const tool=p.tools.find(t=>t.enabled);html=html.replace(/(<a )([^>]*href=")[^"]*("[^>]*data-room-link="workshop"[^>]*>)/g,(_,a,b,c)=>a+b+esc(tool?.url||'/notes?topic=探索')+c);

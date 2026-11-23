@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import http from 'node:http';import {scryptSync} from 'node:crypto';
-import {defaultPresentation,validatePresentation,renderIslandHome,safeToolURL} from '../public/rqly/presentation-core.mjs';import {createIslandStore,defaultIsland,publicIsland} from '../island-store.mjs';
+import {defaultPresentation,validatePresentation,renderIslandHome,safeToolURL,repeatsHeadline} from '../public/rqly/presentation-core.mjs';import {createIslandStore,defaultIsland,publicIsland} from '../island-store.mjs';
+assert(repeatsHeadline({description:'同一个 标题',presentation:{home:{headline:'同一个\n标题'}}}));assert(!repeatsHeadline({description:'自己的介绍',presentation:{home:{headline:'不同的标题'}}}));assert(!repeatsHeadline({description:'',presentation:{home:{headline:''}}}));
 let groups=0;const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ly-display-'));let server;
 try{
  const old=defaultIsland();delete old.presentation;fs.writeFileSync(path.join(dir,'island.json'),JSON.stringify(old));const store=createIslandStore(dir);assert.deepEqual(store.read().presentation,defaultPresentation());assert(!JSON.parse(fs.readFileSync(path.join(dir,'island.json'))).presentation);groups++;
