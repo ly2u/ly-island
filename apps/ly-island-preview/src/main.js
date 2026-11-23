@@ -1,4 +1,4 @@
-import {defaultPresentation} from '../../rqly-sites/public/rqly/presentation-core.mjs';
+import {defaultPresentation,repeatsHeadline} from '../../rqly-sites/public/rqly/presentation-core.mjs';
 import './style.css';
 import './owner.css';
 import {IslandRooms} from './rooms.js';
@@ -68,7 +68,7 @@ function applyIsland(value){
  for(const [id,b] of Object.entries(buttons)){const name=value.buildings[id]?.name||(id==='postoffice'?value.presentation?.spaces.mailboxName:null)||definitions[id].name;b.children[1].textContent=name;b.setAttribute('aria-label','探索'+name);}
  for(const link of document.querySelectorAll('[data-guide-room]')){const name=value.buildings[link.dataset.guideRoom]?.name||(link.dataset.guideRoom==='postoffice'?value.presentation?.spaces.mailboxName:null)||definitions[link.dataset.guideRoom].name;link.setAttribute('aria-label','走进'+name);link.querySelector('title').textContent=name;link.querySelector('text').textContent=[...name].slice(0,6).join('');}
  for(const label of document.querySelectorAll('[data-building-name]'))label.textContent=value.buildings[label.dataset.buildingName]?.name||definitions[label.dataset.buildingName].name;
- applyPresentation(value.presentation||defaultPresentation());$('island-description').textContent=value.description;$('island-description').title=value.description;document.body.classList.toggle('dusk',dusk);
+ applyPresentation(value.presentation||defaultPresentation());$('island-description').textContent=value.description;$('island-description').title=value.description;$('island-description').hidden=repeatsHeadline(value);document.body.classList.toggle('dusk',dusk);
  $('light-toggle').setAttribute('aria-pressed',String(dusk));$('light-toggle').querySelector('span').textContent=dusk?'暮色':'午后';
  scene?.updateIsland(value);if(scene){scene.canvas.dataset.revision=String(value.revision);scene.setArrange(arranging);}
  updateGrowth();rooms.refresh();discovery?.refresh();
@@ -79,7 +79,7 @@ function applyPresentation(p){
  for(const link of document.querySelectorAll('.quick-nav [data-room-link]'))link.textContent=island.buildings[link.dataset.roomLink]?.name||(link.dataset.roomLink==='postoffice'?p.spaces.mailboxName:link.dataset.roomLink==='blog'?'最近文章':'岛主');
  for(const node of document.querySelectorAll('.reading-portal')){const id=node.dataset.roomLink;if(id==='postoffice'){node.querySelector('strong').textContent=p.spaces.mailboxName;node.querySelector('small').textContent=p.spaces.mailboxIntro;}else if(island.buildings[id])node.querySelector('small').textContent=island.buildings[id].description;else if(id==='about')node.querySelector('small').textContent=p.owner.tagline;}
  const tool=p.tools.find(t=>t.enabled);for(const a of document.querySelectorAll('a[data-room-link=workshop]'))a.setAttribute('href',tool?.url||'/notes?topic=探索');
- const about=document.querySelector('.top-actions [data-room-link=about]');about.textContent='岛主';
+ for(const about of document.querySelectorAll('.top-actions [data-room-link=about]'))about.textContent='岛主';
  document.title=p.home.seoTitle;for(const selector of ['meta[name=description]','meta[property="og:description"]'])document.querySelector(selector)?.setAttribute('content',p.home.seoDescription);document.querySelector('meta[property="og:title"]')?.setAttribute('content',p.home.seoTitle);rooms.baseTitle=p.home.seoTitle;
  const noScript=document.querySelector('.no-script');if(noScript){noScript.querySelector('h2').textContent=island.title;noScript.querySelector('p').textContent=island.description;}
 }
@@ -131,6 +131,9 @@ async function startScene(){
  }catch{if(attempt===sceneAttempt)unavailable();}
  finally{if(attempt!==sceneAttempt||readingMode)clearTimeout(timeout);}
 }
+const topMenu=$('top-menu');
+document.addEventListener('click',event=>{if(topMenu.open&&(!topMenu.contains(event.target)||event.target.closest('a')))topMenu.open=false;});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&topMenu.open){topMenu.open=false;topMenu.querySelector('summary').focus();event.preventDefault();}});
 boot();
 fetch('/api/auth/session').then(r=>r.json()).then(data=>{if(data.authenticated){$('account-entry').href='/admin';$('account-entry').textContent='管理平台';}}).catch(()=>{});
 $('growth-toggle').addEventListener('click',()=>{growthPanel.open();});$('latest-update').addEventListener('click',event=>{event.preventDefault();const p=posts[0];if(p)rooms.open(p.kind==='project'?'projects':'library',p.slug);});

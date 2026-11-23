@@ -1,11 +1,11 @@
 import {setupCodeBlocks} from './code-blocks.mjs?v=code-tools-v1';
 import {inPlaceClick} from './navigation.mjs';
-import {readingPositions,validRecordSlug} from './island-content.mjs?v=knowledge-v1';
+import {readingPositions,validRecordSlug} from './island-content.mjs';
 const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback;}catch{return fallback;}};
 function trackOutline(root,headings,toc,scrollElement,signal){
- const buttons=[...toc.querySelectorAll('.toc-item')];let frame=0,active=-1,manualUntil=0,forced=null,forcedUntil=0;
+ const buttons=[...toc.querySelectorAll('.toc-item')];let frame=0,active=-1,manualUntil=0,forced=null,forcedUntil=0;const details=root.querySelector('.reader-outline'),current=root.querySelector('.toc-current');
  const reveal=button=>{
-  if(!button||Date.now()<manualUntil)return;
+  if(!button||!toc.clientHeight||Date.now()<manualUntil)return;
   const bounds=toc.getBoundingClientRect(),item=button.getBoundingClientRect(),gap=8;
   if(item.top<bounds.top+gap)toc.scrollTop-=bounds.top+gap-item.top;
   else if(item.bottom>bounds.bottom-gap)toc.scrollTop+=item.bottom-bounds.bottom+gap;
@@ -14,14 +14,13 @@ function trackOutline(root,headings,toc,scrollElement,signal){
  };
  const select=index=>{
   if(index<0)return;
-  if(active!==index){if(buttons[active])buttons[active].removeAttribute('aria-current');buttons[index].setAttribute('aria-current','location');active=index;}
+  if(active!==index){if(buttons[active])buttons[active].removeAttribute('aria-current');buttons[index].setAttribute('aria-current','location');active=index;if(current)current.textContent=headings[index].textContent;}
   reveal(buttons[index]);
  };
  const update=()=>{
   frame=0;if(signal.aborted||!root.isConnected||!headings.length)return;
   const view=scrollElement===window?{top:0,height:innerHeight}:scrollElement.getBoundingClientRect(),margin=root.querySelector('.reader-margin');
   const available=Math.max(160,Math.floor(view.height-(parseFloat(getComputedStyle(margin).top)||0)-16))+'px';if(root.style.getPropertyValue('--reader-outline-height')!==available)root.style.setProperty('--reader-outline-height',available);
-  if(!toc.clientHeight)return;
   if(forced!==null&&Date.now()<forcedUntil){select(forced);return;}
   forced=null;
   const anchor=view.top+Math.min(130,view.height*.22);
@@ -30,7 +29,7 @@ function trackOutline(root,headings,toc,scrollElement,signal){
  };
  const queue=()=>{if(!signal.aborted&&!frame)frame=requestAnimationFrame(update);};
  for(const [index,button]of buttons.entries())button.addEventListener('click',()=>{
-  forced=index;forcedUntil=Date.now()+900;manualUntil=0;select(index);
+  forced=index;forcedUntil=Date.now()+900;manualUntil=0;select(index);if(details&&(matchMedia('(max-width:1024px)').matches||root.clientWidth<=760))details.open=false;
   headings[index].scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});queue();
  },{signal});
  for(const type of ['wheel','touchstart','pointerdown','keydown']){
@@ -38,7 +37,8 @@ function trackOutline(root,headings,toc,scrollElement,signal){
   scrollElement.addEventListener(type,event=>{if(!toc.contains(event.target)){manualUntil=0;forced=null;queue();}},{passive:true,signal});
  }
  scrollElement.addEventListener('scroll',queue,{passive:true,signal});window.addEventListener('resize',queue,{passive:true,signal});root.addEventListener('load',queue,{capture:true,signal});
- const observer=window.ResizeObserver?new ResizeObserver(queue):null;observer?.observe(root.querySelector('.article-body'));
+ let syncDetails=()=>{};if(details){const compact=matchMedia('(max-width:1024px)');let wasCompact;syncDetails=()=>{const next=compact.matches||root.clientWidth<=760;if(next!==wasCompact){details.open=!next;wasCompact=next;}queue();};syncDetails();compact.addEventListener('change',syncDetails,{signal});window.addEventListener('resize',syncDetails,{passive:true,signal});details.addEventListener('toggle',queue,{signal});}
+ const observer=window.ResizeObserver?new ResizeObserver(()=>{syncDetails();queue();}):null;observer?.observe(root.querySelector('.article-body'));observer?.observe(root);
  document.fonts?.ready.then(queue);queue();
  return {refresh:queue,dispose(){cancelAnimationFrame(frame);observer?.disconnect();}};
 }
