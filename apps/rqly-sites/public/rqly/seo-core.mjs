@@ -19,7 +19,7 @@ export function breadcrumbs(post,seo){
  return '<nav class="reader-breadcrumbs" aria-label="当前位置" itemscope itemtype="https://schema.org/BreadcrumbList"><ol>'+links.map(([name,url],i)=>'<li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem"><a itemprop="item" href="'+escape(url)+'"><span itemprop="name">'+escape(name)+'</span></a><meta itemprop="position" content="'+(i+1)+'"></li>').join('')+'</ol></nav>';
 }
 export function sitemapXML(origin,records,now=Date.now()){
- const root=new URL(origin).origin,seen=new Set(),pages=['/','/notes','/blog','/nantan','/about','/privacy'].map(path=>({url:root+path}));
+ const root=new URL(origin).origin,seen=new Set(),pages=['/','/notes','/blog','/about','/privacy'].map(path=>({url:root+path}));
  for(const p of records){if(!isPublicRecord(p)||!validRecordSlug(p.slug)||seen.has(p.slug))continue;seen.add(p.slug);const date=contentDate(p.updatedAt)||contentDate(p.date);pages.push({url:root+'/notes/'+encodeURIComponent(p.slug),lastmod:date&&Date.parse(date)<=now?date:''});}
  for(const book of knowledgeBooks(records))pages.push({url:root+'/notes?book='+encodeURIComponent(book.id)});
  return '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+pages.map(p=>'<url><loc>'+escape(p.url)+'</loc>'+(p.lastmod?'<lastmod>'+escape(p.lastmod)+'</lastmod>':'')+'</url>').join('')+'</urlset>';
