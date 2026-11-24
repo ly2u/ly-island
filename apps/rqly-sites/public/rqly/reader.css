@@ -74,3 +74,5 @@
 @container (max-width:760px){.reader-surface .article-body :is(h2,h3,h4){scroll-margin-top:128px}}
 @media(max-width:1024px){.reader-surface.has-long-toc .reader-margin{padding-block:8px}}
 @container (max-width:760px){.reader-surface.has-long-toc .reader-margin{padding-block:8px}}
+
+.keeper-end-actions :is(a,button){min-height:44px;display:inline-flex;align-items:center}
