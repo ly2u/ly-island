@@ -11,7 +11,7 @@ export function defaultPresentation(){return {
  home:{brand:'记录与求索',symbol:'LY',eyebrow:'MY LITTLE WORLD',headline:'把日常的积累，\n建成自己的世界。',identity:'LY · 桥梁工程与数字工具实践',seoTitle:'LY 的浮空岛 · 桥梁工程与数字工具',seoDescription:'LY 的个人小岛：桥梁工程、日常记录与数字工具实践。在书屋查阅分类文章，到岛主空间读最近文章，在工程展馆看项目。',footer:'把小的记录留下来，让认识慢慢生长。'},
  owner:{name:'LY',tagline:'记录与求索 / Record & Quest',caption:'在工程与日常之间，\n留下自己的线索。',heading:'做工程，也保持好奇。',body:'我是 LY，一名桥梁工程从业者。工作之外，我也关注桥梁遗产、历史资料，以及 AI 和数字工具能怎样帮助我们理解与记录工程。\n\n这个网站用来留下实践中的思考、读书时的线索和探索中的尝试。有些已经形成认识，有些仍是一串问题。\n\n## Record & Quest\n\nRQ 是记录与求索，LY 是我的姓名缩写。把小的记录留下来，让认识随着时间慢慢生长。\n\n### 桥梁\n\n结构、建造与长期服役，也包括桥梁连接的地方与人。\n\n### 历史\n\n从照片和档案里寻找线索，尽量让每一项判断回到证据。\n\n### 探索\n\nAI、本地模型、点云和工具实践，记录有用的尝试与问题。'},
  spaces:{library:'把记录，\n整理成自己的书架。',blog:'最近文章',blogIntro:'知识资料、个人想法与近况，都从一篇文章开始。',projects:'让一项工程，\n留下可以追溯的过程。',workshop:'把想法，\n做成用得上的东西。',mailboxName:'信箱',mailboxIntro:'看看路过的人留下的纸条，给岛主写一封信。',growthTitle:'让积累，看得见'},
- visibility:{growth:true,latest:true,quickNav:true,identity:true},reading:{libraryView:'all'},
+ visibility:{growth:true,latest:true,quickNav:false,identity:true},reading:{libraryView:'all'},
  tools:[{name:'CivilFlow',detail:'把桥梁参数连成节点工作流，校验、编译，再导出 Civil JSON。',url:'https://midas.rqly.com',tag:'工作流 · 校验 · 导出',enabled:true},{name:'七嘴',detail:'给一份稿件换三个视角，找到值得修改的表达。',url:'https://7zui.com',tag:'专业人员 · 听众 · 编辑',enabled:true}]
 };}
 const fail=message=>{throw Object.assign(new Error(message),{status:400});};

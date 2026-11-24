@@ -42,7 +42,6 @@ rqly.com {
     }
     handle_path /island/* {
         root * /srv/island
-        header Cache-Control "no-cache"
         header X-Content-Type-Options "nosniff"
         route {
             header Cache-Control "no-cache"

@@ -52,3 +52,15 @@ body.dusk .intro-description,body.dusk .intro-identity,body.dusk .quick-nav,body
 body.dusk .identity-symbol{background:#e6eee1;color:#203b30;border-color:#37544540}
 body.dusk .identity small{color:#243e33}body.dusk .scene-controls button{color:#203b30}body.dusk .scene-controls button:hover,body.dusk .scene-controls button[aria-pressed=true]{background:#ccdac5;color:#233e34}
 body.dusk .growth-actions button,body.dusk .growth-heading>span:last-child,body.dusk .latest-update{color:#31553b}body.dusk .fallback{background:#eef3e9}
+/* Keep quick links controlled by the display setting; slim down the growth widget. */
+.growth-card{width:264px;padding:13px 16px 12px;border-radius:14px}
+.growth-heading{gap:8px}
+.growth-icon{width:24px;height:24px;border-radius:8px;font-size:16px}
+.growth-heading h2{font-size:11px;margin:0}
+.growth-heading p{display:none}
+.progress-track{margin:10px 0 8px;height:3px}
+.growth-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px}
+.growth-actions>span{display:none}
+.growth-actions button{font-size:10px;gap:6px;margin-left:auto}
+.latest-update{margin-top:9px;padding-top:8px}
+@media(max-width:760px){.growth-card{width:calc(100% - 40px);padding:11px 14px 10px;bottom:78px}.growth-heading{gap:8px}.growth-icon{width:22px;height:22px;font-size:15px}.progress-track{margin:8px 0 6px}}
