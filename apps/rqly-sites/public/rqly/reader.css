@@ -173,3 +173,5 @@
 .room-action{background:#1f3d2f;color:#f7f6f0;border-radius:8px}
 .room-action:hover{background:#152c21}
 @media(max-width:760px){.room-expand{padding:5px 9px;font-size:10px}.knowledge-shelf{padding-bottom:22px}}
+
+.keeper-end-actions :is(a,button){min-height:44px;display:inline-flex;align-items:center}

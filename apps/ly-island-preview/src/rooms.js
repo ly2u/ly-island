@@ -70,16 +70,16 @@ export class IslandRooms {
   window.addEventListener('storage',event=>{if(event.key==='ly-island-reading-v1'||event.key===null){this.positions=readingPositions(readStored('ly-island-reading-v1',{}));this.callbacks.readingChanged?.();}});
   queueMicrotask(()=>this.sync());
  }
- open(room,slug=null,collection=null,book=null){const q=new URLSearchParams({room});if(slug)q.set('article',slug);if(collection||(slug&&room===this.room&&this.collectionId))q.set('collection',collection||this.collectionId);if(room==='library'&&(book||slug&&room===this.room&&this.bookId))q.set('book',book||this.bookId);this.navigate('#'+q.toString());}
+ open(room,slug=null,collection=null,book=null,view=null){const q=new URLSearchParams({room});if(slug)q.set('article',slug);if(collection||(slug&&room===this.room&&this.collectionId))q.set('collection',collection||this.collectionId);if(room==='library'&&(book||slug&&room===this.room&&this.bookId))q.set('book',book||this.bookId);if(room==='library'&&(view==='books'||view===null&&room===this.room&&this.libraryMode==='books'))q.set('view','books');this.navigate('#'+q.toString());}
  openCollection(id){this.open('search',null,id);}
 
  close(){this.navigate('');}
  navigate(hash){if(location.hash!==hash)history.pushState({islandRoom:true},'',location.pathname+location.search+hash);this.sync();}
  sync(){
-  const q=new URLSearchParams(location.hash.slice(1)),room=q.get('room'),slug=q.get('article'),collection=q.get('collection'),book=room==='library'?q.get('book'):null;
+  const q=new URLSearchParams(location.hash.slice(1)),room=q.get('room'),slug=q.get('article'),collection=q.get('collection'),book=room==='library'?q.get('book'):null,libraryMode=room==='library'&&q.get('view')==='books'?'books':'list';
   if(!Object.hasOwn(names,room)){this.token++;this.pending?.abort();this.saveProgress();this.room=null;this.slug=null;if(this.dialog.open)this.dialog.close();document.body.classList.remove('room-open');this.callbacks.selection(null);document.title=this.baseTitle;return;}
-  if(this.dialog.open&&room===this.room&&slug===this.slug&&collection===this.collectionId&&book===this.bookId)return;
-  this.saveProgress();this.token++;this.pending?.abort();this.room=room;this.slug=slug;this.collectionId=collection;this.bookId=book;document.title=this.names[room]+' · '+this.baseTitle;
+  if(this.dialog.open&&room===this.room&&slug===this.slug&&collection===this.collectionId&&book===this.bookId&&libraryMode===this.libraryMode)return;
+  this.saveProgress();this.token++;this.pending?.abort();this.room=room;this.slug=slug;this.collectionId=collection;this.bookId=book;this.libraryMode=libraryMode;document.title=this.names[room]+' · '+this.baseTitle;
   this.dialog.dataset.room=room;this.dialog.classList.toggle('has-article',Boolean(slug));document.body.classList.add('room-open');
   this.dialog.querySelector('#room-name').textContent=this.names[room];this.dialog.querySelector('#room-caption').textContent=captions[room];
   this.dialog.querySelector('.room-location').textContent=this.presentation.owner.name+' · '+this.presentation.home.brand;this.dialog.querySelector('.room-footer-hint').textContent=this.presentation.home.footer;
@@ -103,7 +103,7 @@ export class IslandRooms {
  renderLibrary(){
   const posts=roomRecords(this.callbacks.posts(),'library'),books=knowledgeBooks(posts);if(!this.callbacks.loaded()){this.content.append(this.empty('正在整理文章…'));return;}if(this.bookId){this.renderNotebook(books);return;}
   const switcher=el('nav','owner-section-tabs');switcher.setAttribute('aria-label','文章视图');
-  for(const [mode,label]of [['list','全部文章'],['books','分类书架']]){const b=button(label,'',()=>{if(this.libraryMode!==mode){this.libraryMode=mode;this.updateExpandLink();this.collection();this.scroll.scrollTop=0;}});b.setAttribute('aria-current',this.libraryMode===mode?'page':'false');switcher.append(b);}
+  for(const [mode,label]of [['list','全部文章'],['books','分类书架']]){const b=button(label,'',()=>{if(this.libraryMode!==mode)this.open('library',null,null,null,mode);});b.setAttribute('aria-current',this.libraryMode===mode?'page':'false');switcher.append(b);}
   this.content.append(switcher);
   renderSearch(this,'library');
   if(this.libraryMode==='list'){
@@ -118,7 +118,7 @@ export class IslandRooms {
   if(!books.length)shelf.append(el('p','room-empty','分类书架还在整理。发布文章后，对应分类会成为一本书。'));
   this.content.append(shelf);
  }
- renderNotebook(books){const book=findCategoryBook(books,this.bookId);const back=button('← 返回全部文章','room-text-action',()=>this.open('library'));this.content.append(back);if(!book){this.content.append(el('h2','','这本书暂时没有公开文章'),el('p','room-empty','分类可能已调整，或其中的笔记尚未公开。'));return;}const head=el('header','notebook-heading');head.append(el('p','room-eyebrow','BOOK / 分类文章'),el('h2','',book.title),el('p','',book.description),el('small','',book.notes.length+' 篇公开文章'));this.content.append(head);renderSearch(this,'library',{book:book.id});const list=el('div','notebook-list');for(const [i,p]of book.notes.entries()){const a=articleLink('','notebook-row',p.slug,()=>this.open('library',p.slug,null,book.id));a.dataset.article=p.slug;a.append(el('span','notebook-number',String(i+1).padStart(2,'0')),el('div'));a.lastChild.append(el('h3','',p.title),el('p','',p.summary),el('small','',p.date));list.append(a);}this.content.append(list);}
+ renderNotebook(books){const book=findCategoryBook(books,this.bookId);const back=button('← 返回全部文章','room-text-action',()=>this.open('library',null,null,null,'list'));this.content.append(back);if(!book){this.content.append(el('h2','','这本书暂时没有公开文章'),el('p','room-empty','分类可能已调整，或其中的笔记尚未公开。'));return;}const head=el('header','notebook-heading');head.append(el('p','room-eyebrow','BOOK / 分类文章'),el('h2','',book.title),el('p','',book.description),el('small','',book.notes.length+' 篇公开文章'));this.content.append(head);renderSearch(this,'library',{book:book.id});const list=el('div','notebook-list');for(const [i,p]of book.notes.entries()){const a=articleLink('','notebook-row',p.slug,()=>this.open('library',p.slug,null,book.id));a.dataset.article=p.slug;a.append(el('span','notebook-number',String(i+1).padStart(2,'0')),el('div'));a.lastChild.append(el('h3','',p.title),el('p','',p.summary),el('small','',p.date));list.append(a);}this.content.append(list);}
 
  renderRecommendations(){
   const {recommendations,curated}=recommendedRecords(this.callbacks.posts(),this.callbacks.island?.(),this.room);if(!recommendations.length)return;
