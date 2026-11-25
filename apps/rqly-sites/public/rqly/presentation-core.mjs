@@ -35,9 +35,10 @@ export function validatePresentation(input){
 export function repeatsHeadline(island){const normalize=value=>String(value??'').replace(/\s+/gu,'');return Boolean(normalize(island.description))&&normalize(island.description)===normalize(island.presentation?.home.headline);}
 
 const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeInlineJSON=value=>JSON.stringify(value).replace(/[<>&\u2028\u2029]/g,c=>({'<':'\\u003c','>':'\\u003e','&':'\\u0026','\u2028':'\\u2028','\u2029':'\\u2029'}[c]));
 // Only fixed slots in our trusted, built shell are substituted. Owner text is
 // never a template, attribute name, script, stylesheet or arbitrary HTML.
-export function renderIslandHome(shell,island,origin){
+export function renderIslandHome(shell,island,origin,bootstrap=null){
  const p=island.presentation||defaultPresentation(),esc=escapeHTML;
  let html=shell.replace(/<title>[\s\S]*?<\/title>/,()=>'<title>'+esc(p.home.seoTitle)+'</title>');
  for(const [property,value]of [['name="description"',p.home.seoDescription],['property="og:title"',p.home.seoTitle],['property="og:description"',p.home.seoDescription],['property="og:url"',origin+'/']]){const pattern=new RegExp('<meta '+property+' content="[^"]*">');html=html.replace(pattern,()=>'<meta '+property+' content="'+esc(value)+'">');}
@@ -51,5 +52,9 @@ export function renderIslandHome(shell,island,origin){
  const tools=p.tools.filter(t=>t.enabled).map(t=>'<a href="'+esc(t.url)+'" rel="noopener noreferrer">'+esc(t.name)+' ↗</a>').join('');
  html=html.replace(/<span data-public-tools>[\s\S]*?<\/span>/,()=>'<span data-public-tools>'+tools+'</span>');
  const tool=p.tools.find(t=>t.enabled);html=html.replace(/(<a )([^>]*href=")[^"]*("[^>]*data-room-link="workshop"[^>]*>)/g,(_,a,b,c)=>a+b+esc(tool?.url||'/notes?topic=探索')+c);
+ if(bootstrap&&typeof bootstrap==='object'){
+  const tag='<script id="island-bootstrap" type="application/json">'+safeInlineJSON(bootstrap)+'</script>';
+  html=html.includes('</body>')?html.replace('</body>',()=>tag+'</body>'):html+tag;
+ }
  return html;
 }
