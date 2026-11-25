@@ -1,18 +1,39 @@
 import {defaultPresentation,repeatsHeadline} from '../../rqly-sites/public/rqly/presentation-core.mjs';
 import './style.css';
 import './owner.css';
-import {IslandRooms} from './rooms.js';
 import {IslandDiscovery} from './discovery.js';
 import {GrowthPanel} from './growth.js';
-import {inPlaceClick} from '../../rqly-sites/public/rqly/navigation.mjs';
 import {initialVisit,interactionHint} from './visit-policy.mjs';
 import {growthStats} from '../../rqly-sites/public/rqly/growth-core.mjs';
+import {readingPositions,validRecordSlug} from '../../rqly-sites/public/rqly/island-content.mjs';
 
 
 const $=id=>document.getElementById(id);
 const definitions={library:{name:'书屋'},projects:{name:'工程展馆'},workshop:{name:'工坊'},about:{name:'岛主'},postoffice:{name:'信箱'}};
-let scene=null,grown=false,dusk=false,arranging=false,posts=[],postsLoaded=false,messageTimer,roomOpen=false,ambientPaused=false,island=null,rules=null,owner=null;
+const readStored=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback;}catch{return fallback;}};
+function roomURL(room,slug=null,collection=null,book=null){
+ if(slug&&validRecordSlug(slug))return '/notes/'+encodeURIComponent(slug);
+ if(room==='library')return book?'/notes?book='+encodeURIComponent(book):'/notes';
+ if(room==='projects')return '/notes?kind=project';
+ if(room==='workshop')return '/workshop';
+ if(room==='about')return '/about';
+ if(room==='postoffice')return '/mailbox';
+ if(room==='blog')return '/blog';
+ if(room==='search')return collection?'/search?collection='+encodeURIComponent(collection):'/search';
+ return '/notes';
+}
+function redirectLegacyHash(){
+ if(!location.hash.startsWith('#room='))return false;
+ const q=new URLSearchParams(location.hash.slice(1)),room=q.get('room');
+ if(!room)return false;
+ location.replace(roomURL(room,q.get('article'),q.get('collection'),q.get('book')));
+ return true;
+}
+if(redirectLegacyHash())throw new Error('Redirecting legacy island hash');
+window.addEventListener('hashchange',redirectLegacyHash);
+let scene=null,grown=false,dusk=false,arranging=false,posts=[],postsLoaded=false,messageTimer,island=null,rules=null,owner=null;
 let readingMode=false,sceneAttempt=0,modePaused=false,postsFailed=false,discovery=null,growthPanel=null,growthPreviewState=null,growthPreviewPending=false;
+let positions=readingPositions(readStored('ly-island-reading-v1',{}));
 let savedView=null;try{savedView=localStorage.getItem('ly-island-view');}catch{}
 const coarseInput=matchMedia('(pointer:coarse)').matches;
 const visit=initialVisit({savedView,saveData:navigator.connection?.saveData===true,coarse:coarseInput,memory:navigator.deviceMemory,cores:navigator.hardwareConcurrency});
@@ -26,23 +47,14 @@ const buttons={};
 $('labels').hidden=true;
 function message(text){$('status-message').textContent=text;clearTimeout(messageTimer);messageTimer=setTimeout(()=>{$('status-message').textContent='';},2800);}
 function highlight(id){for(const [key,b] of Object.entries(buttons))b.setAttribute('aria-pressed',String(key===id));}
-const rooms=new IslandRooms({
- posts:()=>posts,loaded:()=>postsLoaded,failed:()=>postsFailed,retry:()=>loadPublicPosts(),island:()=>island,message,
- readingChanged:()=>discovery?.refreshResume(),
- selection:id=>{
-  id=id==='blog'?'about':id;highlight(id);scene?.select(id==='search'?null:id,false);
-  if(id&&!roomOpen){ambientPaused=scene?.paused??false;scene?.setPaused(true);}
-  if(!id&&roomOpen)scene?.setPaused(ambientPaused);
-  scene?.focusBuilding(id);
-  roomOpen=Boolean(id);
- }
-});
-discovery=new IslandDiscovery({posts:()=>posts,loaded:()=>postsLoaded,failed:()=>postsFailed,island:()=>island,positions:()=>rooms.positions,clearReading:()=>rooms.clearReadingHistory()});
+function openDestination(id,slug=null){location.href=roomURL(id,slug);}
+discovery=new IslandDiscovery({posts:()=>posts,loaded:()=>postsLoaded,failed:()=>postsFailed,island:()=>island,positions:()=>positions,clearReading:()=>{positions={};try{localStorage.removeItem('ly-island-reading-v1');}catch{}discovery?.refreshResume();}});
+window.addEventListener('storage',event=>{if(event.key==='ly-island-reading-v1'||event.key===null){positions=readingPositions(readStored('ly-island-reading-v1',{}));discovery?.refreshResume();}});
 growthPanel=new GrowthPanel({posts:()=>posts,island:()=>island,loaded:()=>postsLoaded,failed:()=>postsFailed,preview:previewGrowth,stopPreview:()=>stopGrowthPreview()});
 for(const [id,d] of Object.entries(definitions)){
  const b=document.createElement('button');b.className='building-label';b.dataset.building=id;b.setAttribute('aria-label','探索'+d.name);b.setAttribute('aria-pressed','false');
  const dot=document.createElement('span');dot.setAttribute('aria-hidden','true');const text=document.createElement('span');text.textContent=d.name;const arrow=document.createElement('span');arrow.className='label-arrow';arrow.textContent='↗';arrow.setAttribute('aria-hidden','true');b.append(dot,text,arrow);
- b.addEventListener('click',()=>{if(arranging){scene?.select(id==='search'?null:id,false);highlight(id);}else rooms.open(id);});$('labels').append(b);buttons[id]=b;
+ b.addEventListener('click',()=>{if(arranging){scene?.select(id,false);highlight(id);}else openDestination(id);});$('labels').append(b);buttons[id]=b;
 }
 function updateGrowth(){
  const {notes,blogs,projects,score,threshold}=growthStats(posts,island||{});
@@ -50,13 +62,13 @@ function updateGrowth(){
  $('growth-description').textContent=postsLoaded?'已有 '+(notes+blogs)+' 篇记录 · '+projects+' 个项目':'公开记录暂时未读取';$('growth-number').textContent=postsLoaded?score+' / '+threshold:'—';$('progress-fill').style.width=Math.min(100,score/threshold*100)+'%';
  $('growth-hint').textContent=grown?'书屋加层 · 展馆扩岛 · 桥梁连接':island?.growth?.unlocked?'扩岛已解锁 · 当前选择萌芽外观':score>=threshold?'积累已达标 · 等待主人确认扩岛':'再积累 '+Math.max(0,threshold-score)+' 点，小岛就能扩展';$('growth-toggle').textContent='成长足迹 ↗';$('demo-note').hidden=true;
  growthPanel?.update();
- const recent=posts[0];$('latest-update').hidden=!recent||island?.presentation?.visibility.latest===false;if(recent){$('latest-update').textContent='最近留下 · '+recent.title;$('latest-update').href='#room='+(recent.kind==='project'?'projects':'library')+'&article='+recent.slug;}
+ const recent=posts[0];$('latest-update').hidden=!recent||island?.presentation?.visibility.latest===false;if(recent){$('latest-update').textContent='最近留下 · '+recent.title;$('latest-update').href='/notes/'+encodeURIComponent(recent.slug);}
 }
 function setReadingMode(value,reason='暂时放下漂浮，留一点时间给文字。',remember=false){
  if(value&&growthPreviewState)stopGrowthPreview({restoreMode:false});
  readingMode=value;document.body.classList.toggle('reading-mode',value);$('fallback').hidden=!value;$('loading').hidden=true;$('labels').hidden=value;
- $('fallback-reason').textContent=reason;$('view-toggle').textContent=value?'3D 小岛':'轻量导览';$('view-toggle').setAttribute('aria-pressed',String(value));
- if(scene){scene.setVisible(!value);if(value){modePaused=scene.paused;scene.setPaused(true);}else{scene.setPaused(roomOpen||modePaused);scene.resize();}}
+ $('fallback-reason').textContent=reason;$('view-toggle').textContent=value?'回到 3D 小岛':'轻量导览';$('view-toggle').setAttribute('aria-pressed',String(value));
+ if(scene){scene.setVisible(!value);if(value){modePaused=scene.paused;scene.setPaused(true);}else{scene.setPaused(modePaused);scene.resize();}}
  if(remember)try{localStorage.setItem('ly-island-view',value?'reading':'3d');}catch{}
 }
 function unavailable(){
@@ -71,16 +83,13 @@ function applyIsland(value){
  applyPresentation(value.presentation||defaultPresentation());$('island-description').textContent=value.description;$('island-description').title=value.description;$('island-description').hidden=repeatsHeadline(value);document.body.classList.toggle('dusk',dusk);
  $('light-toggle').setAttribute('aria-pressed',String(dusk));$('light-toggle').querySelector('span').textContent=dusk?'暮色':'午后';
  scene?.updateIsland(value);if(scene){scene.canvas.dataset.revision=String(value.revision);scene.setArrange(arranging);}
- updateGrowth();rooms.refresh();discovery?.refresh();
+ updateGrowth();discovery?.refresh();
 }
 function applyPresentation(p){
  const brand=document.querySelector('.identity'),symbol=document.createElement('span');symbol.className='identity-symbol';symbol.textContent=p.home.symbol;symbol.append(document.createElement('span'));const title=document.createElement('span');title.textContent=p.home.brand;const small=document.createElement('small');small.textContent=p.home.eyebrow;title.append(small);brand.replaceChildren(symbol,title);brand.setAttribute('aria-label',island.title+'首页');
  document.querySelector('.intro h1').textContent=p.home.headline;const identity=document.querySelector('.intro-identity');identity.querySelector('a').textContent=p.home.identity+' ↗';identity.hidden=!p.visibility.identity;document.querySelector('.growth-card').hidden=!p.visibility.growth;document.querySelector('.growth-heading h2').textContent=p.spaces.growthTitle;document.querySelector('.quick-nav').hidden=!p.visibility.quickNav;
- for(const link of document.querySelectorAll('.quick-nav [data-room-link]'))link.textContent=island.buildings[link.dataset.roomLink]?.name||(link.dataset.roomLink==='postoffice'?p.spaces.mailboxName:link.dataset.roomLink==='blog'?'最近文章':'岛主');
- for(const node of document.querySelectorAll('.reading-portal')){const id=node.dataset.roomLink;if(id==='postoffice'){node.querySelector('strong').textContent=p.spaces.mailboxName;node.querySelector('small').textContent=p.spaces.mailboxIntro;}else if(island.buildings[id])node.querySelector('small').textContent=island.buildings[id].description;else if(id==='about')node.querySelector('small').textContent=p.owner.tagline;}
- const tool=p.tools.find(t=>t.enabled);for(const a of document.querySelectorAll('a[data-room-link=workshop]'))a.setAttribute('href',tool?.url||'/notes?topic=探索');
- for(const about of document.querySelectorAll('.top-actions [data-room-link=about]'))about.textContent='岛主';
- document.title=p.home.seoTitle;for(const selector of ['meta[name=description]','meta[property="og:description"]'])document.querySelector(selector)?.setAttribute('content',p.home.seoDescription);document.querySelector('meta[property="og:title"]')?.setAttribute('content',p.home.seoTitle);rooms.baseTitle=p.home.seoTitle;
+ for(const node of document.querySelectorAll('.reading-portal')){const id=node.dataset.portalRoom;if(id==='postoffice'){node.querySelector('strong').textContent=p.spaces.mailboxName;node.querySelector('small').textContent=p.spaces.mailboxIntro;}else if(island.buildings[id])node.querySelector('small').textContent=island.buildings[id].description;else if(id==='about')node.querySelector('small').textContent=p.owner.tagline;}
+ document.title=p.home.seoTitle;for(const selector of ['meta[name=description]','meta[property="og:description"]'])document.querySelector(selector)?.setAttribute('content',p.home.seoDescription);document.querySelector('meta[property="og:title"]')?.setAttribute('content',p.home.seoTitle);
  const noScript=document.querySelector('.no-script');if(noScript){noScript.querySelector('h2').textContent=island.title;noScript.querySelector('p').textContent=island.description;}
 }
 async function boot(){
@@ -101,8 +110,6 @@ async function previewGrowth({signal}={}){
   await startScene();
   if(signal?.aborted){if(originReading)setReadingMode(true);return false;}
   if(!scene||readingMode||scene.contextLost){clearGrowthQuery();return false;}
-  // The scene uses its saved per-phase layouts; the island data object is untouched.
-  if(roomOpen)rooms.close();
   growthPreviewState={view:scene.captureView(),reading:originReading};scene.setArrange(false);scene.select(null,false);scene.setGrowth(true);scene.resetView();growthPanel.setPreview(true);message('扩岛预览已打开，实际外观没有改变。');return true;
  }finally{growthPreviewPending=false;}
 }
@@ -111,7 +118,7 @@ function stopGrowthPreview({restoreMode=true}={}){
  scene?.setGrowth(grown);if(scene)scene.restoreView(previous.view);growthPanel.setPreview(false);
  if(restoreMode&&previous.reading)setReadingMode(true);
 }
-window.addEventListener('keydown',event=>{if(event.key==='Escape'&&growthPreviewState&&!roomOpen&&!growthPanel.dialog.open){stopGrowthPreview();event.preventDefault();}});
+window.addEventListener('keydown',event=>{if(event.key==='Escape'&&growthPreviewState&&!growthPanel.dialog.open){stopGrowthPreview();event.preventDefault();}});
 async function startScene(){
  if(scene?.contextLost){location.reload();return;}
  if(scene){if(readingMode)setReadingMode(false);return;}
@@ -121,12 +128,11 @@ async function startScene(){
   const {IslandScene}=await import('./scene.js');if(attempt!==sceneAttempt||readingMode)return;
   loadingStage('frame');
   scene=new IslandScene($('world'),{
-   select:id=>{if(arranging)highlight(id);else if(id)rooms.open(id);},message,unavailable,
+   select:id=>{if(arranging)highlight(id);else if(id)openDestination(id);},message,unavailable,
    scenery:(phase,value)=>{if(owner){island.scenery??={};island.scenery[phase]=value;owner.changed();}},layout:(phase,layout)=>{if(owner){island.layouts[phase]=layout;owner.changed();}},
    labels:positions=>{clearTimeout(timeout);if(readingMode)return;for(const [id,p] of Object.entries(positions)){const b=buttons[id];b.style.left=p.x+'px';b.style.top=p.y+'px';b.hidden=!p.visible;}$('loading').hidden=true;}
   },island,rules);
   updateMotionButton();
-  if(roomOpen){ambientPaused=scene.paused;scene.setPaused(true);scene.focusBuilding(rooms.room);}
   $('labels').hidden=false;if(island){scene.setLight(dusk);scene.canvas.dataset.revision=String(island.revision);}
  }catch{if(attempt===sceneAttempt)unavailable();}
  finally{if(attempt!==sceneAttempt||readingMode)clearTimeout(timeout);}
@@ -136,7 +142,7 @@ document.addEventListener('click',event=>{if(topMenu.open&&(!topMenu.contains(ev
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&topMenu.open){topMenu.open=false;topMenu.querySelector('summary').focus();event.preventDefault();}});
 boot();
 fetch('/api/auth/session').then(r=>r.json()).then(data=>{if(data.authenticated){$('account-entry').href='/admin';$('account-entry').textContent='管理平台';}}).catch(()=>{});
-$('growth-toggle').addEventListener('click',()=>{growthPanel.open();});$('latest-update').addEventListener('click',event=>{event.preventDefault();const p=posts[0];if(p)rooms.open(p.kind==='project'?'projects':'library',p.slug);});
+$('growth-toggle').addEventListener('click',()=>{growthPanel.open();});
 $('reset-view').addEventListener('click',()=>{scene?.resetView();message('已回到岛屿全景');});
 $('arrange-toggle').addEventListener('click',()=>{
  if(!scene)return;arranging=!arranging;scene.setArrange(arranging);$('arrange-toggle').setAttribute('aria-pressed',String(arranging));$('arrange-hint').hidden=!arranging;
@@ -155,12 +161,9 @@ $('view-toggle').addEventListener('click',()=>{
 });
 $('retry-scene').addEventListener('click',()=>{try{localStorage.setItem('ly-island-view','3d');}catch{}startScene();});
 $('loading-reading').addEventListener('click',()=>{sceneAttempt++;setReadingMode(true,'先浏览轻量导览，需要时再打开 3D 小岛。',true);});
-for(const a of document.querySelectorAll('[data-room-link]')){
- const room=a.dataset.roomLink;a.addEventListener('click',event=>{if(!inPlaceClick(event))return;event.preventDefault();rooms.open(room);});
-}
 async function loadPublicPosts(){
- postsFailed=false;rooms.refresh();
+ postsFailed=false;
  try{const response=await fetch('/api/posts',{signal:AbortSignal.timeout(8000)});if(!response.ok)throw new Error('public posts unavailable');const data=await response.json();if(!Array.isArray(data.posts))throw new Error('invalid posts');posts=data.posts.filter(p=>p&&typeof p.slug==='string'&&typeof p.title==='string'&&typeof p.date==='string'&&p.published===true);postsLoaded=true;}catch{posts=[];postsLoaded=false;postsFailed=true;}
- updateGrowth();rooms.refresh();discovery.refresh();
+ updateGrowth();discovery.refresh();
 }
 loadPublicPosts();

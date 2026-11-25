@@ -59,7 +59,7 @@ export class IslandRooms {
  constructor(callbacks){
   this.baseTitle=document.title;this.callbacks=callbacks;this.room=null;this.slug=null;this.libraryMode='list';this.token=0;this.pending=null;this.font=Math.max(16,Math.min(22,Number(readStored('ly-island-reader-font',18))||18));this.positions=readingPositions(readStored('ly-island-reading-v1',{}));
   this.dialog=el('dialog','island-room');this.dialog.id='room-dialog';this.dialog.setAttribute('aria-labelledby','room-name');
-  this.dialog.innerHTML='<div class="room-window"><header class="room-top"><button class="room-home" id="room-close" aria-label="收起阅读空间，回到浮空岛">← <span>回到岛上</span></button><div class="room-heading"><span id="room-caption"></span><h2 id="room-name"></h2></div><nav class="room-switcher" aria-label="切换岛内空间"></nav><button class="room-close-icon" aria-label="关闭阅读空间">×</button></header><div class="room-scroll" tabindex="-1"><div class="room-content"></div></div><footer class="room-bottom"><span class="room-location">LY · 私人的小世界</span><span class="room-footer-hint">把写下的日子，放进书架</span><span class="room-coordinate">ISLAND / 01</span></footer></div>';
+  this.dialog.innerHTML='<div class="room-window"><header class="room-top"><button class="room-home" id="room-close" aria-label="收起阅读空间，回到浮空岛">← <span>回到岛上</span></button><div class="room-heading"><span id="room-caption"></span><h2 id="room-name"></h2></div><nav class="room-switcher" aria-label="切换岛内空间"></nav><a class="room-expand" id="room-expand" hidden>全页打开 ↗</a><button class="room-close-icon" aria-label="关闭阅读空间">×</button></header><div class="room-scroll" tabindex="-1"><div class="room-content"></div></div><footer class="room-bottom"><span class="room-location">LY · 私人的小世界</span><span class="room-footer-hint">把写下的日子，放进书架</span><span class="room-coordinate">ISLAND / 01</span></footer></div>';
   document.body.append(this.dialog);this.content=this.dialog.querySelector('.room-content');this.scroll=this.dialog.querySelector('.room-scroll');
   for(const id of Object.keys(names).filter(id=>id!=='blog')){const b=button(names[id],'room-tab',()=>this.open(id));b.dataset.room=id;this.dialog.querySelector('.room-switcher').append(b);}
   this.dialog.querySelector('#room-close').addEventListener('click',()=>this.close());this.dialog.querySelector('.room-close-icon').addEventListener('click',()=>this.close());
@@ -86,7 +86,13 @@ export class IslandRooms {
   this.dialog.querySelector('.room-coordinate').textContent='ISLAND / '+({library:'01',projects:'02',workshop:'03',about:this.presentation.home.symbol,postoffice:'POST',blog:'JOURNAL',search:'FIND'}[room]);
   for(const tab of this.dialog.querySelectorAll('.room-tab')){tab.textContent=this.names[tab.dataset.room];tab.setAttribute('aria-current',tab.dataset.room===(room==='blog'?'about':room)?'page':'false');}
   this.callbacks.selection(room);if(!this.dialog.open)this.dialog.showModal();
+  this.updateExpandLink();
   if(slug)this.readArticle(slug);else if(collection)this.renderDirectory(collection);else if(room==='search')this.searchCollection();else if(room==='postoffice')this.readPostOffice();else if(room==='about')this.readAbout();else if(room==='blog')this.renderBlog();else this.collection();
+ }
+ updateExpandLink(){
+  const link=this.dialog.querySelector('#room-expand');if(!link)return;
+  const href=this.slug?'/notes/'+encodeURIComponent(this.slug):this.room==='library'?(this.bookId?'/notes?book='+encodeURIComponent(this.bookId):this.libraryMode==='books'?'/notes?view=books':'/notes'):this.room==='projects'?'/notes?kind=project':this.room==='about'?'/about':this.room==='blog'?'/blog':'';
+  link.hidden=!href;if(href)link.href=href;
  }
  refresh(){if(!this.room)return;this.dialog.querySelector('#room-name').textContent=this.names[this.room];for(const tab of this.dialog.querySelectorAll('.room-tab'))tab.textContent=this.names[tab.dataset.room];if(this.slug)return;if(this.collectionId)this.renderDirectory(this.collectionId);else if(this.room==='search')this.searchCollection();else if(this.room==='postoffice')this.readPostOffice();else if(this.room==='about')this.readAbout();else if(this.room==='blog')this.renderBlog();else this.collection();}
  renderBlog(){
@@ -97,7 +103,7 @@ export class IslandRooms {
  renderLibrary(){
   const posts=roomRecords(this.callbacks.posts(),'library'),books=knowledgeBooks(posts);if(!this.callbacks.loaded()){this.content.append(this.empty('正在整理文章…'));return;}if(this.bookId){this.renderNotebook(books);return;}
   const switcher=el('nav','owner-section-tabs');switcher.setAttribute('aria-label','文章视图');
-  for(const [mode,label]of [['list','全部文章'],['books','分类书架']]){const b=button(label,'',()=>{if(this.libraryMode!==mode){this.libraryMode=mode;this.collection();}});b.setAttribute('aria-current',this.libraryMode===mode?'page':'false');switcher.append(b);}
+  for(const [mode,label]of [['list','全部文章'],['books','分类书架']]){const b=button(label,'',()=>{if(this.libraryMode!==mode){this.libraryMode=mode;this.updateExpandLink();this.collection();this.scroll.scrollTop=0;}});b.setAttribute('aria-current',this.libraryMode===mode?'page':'false');switcher.append(b);}
   this.content.append(switcher);
   renderSearch(this,'library');
   if(this.libraryMode==='list'){
@@ -108,7 +114,7 @@ export class IslandRooms {
    this.content.append(list);return;
   }
   const shelf=el('div','knowledge-shelf');shelf.dataset.style=this.presentation.reading.libraryView==='notes'?'catalog':'shelf';
-  for(const [i,book]of books.entries()){const card=el('a','category-book');card.href='/notes?book='+encodeURIComponent(book.id);card.dataset.book=book.id;card.style.setProperty('--book-index',i%3);card.append(el('span','book-edition','文章 / 分类'),el('h2','',book.title),el('p','',book.description||'按分类整理的笔记与资料。'),illustration(bookDrawing,'cover-drawing'),el('span','category-book-count',book.notes.length+' 篇文章 · 打开目录 →'));card.addEventListener('click',e=>{if(!inPlaceClick(e))return;e.preventDefault();this.open('library',null,null,book.id);});shelf.append(card);}
+  for(const [i,book]of books.entries()){const card=el('a','category-book');card.href='/notes?book='+encodeURIComponent(book.id);card.dataset.book=book.id;card.style.setProperty('--book-index',i%3);card.append(el('span','book-edition','NO. '+String(i+1).padStart(2,'0')+' · 分类书'),el('h2','',book.title),el('p','',book.description||'按分类整理的笔记与资料。'),illustration(bookDrawing,'cover-drawing'),el('span','category-book-count',book.notes.length+' 篇文章 · 打开目录 →'));card.addEventListener('click',e=>{if(!inPlaceClick(e))return;e.preventDefault();this.open('library',null,null,book.id);});shelf.append(card);}
   if(!books.length)shelf.append(el('p','room-empty','分类书架还在整理。发布文章后，对应分类会成为一本书。'));
   this.content.append(shelf);
  }

@@ -6,8 +6,12 @@ export function plainText(value){
  return String(value??'').replace(/!\[([^\]\n]*)\]\([^\s)]+\)/g,'$1').replace(/\[([^\]\n]+)\]\([^\s)]+\)/g,'$1').replace(/^```[^\n]*$/gm,'').replace(/^\s*(?:#{1,3}\s+|>\s?|[-*]\s+|\d+\.\s+)/gm,'').replace(/[`*]/g,'').replace(/\s+/g,' ').trim().normalize('NFKC');
 }
 export function highlightParts(value,query,{limit=Infinity}={}){
- const text=String(value??''),words=terms(query),lower=fold(text),ranges=[];
- for(const word of words){if(ranges.length>=limit)break;let at=0;while(ranges.length<limit&&(at=lower.indexOf(word,at))>=0){ranges.push([at,at+word.length]);at+=word.length;}}
+ const text=String(value??''),words=terms(query);
+ if(!words.length)return text?[{text,match:false}]:[];
+ let lower='',pos=0;const map=[];
+ for(const ch of text){const piece=fold(ch);for(let k=0;k<piece.length;k++)map.push([pos,pos+ch.length]);lower+=piece;pos+=ch.length;}
+ const ranges=[];
+ for(const word of words){if(ranges.length>=limit)break;let at=0;while(ranges.length<limit&&(at=lower.indexOf(word,at))>=0){ranges.push([map[at][0],map[at+word.length-1][1]]);at+=word.length;}}
  ranges.sort((a,b)=>a[0]-b[0]);const merged=[];for(const range of ranges){const last=merged.at(-1);if(last&&range[0]<=last[1])last[1]=Math.max(last[1],range[1]);else merged.push(range);}
  const parts=[];let at=0;for(const [start,end] of merged){if(start>at)parts.push({text:text.slice(at,start),match:false});parts.push({text:text.slice(start,end),match:true});at=end;}if(at<text.length)parts.push({text:text.slice(at),match:false});return parts;
 }
