@@ -14,11 +14,11 @@
   <div id="scene" aria-label="浮空岛三维场景"><canvas id="world" aria-label="可以旋转、缩放并点击建筑的浮空岛" tabindex="0"></canvas></div>
   <header class="topbar">
     <a class="identity" href="/" aria-label="LY 的浮空岛首页"><span class="identity-symbol"><span data-display="symbol">LY</span><span></span></span><span><span data-display="brand">记录与求索</span><small data-display="eyebrow">MY LITTLE WORLD</small></span></a>
-    <div class="top-actions"><a class="back-link island-search-entry" href="#room=search" data-room-link="search" aria-label="搜索全岛内容">搜索</a><button class="view-toggle" id="view-toggle" aria-pressed="false">轻量导览</button><details class="top-menu" id="top-menu"><summary aria-label="更多导航"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></summary><nav aria-label="更多导航"><a href="/notes" data-room-link="library">书屋 · 文章</a><a href="/notes?kind=project" data-room-link="projects">工程展馆</a><a href="https://midas.rqly.com" data-room-link="workshop">工坊 · 工具</a><a href="/about" data-room-link="about">岛主</a><a href="/#room=postoffice" data-room-link="postoffice">信箱</a><a href="/feed.xml">RSS 订阅</a><a class="menu-account" id="account-entry" href="/login">管理入口</a></nav></details></div>
+    <div class="top-actions"><a class="back-link island-search-entry" href="/search" aria-label="搜索全站内容">搜索</a><button class="view-toggle" id="view-toggle" aria-pressed="false">轻量导览</button><details class="top-menu" id="top-menu"><summary aria-label="更多导航"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></summary><nav aria-label="更多导航"><a href="/notes">文章</a><a href="/notes?view=books">分类书架</a><a href="/notes?kind=project">工程展馆</a><a href="/workshop">工坊</a><a href="/about">岛主</a><a href="/mailbox">信箱</a><a href="/feed.xml">RSS 订阅</a><a class="menu-account" id="account-entry" href="/login">管理入口</a></nav></details></div>
   </header>
   <section class="intro" id="intro">
     <p class="kicker"><span class="live-dot"></span><span data-display="title" id="island-label">一座开始生长的小岛</span></p>
-    <p class="intro-identity"><a data-display="identity" href="/about" data-room-link="about">LY · 桥梁工程与数字工具实践 ↗</a></p>
+    <p class="intro-identity"><a data-display="identity" href="/about">LY · 桥梁工程与数字工具实践 ↗</a></p>
     <h1 data-display="headline">把日常的积累，<br>建成自己的<span>世界。</span></h1>
     <p data-display="description" class="intro-description" id="island-description">文章在书屋，项目是展馆，<br>新的尝试，留在工坊。<br>每一点积累，都让这里多一点不同。</p>
     <div class="island-meta"><span id="island-level">LV. 01</span><span class="meta-line"></span><span id="island-state">初始小岛</span></div>
@@ -39,25 +39,133 @@
   </div>
   <p class="interaction-hint" id="interaction-hint">拖动旋转 · 滚轮缩放 · 点击建筑探索</p>
   <p class="arrange-hint" id="arrange-hint" hidden>拖动建筑调整位置，保存后向所有访客展示。<button id="reset-layout">恢复布局</button></p>
-  <nav class="quick-nav" aria-label="快捷访问"><a href="/notes" data-room-link="library">书屋 · 分类文章</a><a href="/notes?topic=工程" data-room-link="projects">工程展馆 · 项目</a><a href="https://midas.rqly.com" data-room-link="workshop">工坊 · 工具与实践</a><a href="/blog" data-room-link="blog">最近文章</a><a href="/about" data-room-link="about">岛主</a><a href="/island/#room=postoffice" data-room-link="postoffice">信箱</a><a href="/feed.xml">RSS 订阅</a></nav>
+  <nav class="quick-nav" aria-label="快捷访问"><a href="/notes" data-building-name="library">书屋</a><a href="/notes?kind=project" data-building-name="projects">工程展馆</a><a href="/workshop" data-building-name="workshop">工坊</a><a href="/blog">最近文章</a><a href="/about">岛主</a><a href="/mailbox">信箱</a><a href="/feed.xml">RSS 订阅</a></nav>
   <div class="loading" id="loading"><span class="loading-island" aria-hidden="true">⌂</span><p id="loading-stage" role="status">正在读取小岛设置…</p><ol class="loading-steps" aria-label="场景准备阶段"><li data-load-step="settings" aria-current="step">配置</li><li data-load-step="resources">场景</li><li data-load-step="frame">画面</li></ol><button id="loading-reading" type="button">先看轻量导览 →</button><a href="/notes">直接阅读文字目录</a></div>
   <section class="fallback" id="fallback" aria-label="岛屿轻量导览" hidden>
-    <p class="reading-kicker">ISLAND GUIDE / 轻量导览</p><h2>从这里，认识小岛</h2><p id="fallback-reason">暂时放下漂浮，留一点时间给文字。</p>
-    <svg class="island-guide" viewBox="0 0 420 235" role="group" aria-label="小岛示意导览，五座建筑可点击，无需 WebGL"><title>小岛示意导览</title><path d="M30 126 186 62 390 125 358 181 208 221 64 178Z" fill="#aba996"/><path d="M30 126 188 38 390 125 209 191Z" fill="#dbe3c8"/><path d="m123 121 90 31 68-27M213 152l-1-65" fill="none" stroke="#c3c2a7" stroke-width="8" stroke-linecap="round"/>
-      <a href="/notes" data-room-link="library" data-guide-room="library" aria-label="走进书屋"><title>书屋</title><rect class="guide-hit" x="65" y="71" width="112" height="91"/><path d="m91 99 42-17 31 20v42l-42 15-31-18Z" fill="#f6eed7"/><path d="m82 100 44-36 45 39-49 19Z" fill="#b87e57"/><path d="M112 135v-13l12 5v13m9-14 14-5v14l-14 5" fill="#87a59a"/><text x="123" y="174" data-guide-name="library">书屋</text></a>
-      <a href="/notes?kind=project" data-room-link="projects" data-guide-room="projects" aria-label="走进工程展馆"><title>工程展馆</title><rect class="guide-hit" x="242" y="103" width="115" height="91"/><path d="m258 152 45-17 31 17v23l-45 16-31-17Z" fill="#e9dfbf"/><path d="M260 153v-24q23-34 47-17l25 14v29m-72-26 30 19 42-22m-42 22v28" fill="#9db8b7" fill-opacity=".65" stroke="#64868b" stroke-width="3"/><text x="298" y="207" data-guide-name="projects">工程展馆</text></a>
-      <a href="https://midas.rqly.com" data-room-link="workshop" data-guide-room="workshop" aria-label="走进工坊"><title>工坊</title><rect class="guide-hit" x="184" y="28" width="104" height="81"/><path d="m203 67 35-13 30 16v27l-36 13-29-17Z" fill="#d4ba7c"/><path d="m199 66 28-19 45 23-39 15Z" fill="#d2aa60"/><path d="M257 65V44" stroke="#88704d" stroke-width="8"/><text x="236" y="124" data-guide-name="workshop">工坊</text></a>
-      <a href="/about" data-room-link="about" data-guide-room="about" aria-label="认识岛主"><title>岛主</title><rect class="guide-hit" x="171" y="153" width="68" height="73"/><ellipse cx="206" cy="190" rx="20" ry="8" fill="#e6d7ae"/><circle cx="206" cy="163" r="7" fill="#8e9b7c"/><path d="m198 172-5 16h26l-5-16Z" fill="#7b927c"/><text x="206" y="220" data-guide-name="about">岛主</text></a>
-      <a href="/island/#room=postoffice" data-room-link="postoffice" data-guide-room="postoffice" aria-label="打开信箱"><title>信箱</title><rect class="guide-hit" x="44" y="145" width="71" height="69"/><path d="M81 169v24" stroke="#9f825b" stroke-width="5"/><path d="m69 164 12-9 14 8v16l-15 6-11-7Z" fill="#cc9c6d"/><path d="m75 166 7-3 7 4-7 5Z" fill="#f6e8d1"/><text x="81" y="210" data-guide-name="postoffice">信箱</text></a>
-      <path d="m335 89 12-25 13 25h-9v10h-7V89ZM64 121l13-30 13 30h-10v11h-7v-11Z" fill="#98ab83"/>
-    </svg><p class="guide-caption">轻点建筑，或使用下方入口 · 示意导览</p>
-    <div class="reading-portals">
-      <a class="reading-portal" href="/notes" data-room-link="library"><span class="portal-icon" aria-hidden="true">▤</span><span><strong data-building-name="library">书屋</strong><small>阅读公开文章，支持时间线与分类书架</small></span><span aria-hidden="true">↗</span></a>
-      <a class="reading-portal" href="/notes?kind=project" data-room-link="projects"><span class="portal-icon" aria-hidden="true">⌁</span><span><strong data-building-name="projects">工程展馆</strong><small>项目档案与工程实践过程</small></span><span aria-hidden="true">↗</span></a>
-      <a class="reading-portal" href="https://midas.rqly.com" data-room-link="workshop"><span class="portal-icon" aria-hidden="true">⚒</span><span><strong data-building-name="workshop">工坊</strong><small>CivilFlow、七嘴与新的尝试</small></span><span aria-hidden="true">↗</span></a>
-      <a class="reading-portal" href="/about" data-room-link="about"><span class="portal-icon" aria-hidden="true">◉</span><span><strong>岛主</strong><small>认识这个小岛，和留下记录的人</small></span><span aria-hidden="true">↗</span></a>
-      <a class="reading-portal" href="/island/#room=postoffice" data-room-link="postoffice"><span class="portal-icon" aria-hidden="true">✉</span><span><strong>信箱</strong><small>看看路过的人留下的纸条，给岛主写一封信</small></span><span aria-hidden="true">↗</span></a>
-    </div><button id="retry-scene">打开 3D 小岛</button><a class="plain-records" href="/notes">查看文字目录 →</a><a class="plain-records" href="/privacy">隐私说明</a><p data-display="footer" class="guide-caption">把小的记录留下来，让认识慢慢生长。</p>
+    <div class="fallback-grid">
+      <div class="fallback-visual">
+        <p class="reading-kicker">ISLAND GUIDE / 轻量导览</p>
+        <h2>从这里，认识小岛</h2>
+        <p id="fallback-reason">暂时放下漂浮，留一点时间给文字。</p>
+        <div class="guide-stage">
+          <svg class="island-guide" viewBox="0 0 460 285" role="group" aria-label="小岛示意导览，五座建筑可点击，无需 WebGL">
+            <title>小岛示意导览</title>
+            <defs>
+              <linearGradient id="guide-grass" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#dfe6d2"/>
+                <stop offset="100%" stop-color="#cbd6be"/>
+              </linearGradient>
+              <linearGradient id="guide-rock-l" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#b6b09c"/>
+                <stop offset="100%" stop-color="#9e9986"/>
+              </linearGradient>
+              <linearGradient id="guide-rock-r" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#a5a08c"/>
+                <stop offset="100%" stop-color="#8c8876"/>
+              </linearGradient>
+            </defs>
+            <!-- Soft ground shadow & floating island base -->
+            <ellipse cx="230" cy="256" rx="146" ry="18" fill="#1c2420" fill-opacity=".06"/>
+            <path d="M44 136 226 206 226 244 74 186Z" fill="url(#guide-rock-l)"/>
+            <path d="M226 206 416 135 384 185 226 244Z" fill="url(#guide-rock-r)"/>
+            <path d="M44 136 218 52 416 135 226 206Z" fill="url(#guide-grass)" stroke="#b8c4ac" stroke-width="1"/>
+            <!-- Stepping stone paths -->
+            <path d="m146 130 82 32 76-28M228 162l-2-64M228 162l-78 14" fill="none" stroke="#ece6d4" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="m146 130 82 32 76-28M228 162l-2-64M228 162l-78 14" fill="none" stroke="#d5ceb8" stroke-width="1.2" stroke-dasharray="4 5" stroke-linecap="round"/>
+            <!-- Decorative pine trees -->
+            <g fill="#849d7d" opacity=".9">
+              <path d="m356 102 10-22 10 22h-7v8h-6v-8Z"/>
+              <path d="m80 124 11-26 11 26h-8v9h-6v-9Z"/>
+              <path d="m176 74 8-18 8 18h-5v7h-6v-7Z"/>
+            </g>
+            <!-- Library (书屋) -->
+            <a href="/notes" data-guide-room="library" aria-label="走进书屋">
+              <title>书屋</title>
+              <rect class="guide-hit" x="88" y="64" width="108" height="106" rx="12"/>
+              <path d="m110 106 38-15 29 17v37l-38 14-29-16Z" fill="#f7f1df" stroke="#c8bfa9" stroke-width="1"/>
+              <path d="m148 91 29 17v37l-29 14Z" fill="#eae1c8"/>
+              <path d="m101 107 40-32 42 34-44 18Z" fill="#b47652"/>
+              <path d="m141 75 42 34-44 18-16-24Z" fill="#a26543"/>
+              <path d="M128 140v-12l11 4v12m17-12 12-4v12l-12 5" fill="#7fa097"/>
+              <g class="guide-tag" transform="translate(142 161)">
+                <rect x="-26" y="-11" width="52" height="20" rx="10"/>
+                <text x="0" y="3" data-guide-name="library">书屋</text>
+              </g>
+            </a>
+            <!-- Workshop (工坊) -->
+            <a href="/workshop" data-guide-room="workshop" aria-label="走进工坊">
+              <title>工坊</title>
+              <rect class="guide-hit" x="200" y="28" width="102" height="96" rx="12"/>
+              <path d="m220 71 34-13 28 15v27l-34 13-28-15Z" fill="#dec58d" stroke="#bda46c" stroke-width="1"/>
+              <path d="m254 58 28 15v27l-28 13Z" fill="#cca96a"/>
+              <path d="m216 70 28-18 42 22-37 14Z" fill="#c2954e"/>
+              <path d="M270 67V47" stroke="#7d674b" stroke-width="6" stroke-linecap="round"/>
+              <g class="guide-tag" transform="translate(251 116)">
+                <rect x="-26" y="-11" width="52" height="20" rx="10"/>
+                <text x="0" y="3" data-guide-name="workshop">工坊</text>
+              </g>
+            </a>
+            <!-- Gallery (工程展馆) -->
+            <a href="/notes?kind=project" data-guide-room="projects" aria-label="走进工程展馆">
+              <title>工程展馆</title>
+              <rect class="guide-hit" x="268" y="96" width="114" height="106" rx="12"/>
+              <path d="m286 146 42-15 30 16v23l-42 15-30-16Z" fill="#eee8d6" stroke="#c4bea9" stroke-width="1"/>
+              <path d="M288 147v-21q21-30 43-15l25 13v26m-68-23 28 17 40-19m-40 19v25" fill="#9bb8b7" fill-opacity=".62" stroke="#537882" stroke-width="2.4" stroke-linejoin="round"/>
+              <g class="guide-tag" transform="translate(325 191)">
+                <rect x="-36" y="-11" width="72" height="20" rx="10"/>
+                <text x="0" y="3" data-guide-name="projects">工程展馆</text>
+              </g>
+            </a>
+            <!-- Keeper / About (岛主) -->
+            <a href="/about" data-guide-room="about" aria-label="认识岛主">
+              <title>岛主</title>
+              <rect class="guide-hit" x="190" y="148" width="74" height="78" rx="12"/>
+              <ellipse cx="227" cy="184" rx="18" ry="7" fill="#e6dcc0"/>
+              <circle cx="227" cy="161" r="6.5" fill="#7c9178"/>
+              <path d="m220 169-4 14h22l-4-14Z" fill="#5e7c68"/>
+              <g class="guide-tag" transform="translate(227 210)">
+                <rect x="-26" y="-11" width="52" height="20" rx="10"/>
+                <text x="0" y="3" data-guide-name="about">岛主</text>
+              </g>
+            </a>
+            <!-- Mailbox (信箱) -->
+            <a href="/mailbox" data-guide-room="postoffice" aria-label="打开信箱">
+              <title>信箱</title>
+              <rect class="guide-hit" x="80" y="150" width="74" height="78" rx="12"/>
+              <path d="M117 174v21" stroke="#8f7454" stroke-width="4.5" stroke-linecap="round"/>
+              <path d="m106 168 11-8 13 7v15l-13 5-11-6Z" fill="#c3875d"/>
+              <path d="m112 170 6-3 6 4-6 4Z" fill="#f8efe0"/>
+              <g class="guide-tag" transform="translate(117 212)">
+                <rect x="-26" y="-11" width="52" height="20" rx="10"/>
+                <text x="0" y="3" data-guide-name="postoffice">信箱</text>
+              </g>
+            </a>
+          </svg>
+        </div>
+        <p class="guide-caption">轻点图中任意建筑，或选择空间目录直达对应独立页面</p>
+      </div>
+      <div class="fallback-directory">
+        <div class="fallback-dir-head">
+          <span>空间目录</span>
+          <span>05 SPACES</span>
+        </div>
+        <div class="reading-portals">
+          <a class="reading-portal" href="/notes" data-portal-room="library"><span class="portal-index" aria-hidden="true">01</span><span><strong data-building-name="library">书屋</strong><small>阅读公开文章，支持时间线与分类书架</small></span><span class="portal-arrow" aria-hidden="true">→</span></a>
+          <a class="reading-portal" href="/notes?kind=project" data-portal-room="projects"><span class="portal-index" aria-hidden="true">02</span><span><strong data-building-name="projects">工程展馆</strong><small>项目档案与工程实践过程</small></span><span class="portal-arrow" aria-hidden="true">→</span></a>
+          <a class="reading-portal" href="/workshop" data-portal-room="workshop"><span class="portal-index" aria-hidden="true">03</span><span><strong data-building-name="workshop">工坊</strong><small>CivilFlow、七嘴与新的尝试</small></span><span class="portal-arrow" aria-hidden="true">→</span></a>
+          <a class="reading-portal" href="/about" data-portal-room="about"><span class="portal-index" aria-hidden="true">04</span><span><strong>岛主</strong><small>认识这个小岛，和留下记录的人</small></span><span class="portal-arrow" aria-hidden="true">→</span></a>
+          <a class="reading-portal" href="/mailbox" data-portal-room="postoffice"><span class="portal-index" aria-hidden="true">05</span><span><strong>信箱</strong><small>看看路过的人留下的纸条，给岛主写一封信</small></span><span class="portal-arrow" aria-hidden="true">→</span></a>
+        </div>
+        <div class="fallback-actions">
+          <button id="retry-scene" type="button">回到 3D 小岛</button>
+          <div class="fallback-links">
+            <a class="plain-records" href="/notes">全部文章</a>
+            <a class="plain-records" href="/privacy">隐私说明</a>
+          </div>
+        </div>
+        <p data-display="footer" class="fallback-colophon">把小的记录留下来，让认识慢慢生长。</p>
+      </div>
+    </div>
   </section>
   <noscript><section class="no-script"><h2 data-display="title">欢迎来到 LY 的小世界</h2><p data-display="description">这里记录桥梁工程、日常思考与工具实践。</p><a href="/notes">打开分类书架 →</a><a href="/notes?topic=工程">工程手记 →</a><span data-public-tools><a href="https://midas.rqly.com">CivilFlow →</a><a href="https://7zui.com">七嘴 →</a></span><a href="/blog">最近文章 →</a><a href="/about">认识岛主 →</a><a href="/privacy">隐私说明 →</a></section><style>#loading,#scene,.scene-controls,.growth-card,.intro,.quick-nav,#view-toggle{display:none!important}</style></noscript>
   <p class="status-message" id="status-message" role="status" aria-live="polite"></p>

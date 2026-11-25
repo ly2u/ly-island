@@ -11,8 +11,8 @@ export class IslandDiscovery {
   });
  }
  refresh(){
-  for(const link of document.querySelectorAll('.reading-portal[data-room-link]')){
-   const id=link.dataset.roomLink;if(!['library','projects','workshop'].includes(id)||!this.callbacks.loaded())continue;
+  for(const link of document.querySelectorAll('.reading-portal[data-portal-room]')){
+   const id=link.dataset.portalRoom;if(!['library','projects','workshop'].includes(id)||!this.callbacks.loaded())continue;
    const {records,recommendations}=recommendedRecords(this.callbacks.posts(),this.callbacks.island(),id);
    const projectCount=records.filter(p=>p.kind==='project').length;
    const count=id==='library'?records.length+' 篇文章 · '+knowledgeBooks(this.callbacks.posts()).length+' 个分类':id==='projects'?(projectCount?projectCount+' 个项目':'项目档案筹备中'):records.length+' 篇记录';
@@ -25,7 +25,7 @@ export class IslandDiscovery {
   const resume=this.callbacks.loaded()?resumableRecord(this.callbacks.posts(),this.callbacks.positions()):null;
   for(const slot of this.resumeSlots){
    slot.replaceChildren();slot.hidden=!resume;if(!resume)continue;
-   const a=el('a','continue-link');a.href=readingHref(resume.post,resume.room);a.append(el('small','','继续上次阅读'),el('strong','',resume.post.title),el('span','','读到 '+Math.round(resume.progress.ratio*100)+'% · 翻到书签 →'));
+   const a=el('a','continue-link');a.href='/notes/'+encodeURIComponent(resume.post.slug);a.append(el('small','','继续上次阅读'),el('strong','',resume.post.title),el('span','','读到 '+Math.round(resume.progress.ratio*100)+'% · 继续阅读 →'));
    const clear=el('button','continue-clear','清除本机记录');clear.type='button';clear.addEventListener('click',()=>this.callbacks.clearReading());slot.append(a,clear);
   }
  }

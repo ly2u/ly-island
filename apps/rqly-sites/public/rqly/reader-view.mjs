@@ -7,7 +7,7 @@ export const escapeReader=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'
 const coverURL=value=>typeof value==='string'&&/^\/media\/[a-f0-9]{32}\.webp$/.test(value)?value:'';
 export function readerOrganization(post){
  const d=post.organizationDetails;if(!d)return '';
- const links=[...(d.tags||[]),...(d.topics||[]),...(d.series?[d.series]:[])].filter(item=>/^org-[a-f0-9]{16}$/.test(item.id||'')).map(item=>'<a class="directory-chip" data-reader-collection="'+escapeReader(item.id)+'" href="/#'+escapeReader(new URLSearchParams({room:'search',collection:item.id}))+'">'+escapeReader(({tag:'#',topic:'分类 · ',series:'系列 · '}[item.type]||'')+item.name)+'</a>');
+ const links=[...(d.tags||[]),...(d.topics||[]),...(d.series?[d.series]:[])].filter(item=>/^org-[a-f0-9]{16}$/.test(item.id||'')).map(item=>'<a class="directory-chip" data-reader-collection="'+escapeReader(item.id)+'" href="/search?'+escapeReader(new URLSearchParams({collection:item.id}))+'">'+escapeReader(({tag:'#',topic:'分类 · ',series:'系列 · '}[item.type]||'')+item.name)+'</a>');
  if(d.project&&validRecordSlug(d.project.slug))links.push('<a class="directory-chip" data-reader-record="'+escapeReader(d.project.slug)+'" data-reader-room="projects" href="/notes/'+encodeURIComponent(d.project.slug)+'">项目 · '+escapeReader(d.project.title)+'</a>');
  return links.length?'<nav class="article-organization" aria-label="内容归属">'+links.join('')+'</nav>':'';
 }

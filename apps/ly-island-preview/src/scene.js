@@ -270,7 +270,7 @@ export class IslandScene {
   this.scene=new THREE.Scene();this.scene.fog=new THREE.Fog(0xe9eee9,45,95);
   this.camera=new THREE.OrthographicCamera(-10,10,10,-10,.1,130);this.camera.position.set(15,12,18);
   this.controls=new OrbitControls(this.camera,canvas);this.controls.target.set(.5,-.3,0);this.controls.enablePan=false;this.controls.enableDamping=true;this.controls.dampingFactor=.08;
-  this.controls.minPolarAngle=.48;this.controls.maxPolarAngle=1.28;this.controls.minZoom=.65;this.controls.maxZoom=1.85;this.controls.rotateSpeed=.55;
+  this.controls.minPolarAngle=.48;this.controls.maxPolarAngle=1.28;this.controls.minZoom=.6;this.controls.maxZoom=2.0;this.controls.rotateSpeed=.55;
   this.focus=new SceneFocus(this.camera,this.controls);this.focusId=null;
   this.hemi=new THREE.HemisphereLight(0xfff5de,0x93a899,2.7);this.scene.add(this.hemi);
   this.sun=new THREE.DirectionalLight(0xffe8c0,3.4);this.sun.position.set(-9,16,8);this.sun.castShadow=true;
@@ -393,7 +393,7 @@ export class IslandScene {
  resize(reset=false) {
   const width=this.canvas.clientWidth,height=this.canvas.clientHeight,mobile=width<760;if(!width||!height)return;
   if(reset)this.focus.restore({immediate:true});
-  const vertical=this.callbacks.centered?(this.grown?26:20)/(width/height):mobile?(this.grown?26:19.5)/(width/height):this.grown?24:19.5;
+  const vertical=this.callbacks.centered?(this.grown?19.5:14)/(width/height):mobile?(this.grown?19.5:14.2)/(width/height):this.grown?16.8:12.5;
   this.camera.left=-vertical*width/height/2;this.camera.right=vertical*width/height/2;this.camera.top=vertical/2;this.camera.bottom=-vertical/2;
   this.focus.viewport(width,height,{x:this.callbacks.centered||mobile?0:-.12,y:this.callbacks.centered?0:mobile?-.07:.015});
   if(reset){this.camera.zoom=1;this.controls.target.set((this.grown?2:-.1)*LAND_SPREAD,-.3,0);}

@@ -8,7 +8,8 @@ export class GrowthPanel {
   this.callbacks=callbacks;this.dialog=document.getElementById('growth-dialog');this.content=el('section','growth-content');this.content.id='growth-content';document.getElementById('growth-detail').after(this.content);
   this.banner=el('aside','growth-preview-banner');this.banner.hidden=true;this.banner.setAttribute('aria-label','扩岛外观预览');this.banner.append(el('span','','正在预览扩岛外观 · 不会改变已保存的岛屿'));
   this.exit=el('button','','回到实际小岛');this.exit.type='button';this.exit.addEventListener('click',()=>callbacks.stopPreview());this.banner.append(this.exit);document.getElementById('app').append(this.banner);
-  const entry=el('button','growth-reading-entry','看看小岛如何成长 →');entry.type='button';entry.addEventListener('click',()=>this.open());document.querySelector('.reading-portals').after(entry);
+  const entry=el('button','growth-reading-entry','成长足迹');entry.type='button';entry.addEventListener('click',()=>this.open());
+  const linksBar=document.querySelector('.fallback-links');if(linksBar)linksBar.prepend(entry);else document.querySelector('.reading-portals')?.after(entry);
   document.getElementById('close-growth').addEventListener('click',()=>this.dialog.close());
   this.dialog.addEventListener('close',()=>this.request?.abort());
  }
@@ -31,6 +32,6 @@ export class GrowthPanel {
    catch{if(!request.signal.aborted)this.status.textContent='场景暂时无法预览，请稍后再试。';}
    finally{this.busy=false;const button=this.previewButton,grown=this.callbacks.island()?.phase==='grown';button.disabled=!this.callbacks.island()||grown;button.textContent=grown?'当前已是扩展小岛':'在 3D 岛上预览扩岛';}
   });actions.append(preview,el('small','','预览会加载 3D 场景；退出后回到原来的视角和阅读模式。'));this.status=el('p','growth-note');this.status.setAttribute('role','status');this.content.append(actions,this.status);
-  const trail=growthRecords(posts);if(ready&&trail.length){const section=el('section','growth-records');section.append(el('h3','','最近留下的公开记录'));const list=el('ol');for(const record of trail){const item=el('li'),link=articleLink(record.title,'',record.slug,()=>{this.dialog.close();location.hash=readingHref(record);});item.append(el('time','',record.date),link,el('small','',record.points+' 点'));list.append(item);}section.append(list,el('p','growth-note','按当前公开内容整理；草稿与回收站内容不会显示在这里。'));this.content.append(section);}
+  const trail=growthRecords(posts);if(ready&&trail.length){const section=el('section','growth-records');section.append(el('h3','','最近留下的公开记录'));const list=el('ol');for(const record of trail){const item=el('li'),link=el('a','',record.title);link.href='/notes/'+encodeURIComponent(record.slug);item.append(el('time','',record.date),link,el('small','',record.points+' 点'));list.append(item);}section.append(list,el('p','growth-note','按当前公开内容整理；草稿与回收站内容不会显示在这里。'));this.content.append(section);}
  }
 }
