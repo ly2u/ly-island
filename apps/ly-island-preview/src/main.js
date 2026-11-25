@@ -11,9 +11,10 @@ import {readingPositions,validRecordSlug} from '../../rqly-sites/public/rqly/isl
 const $=id=>document.getElementById(id);
 const definitions={library:{name:'书屋'},projects:{name:'工程展馆'},workshop:{name:'工坊'},about:{name:'岛主'},postoffice:{name:'信箱'}};
 const readStored=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback;}catch{return fallback;}};
-function roomURL(room,slug=null,collection=null,book=null){
+function roomURL(room,slug=null,collection=null,book=null,view=null){
  if(slug&&validRecordSlug(slug))return '/notes/'+encodeURIComponent(slug);
- if(room==='library')return book?'/notes?book='+encodeURIComponent(book):'/notes';
+ if(collection)return '/search?collection='+encodeURIComponent(collection);
+ if(room==='library')return book?'/notes?book='+encodeURIComponent(book):view==='books'?'/notes?view=books':'/notes';
  if(room==='projects')return '/notes?kind=project';
  if(room==='workshop')return '/workshop';
  if(room==='about')return '/about';
@@ -26,10 +27,10 @@ function redirectLegacyHash(){
  if(!location.hash.startsWith('#room='))return false;
  const q=new URLSearchParams(location.hash.slice(1)),room=q.get('room');
  if(!room)return false;
- location.replace(roomURL(room,q.get('article'),q.get('collection'),q.get('book')));
+ location.replace(roomURL(room,q.get('article'),q.get('collection'),q.get('book'),q.get('view')));
  return true;
 }
-if(redirectLegacyHash())throw new Error('Redirecting legacy island hash');
+redirectLegacyHash();
 window.addEventListener('hashchange',redirectLegacyHash);
 let scene=null,grown=false,dusk=false,arranging=false,posts=[],postsLoaded=false,messageTimer,island=null,rules=null,owner=null;
 let readingMode=false,sceneAttempt=0,modePaused=false,postsFailed=false,discovery=null,growthPanel=null,growthPreviewState=null,growthPreviewPending=false;

@@ -8,8 +8,15 @@ export function plainText(value){
 export function highlightParts(value,query,{limit=Infinity}={}){
  const text=String(value??''),words=terms(query);
  if(!words.length)return text?[{text,match:false}]:[];
- let lower='',pos=0;const map=[];
- for(const ch of text){const piece=fold(ch);for(let k=0;k<piece.length;k++)map.push([pos,pos+ch.length]);lower+=piece;pos+=ch.length;}
+ // Normalize complete graphemes so decomposed accents keep matching. Map the
+ // normalized UTF-16 offsets back to the original text without splitting them.
+ const normalizedMap=[],map=[];let normalized='';
+ for(const {segment,index} of new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(text)){
+  const piece=segment.normalize('NFKC');normalized+=piece;
+  for(let k=0;k<piece.length;k++)normalizedMap.push([index,index+segment.length]);
+ }
+ let pos=0;for(const ch of normalized){for(let k=0;k<ch.toLowerCase().length;k++)map.push(normalizedMap[pos]);pos+=ch.length;}
+ const lower=normalized.toLowerCase();
  const ranges=[];
  for(const word of words){if(ranges.length>=limit)break;let at=0;while(ranges.length<limit&&(at=lower.indexOf(word,at))>=0){ranges.push([map[at][0],map[at+word.length-1][1]]);at+=word.length;}}
  ranges.sort((a,b)=>a[0]-b[0]);const merged=[];for(const range of ranges){const last=merged.at(-1);if(last&&range[0]<=last[1])last[1]=Math.max(last[1],range[1]);else merged.push(range);}

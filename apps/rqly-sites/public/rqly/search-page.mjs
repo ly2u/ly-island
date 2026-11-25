@@ -1,4 +1,4 @@
-import {highlightParts} from './search-core.mjs';
+import {highlightParts} from './search-core.mjs?v=editorial-v1';
 const el=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e;};
 const mark=(tag,value,query,cls)=>{const e=el(tag,cls);for(const part of highlightParts(value,query))e.append(part.match?el('mark','',part.text):document.createTextNode(part.text));return e;};
 const kinds={note:'文章',blog:'文章',project:'项目'};
@@ -26,6 +26,7 @@ if(root){
  root.replaceChildren(form,filters,status,list,more);
 
  const syncURL=()=>{
+  state.q=input.value.trim();
   const p=new URLSearchParams();
   if(state.q)p.set('q',state.q);if(state.kind)p.set('kind',state.kind);if(state.organization)p.set('collection',state.organization);if(state.order&&state.order!=='relevance')p.set('order',state.order);
   const qs=p.toString();history.replaceState(history.state,'',location.pathname+(qs?'?'+qs:''));
