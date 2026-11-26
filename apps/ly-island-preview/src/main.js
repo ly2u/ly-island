@@ -44,6 +44,20 @@ function loadingStage(stage){const stages=['settings','resources','frame'],at=st
 function updateMotionButton(){if(!scene)return;$('motion-toggle').setAttribute('aria-pressed',String(scene.paused));$('motion-toggle').setAttribute('aria-label',scene.paused?'继续漂浮':'暂停漂浮');$('motion-toggle').querySelector('svg').innerHTML=scene.paused?'<path d="m8 5 10 7-10 7Z"/>':'<path d="M9 5v14M15 5v14"/>';}
 const editRequested=new URLSearchParams(location.search).get('edit')==='1';
 const growthPreviewRequested=new URLSearchParams(location.search).get('preview')==='growth';
+// Start downloading the 3D scene module immediately in parallel with config/posts
+// whenever we intend to render 3D, while keeping low-spec/save-data devices at 0 bytes.
+let sceneModulePromise=null;
+function getSceneModule(){
+ if(!sceneModulePromise)sceneModulePromise=import('./scene.js').catch(error=>{sceneModulePromise=null;throw error;});
+ return sceneModulePromise;
+}
+if(!editRequested&&(!preferReading||growthPreviewRequested))getSceneModule().catch(()=>{});
+function readBootstrap(){
+ const node=$('island-bootstrap');if(!node)return null;
+ try{const data=JSON.parse(node.textContent||'null');return data&&typeof data==='object'?data:null;}catch{return null;}
+}
+const normalizePosts=list=>Array.isArray(list)?list.filter(p=>p&&typeof p.slug==='string'&&typeof p.title==='string'&&typeof p.date==='string'&&p.published===true):[];
+const bootstrap=readBootstrap();
 const buttons={};
 $('labels').hidden=true;
 function message(text){$('status-message').textContent=text;clearTimeout(messageTimer);messageTimer=setTimeout(()=>{$('status-message').textContent='';},2800);}
@@ -96,9 +110,15 @@ function applyPresentation(p){
 async function boot(){
  if(editRequested){location.replace('/admin?view=island');return;}
  if(preferReading)setReadingMode(true,visit.reason);
- loadingStage('settings');
- try{const r=await fetch('/api/island',{signal:AbortSignal.timeout(6000)});if(!r.ok)throw new Error();const data=await r.json();island=data.island;rules=data.rules;}catch{message('岛屿设置暂时未读取，正在显示默认小岛。');}
- if(island)applyIsland(island);
+ if(bootstrap?.island){
+  island=bootstrap.island;rules=bootstrap.rules||null;
+  if(Array.isArray(bootstrap.posts)){posts=normalizePosts(bootstrap.posts);postsLoaded=true;}
+  applyIsland(island);
+ }else{
+  loadingStage('settings');
+  try{const r=await fetch('/api/island',{signal:AbortSignal.timeout(6000)});if(!r.ok)throw new Error();const data=await r.json();island=data.island;rules=data.rules;}catch{message('岛屿设置暂时未读取，正在显示默认小岛。');}
+  if(island)applyIsland(island);
+ }
  if(growthPreviewRequested){const previewed=await previewGrowth();if(!previewed&&!preferReading&&!readingMode&&!scene)startScene();}
  else if(!preferReading&&!readingMode)startScene();
 }
@@ -126,7 +146,7 @@ async function startScene(){
  const attempt=++sceneAttempt;readingMode=false;document.body.classList.remove('reading-mode');$('fallback').hidden=true;$('loading').hidden=false;$('view-toggle').textContent='轻量导览';loadingStage('resources');$('view-toggle').setAttribute('aria-pressed','false');
  const timeout=setTimeout(()=>{if(attempt===sceneAttempt&&!readingMode)unavailable();},12000);
  try{
-  const {IslandScene}=await import('./scene.js');if(attempt!==sceneAttempt||readingMode)return;
+  const {IslandScene}=await getSceneModule();if(attempt!==sceneAttempt||readingMode)return;
   loadingStage('frame');
   scene=new IslandScene($('world'),{
    select:id=>{if(arranging)highlight(id);else if(id)openDestination(id);},message,unavailable,
@@ -164,7 +184,7 @@ $('retry-scene').addEventListener('click',()=>{try{localStorage.setItem('ly-isla
 $('loading-reading').addEventListener('click',()=>{sceneAttempt++;setReadingMode(true,'先浏览轻量导览，需要时再打开 3D 小岛。',true);});
 async function loadPublicPosts(){
  postsFailed=false;
- try{const response=await fetch('/api/posts',{signal:AbortSignal.timeout(8000)});if(!response.ok)throw new Error('public posts unavailable');const data=await response.json();if(!Array.isArray(data.posts))throw new Error('invalid posts');posts=data.posts.filter(p=>p&&typeof p.slug==='string'&&typeof p.title==='string'&&typeof p.date==='string'&&p.published===true);postsLoaded=true;}catch{posts=[];postsLoaded=false;postsFailed=true;}
+ try{const response=await fetch('/api/posts',{signal:AbortSignal.timeout(8000)});if(!response.ok)throw new Error('public posts unavailable');const data=await response.json();if(!Array.isArray(data.posts))throw new Error('invalid posts');posts=normalizePosts(data.posts);postsLoaded=true;}catch{posts=[];postsLoaded=false;postsFailed=true;}
  updateGrowth();discovery.refresh();
 }
-loadPublicPosts();
+if(!Array.isArray(bootstrap?.posts))loadPublicPosts();

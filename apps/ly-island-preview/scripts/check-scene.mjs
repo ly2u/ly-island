@@ -126,3 +126,5 @@ test('two-finger gestures and another pointer release do not activate buildings;
  handlers.pointerdown(event(5));handlers.pointerup(event(5));assert.deepEqual(selected,['library']);
  handlers.pointerdown(event(6));handlers.pointerup(event(6,130));assert.deepEqual(selected,['library']);
 });
+
+import './check-archipelago.mjs';

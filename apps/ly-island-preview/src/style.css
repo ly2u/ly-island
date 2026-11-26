@@ -73,7 +73,10 @@ html,body{background:radial-gradient(circle at 18% 36%,#f4f3ec 0%,#ecf0ea 45%,#e
 .identity>span:last-child{font-family:"Noto Serif SC","Source Han Serif SC","Songti SC",Georgia,serif;letter-spacing:.05em;color:#17201b}
 .intro h1{color:#17201b;font-family:"Noto Serif SC","Source Han Serif SC","Songti SC",Georgia,serif;font-weight:600;letter-spacing:-.02em}
 .intro h1>span{color:#2f5d48}
-.intro-identity{color:#2f5d48}
+.intro .kicker{display:none!important}
+.intro{top:clamp(195px,29vh,260px)}
+.island-meta{margin-top:26px}
+@media(max-width:760px){.intro{top:102px}}
 .building-label{background:rgba(252,251,247,.9);border:1px solid rgba(255,255,255,.95);border-radius:999px;padding:6px 12px;font-weight:500;color:#22302a;box-shadow:0 6px 20px rgba(28,36,32,.09);backdrop-filter:blur(12px)}
 .building-label:hover,.building-label[aria-pressed=true]{background:#fff;box-shadow:0 8px 24px rgba(28,36,32,.15)}
 .scene-controls{background:rgba(252,251,247,.86);border:1px solid rgba(255,255,255,.9);border-radius:999px;padding:6px 10px;box-shadow:0 8px 28px rgba(28,36,32,.08)}
