@@ -1,3 +1,4 @@
+import {assetReference} from './asset-refs.mjs';
 import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import http from 'node:http';import {scryptSync} from 'node:crypto';
 import {createMarkdownRenderer} from '../markdown-renderer.mjs';
 import {highlightCode} from '../code-highlighter.mjs';
@@ -19,7 +20,7 @@ try{
  const headers={'Content-Type':'application/json',Origin:base,'X-Requested-With':'rqly-editor'},login=await fetch(base+'/api/auth/login',{method:'POST',headers,body:JSON.stringify({username:'ly',password:'fixture-only-password'})});assert.equal(login.status,200);headers.Cookie=login.headers.get('set-cookie').split(';')[0];headers['X-CSRF-Token']=(await login.json()).csrfToken;
  let response=await fetch(base+'/api/admin/preview',{method:'POST',headers,body:JSON.stringify({body:source})});assert.equal(response.status,200);assert.equal((await response.json()).html,mapped);groups++;
  response=await fetch(base+'/api/admin/posts',{method:'POST',headers,body:JSON.stringify({slug:'code-example',kind:'note',title:'代码示例',body:source,published:true})});assert.equal(response.status,200);const before=fs.readFileSync(path.join(dir,'posts.json'));
- const article=await(await fetch(base+'/notes/code-example')).text();assert(article.includes(html));assert(article.includes('reader-page.mjs?v=editorial-v3'));assert.equal(content((await(await fetch(base+'/api/posts/code-example')).json()).html),code);
+ const article=await(await fetch(base+'/notes/code-example')).text();assert(article.includes(html));assert(article.includes(assetReference('reader-page.mjs')));assert.equal(content((await(await fetch(base+'/api/posts/code-example')).json()).html),code);
  for(const asset of ['/code-blocks.mjs','/code-policy.mjs','/reader-client.mjs'])assert.equal((await fetch(base+asset)).status,200);assert.equal((await fetch(base+'/code-highlighter.mjs')).status,404);assert.deepEqual(fs.readFileSync(path.join(dir,'posts.json')),before);groups++;
  console.log(groups+' code-block groups passed: safe pinned language grammars, exact whitespace/Unicode, finite markup, unknown/large-code fallback, source maps, preview/article equivalence, assets and no GET writes.');
 }finally{if(server){server.closeAllConnections();await new Promise(r=>server.close(r));}fs.rmSync(dir,{recursive:true,force:true});}

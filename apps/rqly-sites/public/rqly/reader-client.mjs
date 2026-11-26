@@ -107,7 +107,7 @@ function setupMobileTocDrawer(root,headings,onOpen,signal){
   if(value){
    details.hidden=true;pane.hidden=false;pane.append(toc);margin.scrollTop=0;
    margin.setAttribute('role','dialog');margin.setAttribute('aria-modal','true');margin.setAttribute('aria-label','文章目录');
-   details.open=true;onOpen?.();
+   if(details.tagName==='DETAILS')details.open=true;onOpen?.();
    requestAnimationFrame(()=>{if(opened&&!signal.aborted){const active=margin.querySelector('.toc-item[aria-current=location]')||margin.querySelector('.toc-item')||closeBtn;active.focus({preventScroll:true});}});
   }else{
    if(toc.parentElement===pane)details.append(toc);details.hidden=detailsHidden;pane.hidden=true;margin.scrollTop=0;
@@ -203,7 +203,7 @@ function trackOutline(root,headings,toc,tree,scrollElement,signal){
   scrollElement.addEventListener(type,event=>{if(!toc.contains(event.target)){manualUntil=0;forced=null;queue();}},{passive:true,signal});
  }
  scrollElement.addEventListener('scroll',queue,{passive:true,signal});window.addEventListener('resize',queue,{passive:true,signal});root.addEventListener('load',queue,{capture:true,signal});
- let syncDetails=()=>{};if(details){const compact=matchMedia('(max-width:1024px)');let wasCompact;syncDetails=()=>{const next=compact.matches||root.clientWidth<=680;root.classList.toggle('toc-compact',next);drawer.sync?.();if(next!==wasCompact){if(!next){drawer.close({restoreFocus:false});details.open=true;}wasCompact=next;}queue();};syncDetails();compact.addEventListener('change',syncDetails,{signal});window.addEventListener('resize',syncDetails,{passive:true,signal});details.addEventListener('toggle',queue,{signal});}
+ let syncDetails=()=>{};if(details){const compact=matchMedia('(max-width:1024px)');let wasCompact;syncDetails=()=>{const next=compact.matches||root.clientWidth<=680;root.classList.toggle('toc-compact',next);drawer.sync?.();if(next!==wasCompact){if(!next){drawer.close({restoreFocus:false});if(details.tagName==='DETAILS')details.open=true;}wasCompact=next;}queue();};syncDetails();compact.addEventListener('change',syncDetails,{signal});window.addEventListener('resize',syncDetails,{passive:true,signal});details.addEventListener('toggle',queue,{signal});}
  const observer=window.ResizeObserver?new ResizeObserver(()=>{syncDetails();queue();}):null;observer?.observe(root.querySelector('.article-body'));observer?.observe(root);
  document.fonts?.ready.then(queue);queue();
  return {refresh:queue,dispose(){cancelAnimationFrame(frame);observer?.disconnect();removeTooltip();drawer.dispose();root.classList.remove('toc-compact');}};
