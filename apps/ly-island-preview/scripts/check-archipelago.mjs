@@ -13,9 +13,9 @@ test('grown building logical positions survive rebuilding across the satellite g
  scene.layouts.grown=before;scene.build(true);assert.deepEqual(scene.getLayout(),before);assert.equal(scene.buildings.get('projects').position.x,9*1.25+3.6);
 });
 test('saved satellite mailbox and decoration tree use the same visual coordinates as other trees',()=>{
- const scenery=defaultIsland().scenery;scenery.grown={postoffice:[7.75,1],trees:{'tree-12':[7.75,1.5],'decoration-west':[8,-1.5]}};
+ const scenery=defaultIsland().scenery;scenery.grown={postoffice:[7.75,1],trees:{'tree-12':[7.75,1.5],'decoration-west':[8,-1.25]}};
  const scene=fixture({scenery,decorations:[{slot:'west',type:'tree'}]});
- for(const[id,x,z]of[['postoffice',7.75,1],['tree-12',7.75,1.5],['decoration-west',8,-1.5]]){
+ for(const[id,x,z]of[['postoffice',7.75,1],['tree-12',7.75,1.5],['decoration-west',8,-1.25]]){
   const g=scene.sceneryObjects.get(id);assert(g,id);assert.equal(g.position.x,x*1.25+3.6,id);assert.equal(g.position.z,z*1.25,id);
   scene.saveScenery(id);
  }
@@ -26,4 +26,14 @@ test('new grown buildings retain usable paths and separate animated sails after 
  for(const id of['library','projects','workshop','postoffice'])assert.equal(ends[id].connected,true,id);
  assert(scene.windmill);assert(scene.windmill.parent);assert(scene.windmill.children.some(c=>c.isMesh));
  const box=new THREE.Box3().setFromObject(scene.buildings.get('library'));scene.windmill.rotation.z+=.25;scene.world.updateMatrixWorld(true);assert.deepEqual(new THREE.Box3().setFromObject(scene.buildings.get('library')),box);
+});
+
+test('drag clearance rejects decorative tree positions that a rebuild would remove',()=>{
+ const scenery=defaultIsland().scenery;scenery.grown.postoffice=[7,.5];
+ const scene=fixture({scenery,decorations:[{slot:'west',type:'tree'}]});
+ assert.equal(scene.canMove('decoration-west',7,-.25),false);
+ assert.equal(scene.canMove('decoration-west',7.5,-1),true);
+ const tree=scene.sceneryObjects.get('decoration-west');tree.position.set(7.5*1.25+3.6,0,-1.25);scene.saveScenery('decoration-west');
+ assert.equal(scene.canMove('postoffice',7.5,-.5),false);
+ scene.build(true);assert(scene.sceneryObjects.has('decoration-west'));
 });

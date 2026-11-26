@@ -593,7 +593,20 @@ export class IslandScene {
   if(!this.inBounds(id,x,z))return false;const pos=toWorld(x,z,this.grown),g=this.editable(id),building=this.buildings.has(id);
   for(const [other,obj] of this.buildings){if(other===id)continue;if(building){if(Math.hypot(obj.position.x-pos[0],obj.position.z-pos[1])<(this.layoutRules?.minDistance??2.15)*LAND_SPREAD)return false;}else{if(Math.hypot(obj.position.x-pos[0],obj.position.z-pos[1])<1.05*LAND_SPREAD)return false;const b=new THREE.Box3().setFromObject(obj);if(pos[0]>b.min.x-.32&&pos[0]<b.max.x+.32&&pos[1]>b.min.z-.32&&pos[1]<b.max.z+.32)return false;}}
   const proposed=building?new THREE.Box3().setFromObject(g):null;if(proposed)proposed.translate(new THREE.Vector3(pos[0]-g.position.x,0,pos[1]-g.position.z));
-  for(const [other,obj] of [...this.sceneryObjects,...[...this.landmarks].filter(([key])=>key==='about')]){if(other===id)continue;if(building){if(Math.hypot(obj.position.x-pos[0],obj.position.z-pos[1])<1.05*LAND_SPREAD)return false;if(obj.position.x>proposed.min.x-.25&&obj.position.x<proposed.max.x+.25&&obj.position.z>proposed.min.z-.25&&obj.position.z<proposed.max.z+.25)return false;}else if(Math.hypot(obj.position.x-pos[0],obj.position.z-pos[1])<.5*LAND_SPREAD)return false;}
+  for(const [other,obj] of [...this.sceneryObjects,...[...this.landmarks].filter(([key])=>key==='about')]){
+   if(other===id)continue;
+   if(building){if(Math.hypot(obj.position.x-pos[0],obj.position.z-pos[1])<1.05*LAND_SPREAD)return false;if(obj.position.x>proposed.min.x-.25&&obj.position.x<proposed.max.x+.25&&obj.position.z>proposed.min.z-.25&&obj.position.z<proposed.max.z+.25)return false;}
+   else{
+    // Match the rebuild clearance for decorative trees. A position accepted
+    // while dragging must not make the tree disappear on the next rebuild.
+    let clearance=.5*LAND_SPREAD;
+    if(id.startsWith('decoration-')||other.startsWith('decoration-')){
+     if(id==='postoffice'||other==='postoffice')clearance=.95;
+     if(other==='about')clearance=1.05;
+    }
+    if(Math.hypot(obj.position.x-pos[0],obj.position.z-pos[1])<clearance)return false;
+   }
+  }
   return true;
  }
  saveScenery(id){const phase=this.grown?'grown':'initial';this.scenery[phase]??={postoffice:null,trees:{}};const g=this.sceneryObjects.get(id),[lx,lz]=fromWorld(g.position.x,g.position.z,this.grown),point=[Number(lx.toFixed(6)),Number(lz.toFixed(6))];if(id==='postoffice')this.scenery[phase].postoffice=point;else{this.scenery[phase].trees??={};this.scenery[phase].trees[id]=point;}this.callbacks.scenery?.(phase,structuredClone(this.scenery[phase]));}
