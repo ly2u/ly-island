@@ -2,6 +2,7 @@ import {setupCodeBlocks} from './code-blocks.mjs?v=code-tools-v1';
 import {inPlaceClick} from './navigation.mjs';
 import {readingPositions,validRecordSlug} from './island-content.mjs';
 const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback;}catch{return fallback;}};
+let outlineSerial=0;
 function buildOutlineTree(headings,toc){
  toc.replaceChildren();
  if(!headings.length){const p=document.createElement('p');p.textContent='从这里开始阅读。';toc.append(p);return {buttons:[],groups:[],itemGroup:[]};}
@@ -45,11 +46,15 @@ function buildOutlineTree(headings,toc){
 }
 function attachTocTooltip(toc,signal){
  const tip=document.createElement('div');tip.className='toc-tooltip';tip.setAttribute('role','tooltip');tip.hidden=true;
- document.body.append(tip);
- const hide=()=>{tip.hidden=true;};
+ tip.id='reader-toc-tooltip-'+(++outlineSerial);
+ (toc.closest('dialog')||document.body).append(tip);
+ let described=null;
+ const hide=()=>{tip.hidden=true;if(described){const ids=(described.getAttribute('aria-describedby')||'').split(/\s+/).filter(id=>id&&id!==tip.id);if(ids.length)described.setAttribute('aria-describedby',ids.join(' '));else described.removeAttribute('aria-describedby');described=null;}};
  const show=button=>{
+  hide();
   if(button.scrollWidth<=button.clientWidth+1){hide();return;}
   tip.textContent=button.textContent;tip.hidden=false;
+  described=button;button.setAttribute('aria-describedby',((button.getAttribute('aria-describedby')||'')+' '+tip.id).trim());
   const r=button.getBoundingClientRect(),tw=tip.offsetWidth,th=tip.offsetHeight,gap=10;
   let left=r.left-tw-gap;
   if(left<12)left=Math.min(innerWidth-tw-12,Math.max(12,r.left));
@@ -66,10 +71,12 @@ function attachTocTooltip(toc,signal){
   const btn=event.target.closest('.toc-item');
   if(btn&&(!event.relatedTarget||!btn.contains(event.relatedTarget)))hide();
  },{signal});
+ toc.addEventListener('focusin',event=>{const btn=event.target.closest('.toc-item');if(btn&&toc.contains(btn))show(btn);},{signal});
+ toc.addEventListener('focusout',hide,{signal});
  toc.addEventListener('scroll',hide,{passive:true,signal});
- window.addEventListener('scroll',hide,{passive:true,signal});
+ window.addEventListener('scroll',hide,{passive:true,signal});toc.closest('dialog')?.addEventListener('scroll',hide,{passive:true,signal});
  window.addEventListener('resize',hide,{passive:true,signal});
- return ()=>{tip.remove();};
+ return ()=>{hide();tip.remove();};
 }
 function setupMobileTocDrawer(root,headings,onOpen,signal){
  if(!headings.length)return {close(){},dispose(){}};
@@ -77,6 +84,9 @@ function setupMobileTocDrawer(root,headings,onOpen,signal){
  if(!margin||!details)return {close(){},dispose(){}};
  const backdrop=document.createElement('div');backdrop.className='toc-fab-backdrop';backdrop.hidden=true;
  const fab=document.createElement('button');fab.type='button';fab.className='toc-fab';
+ const originalId=margin.getAttribute('id'),originalRole=margin.getAttribute('role'),originalModal=margin.getAttribute('aria-modal'),originalLabel=margin.getAttribute('aria-label');
+ if(!margin.id)margin.id='reader-toc-drawer-'+(++outlineSerial);
+ fab.setAttribute('aria-controls',margin.id);fab.setAttribute('aria-haspopup','dialog');
  fab.setAttribute('aria-label','打开文章目录');fab.setAttribute('aria-expanded','false');
  fab.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h11"/></svg>';
  const closeBtn=document.createElement('button');closeBtn.type='button';closeBtn.className='toc-drawer-close';
@@ -85,19 +95,40 @@ function setupMobileTocDrawer(root,headings,onOpen,signal){
  if(summary)summary.append(closeBtn);
  root.append(backdrop,fab);
  let opened=false;
- const setOpen=value=>{
+ const restore=(name,value)=>{if(value===null)margin.removeAttribute(name);else margin.setAttribute(name,value);};
+ const setOpen=(value,restoreFocus=true)=>{
+  const wasOpened=opened;
   opened=value;
   root.classList.toggle('toc-drawer-open',value);
   backdrop.hidden=!value;
   fab.setAttribute('aria-expanded',String(value));
   fab.setAttribute('aria-label',value?'关闭文章目录':'打开文章目录');
-  if(value){details.open=true;onOpen?.();}
+  if(value){
+   margin.setAttribute('role','dialog');margin.setAttribute('aria-modal','true');margin.setAttribute('aria-label','文章目录');
+   details.open=true;onOpen?.();
+   requestAnimationFrame(()=>{if(opened&&!signal.aborted){const active=margin.querySelector('.toc-item[aria-current=location]')||margin.querySelector('.toc-item')||closeBtn;active.focus({preventScroll:true});}});
+  }else{
+   restore('role',originalRole);restore('aria-modal',originalModal);restore('aria-label',originalLabel);
+   if(wasOpened&&restoreFocus&&fab.getClientRects().length)fab.focus({preventScroll:true});
+  }
  };
  fab.addEventListener('click',()=>setOpen(!opened),{signal});
  backdrop.addEventListener('click',()=>setOpen(false),{signal});
  closeBtn.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();setOpen(false);},{signal});
- window.addEventListener('keydown',event=>{if(event.key==='Escape'&&opened){setOpen(false);fab.focus();}},{signal});
- return {close:()=>setOpen(false),dispose(){backdrop.remove();fab.remove();closeBtn.remove();root.classList.remove('toc-drawer-open');}};
+ window.addEventListener('keydown',event=>{
+  if(!opened)return;
+  if(event.key==='Escape'){event.preventDefault();event.stopPropagation();setOpen(false);}
+  else if(event.key==='Tab'){
+   const items=[...margin.querySelectorAll('button,a[href]')].filter(e=>!e.disabled&&e.getClientRects().length);
+   const at=items.indexOf(document.activeElement);
+   if(items.length&&(at<0||event.shiftKey&&at===0||!event.shiftKey&&at===items.length-1)){event.preventDefault();items[event.shiftKey?items.length-1:0].focus();}
+  }
+ },{capture:true,signal});
+ const dialog=root.closest('dialog');dialog?.addEventListener('close',()=>setOpen(false,false),{signal});
+ const sync=()=>{
+  if(dialog?.open){const r=dialog.getBoundingClientRect();root.style.setProperty('--toc-frame-right',Math.max(18,innerWidth-r.right+18)+'px');root.style.setProperty('--toc-frame-bottom',Math.max(22,innerHeight-r.bottom+18)+'px');}
+ };
+ return {sync,close:({restoreFocus=true}={})=>setOpen(false,restoreFocus),dispose(){setOpen(false,false);backdrop.remove();fab.remove();closeBtn.remove();restore('id',originalId);root.classList.remove('toc-drawer-open','toc-compact');root.style.removeProperty('--toc-frame-right');root.style.removeProperty('--toc-frame-bottom');}};
 }
 function trackOutline(root,headings,toc,tree,scrollElement,signal){
  const {buttons,groups,itemGroup}=tree;
@@ -158,7 +189,8 @@ function trackOutline(root,headings,toc,tree,scrollElement,signal){
  for(const [index,button]of buttons.entries())button.addEventListener('click',()=>{
   forced=index;forcedUntil=Date.now()+900;manualUntil=0;
   const g=itemGroup[index]??-1;if(g>=0){manualOverrides.delete(g);activeGroup=g;applyGroups();}
-  select(index);if(matchMedia('(max-width:1024px)').matches||root.clientWidth<=680)drawer.close();
+  select(index);if(root.classList.contains('toc-compact'))drawer.close({restoreFocus:false});
+  if(!headings[index].hasAttribute('tabindex'))headings[index].setAttribute('tabindex','-1');headings[index].focus({preventScroll:true});
   headings[index].scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});queue();
  },{signal});
  for(const type of ['wheel','touchstart','pointerdown','keydown']){
@@ -166,10 +198,10 @@ function trackOutline(root,headings,toc,tree,scrollElement,signal){
   scrollElement.addEventListener(type,event=>{if(!toc.contains(event.target)){manualUntil=0;forced=null;queue();}},{passive:true,signal});
  }
  scrollElement.addEventListener('scroll',queue,{passive:true,signal});window.addEventListener('resize',queue,{passive:true,signal});root.addEventListener('load',queue,{capture:true,signal});
- let syncDetails=()=>{};if(details){const compact=matchMedia('(max-width:1024px)');let wasCompact;syncDetails=()=>{const next=compact.matches||root.clientWidth<=680;if(next!==wasCompact){if(!next){drawer.close();details.open=true;}wasCompact=next;}queue();};syncDetails();compact.addEventListener('change',syncDetails,{signal});window.addEventListener('resize',syncDetails,{passive:true,signal});details.addEventListener('toggle',queue,{signal});}
+ let syncDetails=()=>{};if(details){const compact=matchMedia('(max-width:1024px)');let wasCompact;syncDetails=()=>{const next=compact.matches||root.clientWidth<=680;root.classList.toggle('toc-compact',next);drawer.sync?.();if(next!==wasCompact){if(!next){drawer.close({restoreFocus:false});details.open=true;}wasCompact=next;}queue();};syncDetails();compact.addEventListener('change',syncDetails,{signal});window.addEventListener('resize',syncDetails,{passive:true,signal});details.addEventListener('toggle',queue,{signal});}
  const observer=window.ResizeObserver?new ResizeObserver(()=>{syncDetails();queue();}):null;observer?.observe(root.querySelector('.article-body'));observer?.observe(root);
  document.fonts?.ready.then(queue);queue();
- return {refresh:queue,dispose(){cancelAnimationFrame(frame);observer?.disconnect();removeTooltip();drawer.dispose();}};
+ return {refresh:queue,dispose(){cancelAnimationFrame(frame);observer?.disconnect();removeTooltip();drawer.dispose();root.classList.remove('toc-compact');}};
 }
 export function setupReader(root,{onBack,onFont,onRecord,onCollection,manageProgress=false,scrollElement=window,initialFont}={}){
  const controller=new AbortController(),signal=controller.signal,spread=root.querySelector('.reader-spread'),body=root.querySelector('.article-body'),toc=root.querySelector('.reader-toc');
