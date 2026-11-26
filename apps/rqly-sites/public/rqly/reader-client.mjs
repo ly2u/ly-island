@@ -80,8 +80,9 @@ function attachTocTooltip(toc,signal){
 }
 function setupMobileTocDrawer(root,headings,onOpen,signal){
  if(!headings.length)return {close(){},dispose(){}};
- const margin=root.querySelector('.reader-margin'),details=root.querySelector('.reader-outline');
- if(!margin||!details)return {close(){},dispose(){}};
+ const margin=root.querySelector('.reader-margin'),details=root.querySelector('.reader-outline'),toc=root.querySelector('.reader-toc');
+ if(!margin||!details||!toc)return {close(){},dispose(){}};
+ const detailsHidden=details.hidden;
  const backdrop=document.createElement('div');backdrop.className='toc-fab-backdrop';backdrop.hidden=true;
  const fab=document.createElement('button');fab.type='button';fab.className='toc-fab';
  const originalId=margin.getAttribute('id'),originalRole=margin.getAttribute('role'),originalModal=margin.getAttribute('aria-modal'),originalLabel=margin.getAttribute('aria-label');
@@ -91,8 +92,8 @@ function setupMobileTocDrawer(root,headings,onOpen,signal){
  fab.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h11"/></svg>';
  const closeBtn=document.createElement('button');closeBtn.type='button';closeBtn.className='toc-drawer-close';
  closeBtn.setAttribute('aria-label','关闭文章目录');closeBtn.textContent='×';
- const summary=details.querySelector('.toc-title');
- if(summary)summary.append(closeBtn);
+ const pane=document.createElement('section');pane.className='toc-drawer-content';pane.hidden=true;
+ const title=document.createElement('div');title.className='toc-drawer-title';const label=document.createElement('span');label.textContent='文章目录';title.append(label,closeBtn);pane.append(title);margin.append(pane);
  root.append(backdrop,fab);
  let opened=false;
  const restore=(name,value)=>{if(value===null)margin.removeAttribute(name);else margin.setAttribute(name,value);};
@@ -104,10 +105,12 @@ function setupMobileTocDrawer(root,headings,onOpen,signal){
   fab.setAttribute('aria-expanded',String(value));
   fab.setAttribute('aria-label',value?'关闭文章目录':'打开文章目录');
   if(value){
+   details.hidden=true;pane.hidden=false;pane.append(toc);margin.scrollTop=0;
    margin.setAttribute('role','dialog');margin.setAttribute('aria-modal','true');margin.setAttribute('aria-label','文章目录');
    details.open=true;onOpen?.();
    requestAnimationFrame(()=>{if(opened&&!signal.aborted){const active=margin.querySelector('.toc-item[aria-current=location]')||margin.querySelector('.toc-item')||closeBtn;active.focus({preventScroll:true});}});
   }else{
+   if(toc.parentElement===pane)details.append(toc);details.hidden=detailsHidden;pane.hidden=true;margin.scrollTop=0;
    restore('role',originalRole);restore('aria-modal',originalModal);restore('aria-label',originalLabel);
    if(wasOpened&&restoreFocus&&fab.getClientRects().length)fab.focus({preventScroll:true});
   }
@@ -128,7 +131,7 @@ function setupMobileTocDrawer(root,headings,onOpen,signal){
  const sync=()=>{
   if(dialog?.open){const r=dialog.getBoundingClientRect();root.style.setProperty('--toc-frame-right',Math.max(18,innerWidth-r.right+18)+'px');root.style.setProperty('--toc-frame-bottom',Math.max(22,innerHeight-r.bottom+18)+'px');}
  };
- return {sync,close:({restoreFocus=true}={})=>setOpen(false,restoreFocus),dispose(){setOpen(false,false);backdrop.remove();fab.remove();closeBtn.remove();restore('id',originalId);root.classList.remove('toc-drawer-open','toc-compact');root.style.removeProperty('--toc-frame-right');root.style.removeProperty('--toc-frame-bottom');}};
+ return {sync,close:({restoreFocus=true}={})=>setOpen(false,restoreFocus),dispose(){setOpen(false,false);backdrop.remove();fab.remove();pane.remove();restore('id',originalId);root.classList.remove('toc-drawer-open','toc-compact');root.style.removeProperty('--toc-frame-right');root.style.removeProperty('--toc-frame-bottom');}};
 }
 function trackOutline(root,headings,toc,tree,scrollElement,signal){
  const {buttons,groups,itemGroup}=tree;
