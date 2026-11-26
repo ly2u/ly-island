@@ -32,7 +32,7 @@ function buildOutlineTree(headings,toc){
    if(!currentGroup.children){
     const toggle=document.createElement('button');toggle.type='button';toggle.className='toc-toggle';
     toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-label','展开或收起子目录');
-    toggle.textContent='▸';
+    toggle.innerHTML='<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg>';
     currentGroup.head.append(toggle);
     const children=document.createElement('div');children.className='toc-children';children.hidden=true;
     currentGroup.el.append(children);
@@ -180,9 +180,11 @@ function trackOutline(root,headings,toc,tree,scrollElement,signal){
  const update=()=>{
   frame=0;if(signal.aborted||!root.isConnected||!headings.length)return;
   const view=scrollElement===window?{top:0,height:innerHeight}:scrollElement.getBoundingClientRect(),margin=root.querySelector('.reader-margin');
-  const available=Math.max(160,Math.floor(view.height-(parseFloat(getComputedStyle(margin).top)||0)-16))+'px';if(root.style.getPropertyValue('--reader-outline-height')!==available)root.style.setProperty('--reader-outline-height',available);
+  const available=Math.max(180,Math.floor(view.height-(parseFloat(getComputedStyle(margin).top)||0)-20))+'px';if(root.style.getPropertyValue('--reader-outline-height')!==available)root.style.setProperty('--reader-outline-height',available);
   if(forced!==null&&Date.now()<forcedUntil){select(forced);return;}
   forced=null;
+  const nearBottom=scrollElement===window?scrollY+innerHeight>=document.documentElement.scrollHeight-28:scrollElement.scrollTop+scrollElement.clientHeight>=scrollElement.scrollHeight-28;
+  if(nearBottom){select(headings.length-1);return;}
   const anchor=view.top+Math.min(130,view.height*.22);
   let lo=0,hi=headings.length;while(lo<hi){const mid=(lo+hi)>>1;if(headings[mid].getBoundingClientRect().top<=anchor)lo=mid+1;else hi=mid;}
   select(Math.max(0,lo-1));
@@ -220,16 +222,26 @@ export function setupReader(root,{onBack,onFont,onRecord,onCollection,manageProg
   if(target.hasAttribute('data-reader-back')||target.hasAttribute('data-reader-end')){if(onBack){event.preventDefault();onBack();}}
   if(target.dataset.readerCollection&&onCollection){event.preventDefault();onCollection(target.dataset.readerCollection);}
   if(target.dataset.readerRecord&&onRecord){event.preventDefault();onRecord(target.dataset.readerRecord,target.dataset.readerRoom);}
-  if(target.hasAttribute('data-reader-share')){event.preventDefault();const slug=root.dataset.readerSlug;if(!validRecordSlug(slug)||root.dataset.readerPreview==='true')return;Promise.resolve().then(()=>navigator.clipboard.writeText(new URL('/notes/'+encodeURIComponent(slug),location.origin).href)).then(()=>{target.textContent='阅读链接已复制';}).catch(()=>{target.textContent='可使用独立文章页地址分享';});}
+  if(target.hasAttribute('data-reader-share')){event.preventDefault();const slug=root.dataset.readerSlug;if(!validRecordSlug(slug)||root.dataset.readerPreview==='true')return;const original=target.dataset.label||(target.dataset.label=target.textContent);Promise.resolve().then(()=>navigator.clipboard.writeText(new URL('/notes/'+encodeURIComponent(slug),location.origin).href)).then(()=>{target.textContent='已复制链接 ✓';setTimeout(()=>{if(!signal.aborted)target.textContent=original;},2200);}).catch(()=>{target.textContent='请复制地址栏链接';});}
+  if(target.hasAttribute('data-reader-native-share')){event.preventDefault();const slug=root.dataset.readerSlug;if(!validRecordSlug(slug)||root.dataset.readerPreview==='true'||typeof navigator.share!=='function')return;navigator.share({title:document.title,url:new URL('/notes/'+encodeURIComponent(slug),location.origin).href}).catch(()=>{});}
  },{signal});
+ const nativeShare=root.querySelector('[data-reader-native-share]');
+ if(nativeShare&&typeof navigator.share==='function')nativeShare.hidden=false;
  const slug=root.dataset.readerSlug,preview=root.dataset.readerPreview==='true';
+ let sidebarProgress=null;
  if(manageProgress&&!preview&&validRecordSlug(slug)){
+  const sidebarMount=document.body.classList.contains('reader-page')?document.querySelector('.header .primary-menu-content'):null;
+  if(sidebarMount){
+   sidebarProgress=document.createElement('div');sidebarProgress.className='sidebar-reading-progress';sidebarProgress.setAttribute('aria-label','阅读进度');
+   sidebarProgress.innerHTML='<div class="sidebar-reading-head"><span>阅读进度</span><strong class="reader-progress-label">0%</strong></div><span class="reading-track"><span class="reading-fill"></span></span>';
+   sidebarMount.append(sidebarProgress);
+  }
   const entries=readingPositions(read('ly-island-reading-v1',{})),saved=entries[slug];
   const flush=()=>{clearTimeout(timer);try{const current=readingPositions(read('ly-island-reading-v1',{}));current[slug]=entries[slug];localStorage.setItem('ly-island-reading-v1',JSON.stringify(readingPositions(current)));}catch{}};
-  const update=()=>{const max=scrollElement===window?document.documentElement.scrollHeight-innerHeight:scrollElement.scrollHeight-scrollElement.clientHeight,top=scrollElement===window?scrollY:scrollElement.scrollTop,ratio=max>5?Math.max(0,Math.min(1,top/max)):1;entries[slug]={ratio,updated:Date.now(),room:root.dataset.room};const label=root.querySelector('.reader-progress-label'),fill=root.querySelector('.reading-fill');if(label)label.textContent=Math.round(ratio*100)+'%';if(fill)fill.style.width=ratio*100+'%';clearTimeout(timer);timer=setTimeout(flush,150);};
+  const update=()=>{const max=scrollElement===window?document.documentElement.scrollHeight-innerHeight:scrollElement.scrollHeight-scrollElement.clientHeight,top=scrollElement===window?scrollY:scrollElement.scrollTop,ratio=max>5?Math.max(0,Math.min(1,top/max)):1;entries[slug]={ratio,updated:Date.now(),room:root.dataset.room};const pct=Math.round(ratio*100)+'%';for(const box of [sidebarProgress,root].filter(Boolean)){const label=box.querySelector('.reader-progress-label'),fill=box.querySelector('.reading-fill');if(label)label.textContent=pct;if(fill)fill.style.width=ratio*100+'%';}clearTimeout(timer);timer=setTimeout(flush,150);};
   scrollElement.addEventListener('scroll',update,{passive:true,signal});window.addEventListener('pagehide',()=>{update();flush();},{signal});
   let interacted=false;for(const type of ['wheel','touchstart','pointerdown','keydown'])window.addEventListener(type,()=>{interacted=true;},{passive:true,signal,once:true});
   requestAnimationFrame(async()=>{if(saved&&!location.hash){await Promise.race([document.fonts?.ready||Promise.resolve(),new Promise(resolve=>setTimeout(resolve,750))]);await new Promise(resolve=>requestAnimationFrame(resolve));if(signal.aborted)return;if(!interacted){const max=document.documentElement.scrollHeight-innerHeight;window.scrollTo(0,saved.ratio*Math.max(0,max));}}update();});
  }
- return {setFont,dispose(){controller.abort();outline.dispose();codeTools.dispose();clearTimeout(timer);}};
+ return {setFont,dispose(){controller.abort();outline.dispose();codeTools.dispose();sidebarProgress?.remove();clearTimeout(timer);}};
 }

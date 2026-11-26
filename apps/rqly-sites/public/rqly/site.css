@@ -19,8 +19,14 @@
 :root{--ink:#1c2420;--muted:#5c665f;--line:#1c242017;--accent:#2f5d48;--surface:#fcfbf7;--serif:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong",Georgia,serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 body{background:#f5f4ee;color:var(--ink);position:relative}
 body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.026;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
-.header{position:relative;z-index:25}main,.footer{position:relative;z-index:1}
-@media(min-width:1025px){body{max-width:1160px;grid-template-columns:208px minmax(0,1fr);column-gap:68px}.header{padding-right:28px;border-right:1px solid rgba(28,36,32,.08)}}
+.header{z-index:25}main,.footer{position:relative;z-index:1}
+@media(min-width:1025px){body{max-width:1160px;grid-template-columns:208px minmax(0,1fr);column-gap:68px}.header{position:sticky;top:36px;align-self:start;min-height:auto;max-height:calc(100dvh - 72px);overflow-y:auto;padding-right:28px;border-right:1px solid rgba(28,36,32,.08)}.primary-menu-content{min-height:auto}}
+.sidebar-reading-progress{margin-top:26px;padding:18px 0 0 14px;border-top:1px solid rgba(28,36,32,.08)}
+.sidebar-reading-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:11.5px;color:#68726b}
+.sidebar-reading-head strong{font:500 12px/1 var(--mono);font-variant-numeric:tabular-nums;color:#17201b}
+.sidebar-reading-progress .reading-track{display:block;width:100%;height:3px;margin-top:10px;border-radius:999px;background:rgba(28,36,32,.09);overflow:hidden}
+.sidebar-reading-progress .reading-fill{display:block;height:100%;width:0;border-radius:999px;background:#2f5d48;transition:width .12s linear}
+@media(max-width:1024px){.header{position:relative;z-index:25}.sidebar-reading-progress{display:none}}
 .brand{gap:16px}
 .brand-mark{width:48px;height:48px;border-radius:10px;background:#fcfbf7;border:1px solid rgba(28,36,32,.18);box-shadow:inset 0 0 0 3px #fcfbf7,inset 0 0 0 4px rgba(28,36,32,.1),0 2px 8px rgba(28,36,32,.04);color:#17201b;font:500 19px/1 var(--serif);letter-spacing:.04em}
 .brand-dot{right:6px;bottom:6px;width:5px;height:5px;border:0;background:#2f5d48}
