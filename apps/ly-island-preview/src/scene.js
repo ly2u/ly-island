@@ -543,7 +543,7 @@ export class IslandScene {
   const postalCandidates=[[-2.6,4.3],[3.9,3.3],[-4.45,2.4],[-4.5,-.6]].map(spread);
   const postalClearance=p=>Math.min(clearance(p),Math.hypot(p[0]-spot[0],p[1]-spot[1])-1.1);
   const postalDefault=postalCandidates.find(p=>postalClearance(p)>.8)||[...postalCandidates].sort((a,b)=>postalClearance(b)-postalClearance(a))[0];
-  const postalSpot=Array.isArray(scenery.postoffice)&&this.inBounds('postoffice',...scenery.postoffice)?spread(scenery.postoffice):postalDefault;
+  const postalSpot=Array.isArray(scenery.postoffice)&&this.inBounds('postoffice',...scenery.postoffice)?toWorld(...scenery.postoffice,grown):postalDefault;
   const mailbox=new THREE.Group();mailbox.position.set(postalSpot[0],.1,postalSpot[1]);mailbox.scale.setScalar(.65);mailbox.userData.building='postoffice';this.world.add(mailbox);this.heightMap.set('postoffice',postBox(mailbox,grown));this.landmarks.set('postoffice',mailbox);this.sceneryObjects.set('postoffice',mailbox);mailbox.userData.editable='postoffice';
   const nature=new THREE.Group();this.world.add(nature);
   const trees=[[-4,-1.8,1.8],[-4.45,.2,1.2],[-3.55,-3.2,2],[-2.4,-3.5,1.1],[1.55,-3.55,1.5],[3.15,-2.9,1.9],[4.3,-.3,1.45],[3.85,2.65,1.1],[-3.8,2.6,1.2],[-.4,3.1,.9]];
@@ -570,7 +570,7 @@ export class IslandScene {
   const terrace=new THREE.Group();terrace.position.set(-1.6*LAND_SPREAD,.15,3.5*LAND_SPREAD);nature.add(terrace);
   box(terrace,1.1,.1,.85,color.timber);for(let i=0;i<7;i++)box(terrace,.055,.02,.82,color.path,-.5+i*.15,.065,0);
   for(const x of [-.47,.47]){bar(terrace,[x,.1,-.35],[x,.6,-.35],.025,color.frame);bar(terrace,[x,.1,.35],[x,.6,.35],.025,color.frame);}bar(terrace,[-.47,.6,.35],[.47,.6,.35],.025,color.frame);
-  for(const item of this.decorations){const point=this.decorationSlots[item.slot]?.point;if(!point)continue;const id='decoration-'+item.slot;const [x,z]=spread(item.type==='tree'?(scenery.trees?.[id]??point):point);if([...this.buildings.values()].some(g=>Math.hypot(g.position.x-x,g.position.z-z)<1.4)||Math.hypot(keeper.position.x-x,keeper.position.z-z)<1.05||Math.hypot(mailbox.position.x-x,mailbox.position.z-z)<.95)continue;const group=new THREE.Group();group.userData.decoration=item.slot;group.position.set(x,0,z);nature.add(group);({tree:(p,x,z)=>tree(p,x,z,1.35,1),bench,lamp}[item.type])?.(group,0,0);if(item.type==='tree'){group.userData.editable=id;this.sceneryObjects.set(id,group);}}
+  for(const item of this.decorations){const point=this.decorationSlots[item.slot]?.point;if(!point)continue;const id='decoration-'+item.slot;const [x,z]=toWorld(...(item.type==='tree'?(scenery.trees?.[id]??point):point),grown);if([...this.buildings.values()].some(g=>Math.hypot(g.position.x-x,g.position.z-z)<1.4)||Math.hypot(keeper.position.x-x,keeper.position.z-z)<1.05||Math.hypot(mailbox.position.x-x,mailbox.position.z-z)<.95)continue;const group=new THREE.Group();group.userData.decoration=item.slot;group.position.set(x,0,z);nature.add(group);({tree:(p,x,z)=>tree(p,x,z,1.35,1),bench,lamp}[item.type])?.(group,0,0);if(item.type==='tree'){group.userData.editable=id;this.sceneryObjects.set(id,group);}}
   this.pathsDirty=true;this.rebuildPaths();
   this.canvas.dataset.decorations=String(this.decorations.length);this.clouds=[];
   const cloudSpots=[[-8,-1.8,1.8,1.2],[4,-3.2,6.6,1.15],[9,-1.6,-4.3,1],[-1,-4,-6,1.3]];
@@ -601,10 +601,12 @@ export class IslandScene {
   if(this.paths){this.paths.traverse(o=>{if(o.isMesh)o.geometry.dispose();});this.world.remove(this.paths);}this.paths=new THREE.Group();this.world.add(this.paths);this.pathsDirty=false;
   const boxes=[...this.buildings.values()].map(g=>new THREE.Box3().setFromObject(g)),trees=[...this.sceneryObjects].filter(([id])=>id!=='postoffice').map(([,g])=>[g.position.x,g.position.z]);const blocked=([x,z])=>boxes.some(b=>x>b.min.x-.12&&x<b.max.x+.12&&z>b.min.z-.12&&z<b.max.z+.12)||trees.some(p=>Math.hypot(x-p[0],z-p[1])<.28);
   const satX=9*LAND_SPREAD+SATELLITE_GAP,satZ=.5*LAND_SPREAD;
-  const inside=([x,z])=>this.inBounds('postoffice',x/LAND_SPREAD,z/LAND_SPREAD)||(this.grown&&((((x-satX)/(2.45*LAND_SPREAD))**2+((z-satZ)/(2.32*LAND_SPREAD))**2)<=1||(x>=7.8&&x<=12.1&&Math.abs(z-satZ)<.55)));
+  // Keep a walkable rim on the larger satellite's grass top around the new
+  // gallery terrace. The old inset leaves no route around its front corner.
+  const inside=([x,z])=>this.inBounds('postoffice',x/LAND_SPREAD,z/LAND_SPREAD)||(this.grown&&((((x-satX)/(2.55*LAND_SPREAD))**2+((z-satZ)/(2.43*LAND_SPREAD))**2)<=1||(x>=7.8&&x<=12.1&&Math.abs(z-satZ)<.55)));
   const drawn=new Set(),draw=(points,width)=>{for(let i=1;i<points.length;i++){const a=points[i-1],b=points[i],distance=Math.hypot(b[0]-a[0],b[1]-a[1]),count=Math.max(1,Math.ceil(distance/.44));for(let j=0;j<count;j++){const t=j/count,x=a[0]+(b[0]-a[0])*t,z=a[1]+(b[1]-a[1])*t,key=x.toFixed(3)+','+z.toFixed(3);if(drawn.has(key))continue;drawn.add(key);const stone=box(this.paths,width,.045,.32,color.path,x,.13,z);stone.rotation.y=Math.atan2(b[0]-a[0],b[1]-a[1]);}}if(points.length){const [x,z]=points.at(-1);const key=x.toFixed(3)+','+z.toFixed(3);if(!drawn.has(key)){drawn.add(key);box(this.paths,width,.045,.32,color.path,x,.13,z);}}};
   const hub=[[-.2,1.4],[0,0],[1.2,.1],[-1.2,.3]].map(spread).find(p=>!blocked(p))??spread([0,0]);const ends={};
-  const connect=(id,g,offset,approach,start=hub)=>{const end=[g.position.x+offset[0],g.position.z+offset[1]],front=[end[0],end[1]+approach],points=routePath(start,front,{inside,blocked});if(points.length)draw([...points,end],id==='postoffice'?.35:.44);ends[id]={point:end,connected:points.length>0};};
+  const connect=(id,g,offset,approach,start=hub)=>{const end=[g.position.x+offset[0],g.position.z+offset[1]],front=[end[0],end[1]+approach],points=routePath(start,front,{inside,blocked,...this.grown&&id==='projects'?{step:.15}:{}});if(points.length)draw([...points,end],id==='postoffice'?.35:.44);ends[id]={point:end,connected:points.length>0};};
   for(const [id,offset] of [['library',[.6,1.55]],['projects',[.95,1.55]],['workshop',[-.28,1.5]]])connect(id,this.buildings.get(id),offset,.5,this.grown&&id==='projects'?[11.9,satZ]:hub);
   connect('postoffice',this.landmarks.get('postoffice'),[0,.42],.42);
   if(this.grown){const p=routePath(hub,[8.15,satZ],{inside,blocked});draw(p,.44);}
